@@ -2140,23 +2140,25 @@ function GrowinStones() {
     setEquip({ ...p.equip });
   };
 
-  // ————— Tema (creme / carvão) —————
+  // ————— Tema Tom sobre Tom (Duotone Sidebar) —————
   const T = dark
     ? {
-        bg: "#151310", surface: "#1e1b17", surface2: "#26221d", inset: "#12100d",
-        border: "#37322a", borderSoft: "#2c2822",
+        bg: "#141210", surface: "#1c1916", surface2: "#26221d", inset: "#110f0d",
+        border: "#37322a", borderSoft: "#2a2620",
         text: "#ece5d8", muted: "#a89f90", faint: "#6e675c",
-        brand: "#e9dfc9", accentBg: "#2e2a23", accentBorder: "#57503f",
+        brand: "#d97706", accentBg: "#2e2a23", accentBorder: "#57503f",
+        sidebarBg: "#1c1916", sidebarBorder: "#37322a", sidebarText: "#ece5d8", sidebarActiveBg: "#29241f",
         pipe: "#c8bda4", pipeReturn: "#8a9a7b",
         potFill: "#3b422f", potStroke: "#76856a", potNum: "#cdd6bd",
         tank: "#3d4a4a", tankStroke: "#6b7d7d",
         pump: "#4a4f5c", pumpStroke: "#7d84a0",
       }
     : {
-        bg: "#f7f3ea", surface: "#fffdf8", surface2: "#f1ece0", inset: "#efe9db",
-        border: "#e0d9c8", borderSoft: "#e9e3d4",
-        text: "#1f1b16", muted: "#7a7263", faint: "#a89f8d",
-        brand: "#1f1b16", accentBg: "#ece5d4", accentBorder: "#c9bfa8",
+        bg: "#f7f4ed", surface: "#efebe2", surface2: "#e4dec6", inset: "#e9e3d3",
+        border: "#d8cfbe", borderSoft: "#e2d9c8",
+        text: "#292524", muted: "#78716c", faint: "#a89f8d",
+        brand: "#b45309", accentBg: "#e4dec6", accentBorder: "#d8cfbe",
+        sidebarBg: "#efebe2", sidebarBorder: "#d8cfbe", sidebarText: "#292524", sidebarActiveBg: "#e4dec6",
         pipe: "#3a352c", pipeReturn: "#6b7d55",
         potFill: "#dde3d0", potStroke: "#7e8c6d", potNum: "#3f4a33",
         tank: "#c4d2d0", tankStroke: "#6f8280",
@@ -3615,28 +3617,32 @@ function GrowinStones() {
       >
         {/* Top Header Sidebar */}
         <div>
-          <div className="flex items-center justify-between mb-6 px-1">
-            {!sidebarCollapsed && (
-              <div className="flex items-center gap-2">
-                <Logo height={30} color={T.brand} />
+          {/* Linha 1: LOGO (Expandido ou Ícone Colapsado) */}
+          <div className="flex items-center justify-center mb-3 min-h-[34px] px-1">
+            {!sidebarCollapsed ? (
+              <div className="w-full flex items-center justify-start">
+                <Logo height={28} color={T.brand} />
               </div>
-            )}
-            {sidebarCollapsed && (
+            ) : (
               <div className="mx-auto flex items-center justify-center py-1" title="GrowinStones">
-                <svg xmlns="http://www.w3.org/2000/svg" id="Layer_1" version="1.1" viewBox="0 0 128.38 168.24" className="w-6 h-7 text-amber-500 fill-current">
+                <svg xmlns="http://www.w3.org/2000/svg" id="Layer_1" version="1.1" viewBox="0 0 128.38 168.24" className="w-6 h-7 fill-current" style={{ color: T.text }}>
                   <g id="H8AvKh">
                     <path d="M105.41,132.58h0v-6.99c0-1.28-2.1-6.84-2.8-8.28-9.04-18.66-35.46-16.44-46.77-1.28-8.66,11.62-11.28,28.4-1.03,39.92,4.68,5.26,14.22,5.98,19.27,11.34-12.46-4.63-25.99-6.6-39.04-3.13-3.7.98-7.09,2.67-10.61,4.09,3.87-4.86,10.57-7.39,16.47-8.84,2.4-.59,5.07-.56,7.42-1.27.36-.11,1.04.17.69-.73-.77-1.95-4.69-5.72-5.21-7.85-.23-.96.47-3.61.26-5.52-.23-2.2-1.08-4.46-2.51-6.16-.08,1.62,1.01,2.79,1.21,4.58.18,1.6.15,4.43-.32,5.95-.82,2.64-5.54,5.32-7.34,2.67-2.77-7.38-10.82-24.23-20.3-14.4-.78.81-1,2.23-1.93,2.65.44-6.95,3.82-10.96,11.08-10.36-14.91-13.69-32.89-36.11-18.91-56.52,2.91-4.25,7.54-8.59,12.16-10.74.35-1.35-1.03-.98-1.9-1.7-4.97-4.14-4.29-10.9.45-14.93,5.07-4.32,22.25-8.78,21.68-16.81-.37-5.16-6.82-9.45-10.11-12.83,5.83-.32,11.59-.93,17.35.47-4.38-3.95-9.1-8.34-10.12-14.46,2.56,1.92,5.15,2.62,8.14,1.15C43.57,2.16,45.5-.14,45.63,0c.09.09.24.98.71,1.46,3.46,3.58,7.67,4.6,11.83,1.43.77,6.44,5.19,8.59,11.09,6.27.27,4.65,4.54,6.42,8.68,6.51-5.68,6.06-14.25,7.98-22.17,5.55.94,2.04,1.87,3.69,2.53,5.9,5.31,17.77-5.14,31.41-10.11,47.02-1.96,6.16-4.79,17.48,3.95,19.4l4.59-1.71c-1.7,3.18-2.99,6.24-6.09,8.37l-3.54,1.51c11.16-.98,11.28-14,13.63-22.27,10.65-37.52,58.19-30.79,66.06,5.98,5.93,27.7-5.06,55.06-27.15,71.96-.38.29-.93,1.3-1.44.49,15.59-14.76,26.98-40.3,19.17-61.59-6.76-18.42-26.04-20.48-42.79-15.29-.12.85,1.09.48,1.62.42,8.12-.88,14.38-1.86,22.46.8,19.21,6.33,19.5,29.87,14.34,46.12-2.21,6.94-5.72,13.63-9.75,19.66l4.82-13.01c2.63-10.65,2.02-23.1-4.19-32.45-7.57-11.41-20.6-12.86-31.72-5.39,2.42-.09,4.53-1.5,7.13-2.03,20.41-4.14,28.54,15.88,27.11,32.9l-.98,4.56h0ZM43.07,25.01c3.28,1.09,4.4-3.78,1.25-4.21-2.39-.32-3.41,3.49-1.25,4.21ZM22.99,61.22h0c-.11.85,1.09.45,1.68.48,14.78.66,19.8-12.51,20.97-25.06l-3.76,11.42c-3.63,7.73-10.07,12.93-18.89,13.17h0ZM13.35,81.47c-2.92,12.71-2,26.63,8.67,35.44,4.55,3.75,11.46,6.93,17.37,7.22-10.19-3.37-18.92-9.63-23.23-19.68-.96-2.24-2.81-7.47-2.81-9.72,0-3.61-.21-7.53,0-11.09,0-.33,1.27-2.07,0-2.17Z" />
                   </g>
                 </svg>
               </div>
             )}
+          </div>
+
+          {/* Linha 2 (ABAIXO DA LINHA DO LOGO): Botão de Colapsar */}
+          <div className="flex items-center justify-center mb-4 px-1">
             <button
               onClick={() => setSidebarCollapsed((c) => !c)}
-              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors text-xs font-bold shrink-0"
-              style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.textMuted }}
+              className="w-full py-1.5 rounded-xl flex items-center justify-center transition-all text-xs font-bold"
+              style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}
               title={sidebarCollapsed ? "Expandir Menu" : "Recolher Menu"}
             >
-              {sidebarCollapsed ? "→" : "←"}
+              {sidebarCollapsed ? "→" : "← Recolher Menu"}
             </button>
           </div>
 
@@ -3646,95 +3652,58 @@ function GrowinStones() {
               href={`https://${currentUser?.username}.thegrowinstones.com`}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-between px-3 py-2 rounded-xl mb-6 text-xs font-mono transition-opacity hover:opacity-85"
-              style={{ background: dark ? "rgba(16,185,129,0.1)" : "#ecfdf5", border: "1px solid #10b981", color: "#10b981" }}
+              className="flex items-center justify-between px-3 py-2 rounded-xl mb-5 text-xs font-mono transition-opacity hover:opacity-85"
+              style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
             >
               <span className="truncate">https://{currentUser?.username}.grow...</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse"></span>
+              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse"></span>
             </a>
           )}
-
-          {/* Menu Items com Ícones Vetoriais Monocromáticos */}
+{/* Menu Items com Ícones Vetoriais Monocromáticos */}
           <nav className="space-y-1.5">
-            <button
-              onClick={() => setActiveTab("configurator")}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === "configurator" ? "shadow-sm" : "hover:opacity-80"}`}
-              style={{
-                background: activeTab === "configurator" ? (dark ? "#0284c7" : "#0369a1") : T.surface2,
-                color: activeTab === "configurator" ? "#ffffff" : T.text
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>
-              </svg>
-              {!sidebarCollapsed && <span>Configurador de Grow</span>}
-            </button>
-
-            <button
-              onClick={() => setActiveTab("my_grows")}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === "my_grows" ? "shadow-sm" : "hover:opacity-80"}`}
-              style={{
-                background: activeTab === "my_grows" ? (dark ? "#0284c7" : "#0369a1") : T.surface2,
-                color: activeTab === "my_grows" ? "#ffffff" : T.text
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                <path d="M12 22v-9"/><path d="M12 13a6 6 0 0 1 6-6c0 6-6 6-6 6z"/><path d="M12 13a6 6 0 0 0-6-6c0 6 6 6 6 6z"/>
-              </svg>
-              {!sidebarCollapsed && (
-                <div className="flex items-center justify-between w-full">
-                  <span>Meus Grows</span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400 font-bold">LIVE</span>
-                </div>
+            {[
+              { id: "configurator", label: "Configurador de Grow", icon: (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
+              )},
+              { id: "my_grows", label: "Meus Grows", badge: "LIVE", icon: (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M12 22v-9"/><path d="M12 13a6 6 0 0 1 6-6c0 6-6 6-6 6z"/><path d="M12 13a6 6 0 0 0-6-6c0 6 6 6 6 6z"/></svg>
+              )},
+              { id: "comparison", label: "Comparar Setups", icon: (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              )},
+              { id: "mqtt", label: "Telemetria ESP32", badge: "MQTT", icon: (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>
+              )},
+              { id: "settings", label: "Configurações", icon: (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
               )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab("comparison")}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === "comparison" ? "shadow-sm" : "hover:opacity-80"}`}
-              style={{
-                background: activeTab === "comparison" ? (dark ? "#0284c7" : "#0369a1") : T.surface2,
-                color: activeTab === "comparison" ? "#ffffff" : T.text
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
-              </svg>
-              {!sidebarCollapsed && <span>Comparar Setups</span>}
-            </button>
-
-            <button
-              onClick={() => setActiveTab("mqtt")}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === "mqtt" ? "shadow-sm" : "hover:opacity-80"}`}
-              style={{
-                background: activeTab === "mqtt" ? (dark ? "#0284c7" : "#0369a1") : T.surface2,
-                color: activeTab === "mqtt" ? "#ffffff" : T.text
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                <rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/>
-              </svg>
-              {!sidebarCollapsed && (
-                <div className="flex items-center justify-between w-full">
-                  <span>Telemetria ESP32</span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-sky-500/20 text-sky-400 font-bold font-mono">MQTT</span>
-                </div>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab("settings")}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === "settings" ? "shadow-sm" : "hover:opacity-80"}`}
-              style={{
-                background: activeTab === "settings" ? (dark ? "#0284c7" : "#0369a1") : T.surface2,
-                color: activeTab === "settings" ? "#ffffff" : T.text
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-              </svg>
-              {!sidebarCollapsed && <span>Configurações</span>}
-            </button>
+            ].map((item) => {
+              const active = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${active ? "shadow-sm" : "hover:opacity-85"}`}
+                  style={{
+                    background: active ? T.sidebarActiveBg : "transparent",
+                    color: active ? T.text : T.muted,
+                    border: active ? `1px solid ${T.border}` : "1px solid transparent"
+                  }}
+                >
+                  {item.icon}
+                  {!sidebarCollapsed && (
+                    <div className="flex items-center justify-between w-full">
+                      <span>{item.label}</span>
+                      {item.badge && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}>
+                          {item.badge}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </nav>
         </div>
 
@@ -3743,7 +3712,7 @@ function GrowinStones() {
           {!sidebarCollapsed ? (
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0" style={{ background: "#0284c7" }}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0" style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}>
                   {currentUser?.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
