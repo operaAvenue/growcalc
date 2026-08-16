@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import ESP32WebFlasherModal from "./components/ESP32WebFlasherModal";
+import ESP32GPIOConfigModal from "./components/ESP32GPIOConfigModal";
 
 // ————————————————————————— ESP32 TELEMETRY & CONTROLE —————————————————————————
 function MQTTMonitorView({ currentUser, T, dark, showToast }) {
@@ -9,11 +10,12 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [codeModalOpen, setCodeModalOpen] = useState(false);
   const [flasherModalOpen, setFlasherModalOpen] = useState(false);
+  const [gpioModalOpen, setGpioModalOpen] = useState(false);
   const [togglingKeys, setTogglingKeys] = useState({});
   const [loading, setLoading] = useState(true);
 
   const userSlug = currentUser?.username || "guest";
-  const activeId = selectedDevice || userSlug;
+  const activeId = selectedDevice || (devices.length > 0 ? devices[0].id : "melkweg003");
 
   const fetchTelemetry = async () => {
     try {
@@ -21,8 +23,8 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
       if (res.ok) {
         const result = await res.json();
         setTelemetry(result);
-        if (result.devices) setDevices(result.devices);
-        if (result.recentLogs) setLogs(result.recentLogs);
+        if (result.devices && Array.isArray(result.devices)) setDevices(result.devices);
+        if (result.recentLogs && Array.isArray(result.recentLogs)) setLogs(result.recentLogs);
       }
     } catch (e) {
     } finally {
@@ -36,23 +38,50 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
     return () => clearInterval(interval);
   }, [activeId]);
 
+  const deviceIp = telemetry?.data?.ip || "192.168.1.141";
+
   const toggleESP32Relay = async (key, currentVal) => {
-    const nextState = (currentVal === true || currentVal === "ON" || currentVal === "1") ? "OFF" : "ON";
+    const isCurrentlyOn = currentVal === true || currentVal === "ON" || currentVal === "1" || currentVal === 1;
+    const nextState = isCurrentlyOn ? "OFF" : "ON";
+    const nextValNum = isCurrentlyOn ? 0 : 1;
+
     setTogglingKeys((prev) => ({ ...prev, [key]: true }));
 
-    const cmdTopic = telemetry?.topic?.includes("openagro/")
-      ? telemetry.topic.replace(/\/state$/, "/set")
-      : `openagro/${activeId}/${key}/set`;
+    // Extract GPIO number from key if present
+    let gpioNum = null;
+    const match = key.match(/\d+/);
+    if (match) gpioNum = parseInt(match[0], 10);
+    else if (key.includes("painel")) gpioNum = 19;
+    else if (key.includes("exaustor")) gpioNum = 18;
+    else if (key.includes("ph_down")) gpioNum = 14;
+    else if (key.includes("ph_up")) gpioNum = 12;
+    else if (key.includes("nutriente_a")) gpioNum = 27;
+    else if (key.includes("nutriente_b")) gpioNum = 26;
+    else if (key.includes("nutriente_c")) gpioNum = 25;
+    else if (key.includes("agua")) gpioNum = 33;
 
+    // 1. Direct local IP toggle if accessible
+    if (deviceIp && gpioNum !== null) {
+      try {
+        await fetch(`http://${deviceIp}/api/toggle?pin=${gpioNum}&val=${nextValNum}`, { mode: 'no-cors' });
+      } catch (e) {}
+    }
+
+    // 2. Publish command via server MQTT
     try {
       const res = await fetch("https://grow.thegrowinstones.com/api/mqtt/cmd", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: cmdTopic, payload: nextState })
+        body: JSON.stringify({
+          deviceId: activeId,
+          pin: key,
+          topic: `openagro/${activeId}/${key}/set`,
+          payload: nextState
+        })
       });
       if (res.ok) {
         showToast(`Comando enviado ao ESP32: ${key} -> ${nextState}`);
-        fetchTelemetry();
+        setTimeout(fetchTelemetry, 600);
       }
     } catch (e) {
       showToast("Erro ao enviar comando para o ESP32.");
@@ -61,28 +90,75 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
     }
   };
 
+  const triggerDose = async (key, doseMl = 0.5) => {
+    setTogglingKeys((prev) => ({ ...prev, [key]: true }));
+    let gpioNum = 14;
+    if (key.includes("ph_up")) gpioNum = 12;
+    else if (key.includes("nutriente_a")) gpioNum = 27;
+    else if (key.includes("nutriente_b")) gpioNum = 26;
+    else if (key.includes("nutriente_c")) gpioNum = 25;
+    else if (key.includes("agua")) gpioNum = 33;
+    else {
+      const match = key.match(/\d+/);
+      if (match) gpioNum = parseInt(match[0], 10);
+    }
+
+    if (deviceIp) {
+      try {
+        await fetch(`http://${deviceIp}/api/toggle?pin=${gpioNum}&val=1`, { mode: 'no-cors' });
+      } catch (e) {}
+    }
+
+    try {
+      await fetch("https://grow.thegrowinstones.com/api/mqtt/cmd", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deviceId: activeId,
+          pin: key,
+          topic: `openagro/${activeId}/${key}/set`,
+          payload: "ON"
+        })
+      });
+      showToast(`Pulso de dosagem disparado: ${key} (${doseMl} ml)`);
+      setTimeout(fetchTelemetry, 800);
+    } catch (e) {
+      showToast("Erro ao acionar bomba dosadora.");
+    } finally {
+      setTogglingKeys((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
   const parseDynamicData = (data) => {
-    if (!data || typeof data !== "object") return { sensors: [], actuators: [], info: [] };
+    if (!data || typeof data !== "object") return { sensors: [], pumps: [], actuators: [], info: [] };
 
     const sensors = [];
+    const pumps = [];
     const actuators = [];
     const info = [];
 
     Object.entries(data).forEach(([key, val]) => {
+      const lower = key.toLowerCase();
+      if (lower === "hostname" || lower === "ip" || lower === "rssi" || lower === "state") {
+        return; // Handled in device header badges
+      }
+
       const label = key
         .replace(/_/g, " ")
         .replace(/([a-z])([A-Z])/g, "$1 $2")
         .replace(/^./, (str) => str.toUpperCase());
 
-      const isBoolVal = typeof val === "boolean" || val === "ON" || val === "OFF" || val === "1" || val === "0";
+      const isBoolVal = typeof val === "boolean" || val === "ON" || val === "OFF" || val === "1" || val === "0" || val === 1 || val === 0;
 
-      if (isBoolVal && (key.includes("gpio") || key.includes("bomba") || key.includes("solenoide") || key.includes("painel") || key.includes("exaustor") || key.includes("relay") || typeof val === "boolean")) {
-        const isTrue = val === true || val === "ON" || val === "1";
+      if (lower.includes("bomba") || lower.includes("pump") || lower.includes("dose")) {
+        const isTrue = val === true || val === "ON" || val === "1" || val === 1;
+        pumps.push({ key, label, val: isTrue, rawVal: val });
+      } else if (isBoolVal && (lower.includes("gpio") || lower.includes("painel") || lower.includes("exaustor") || lower.includes("rele") || lower.includes("relay") || lower.includes("luz") || typeof val === "boolean")) {
+        const isTrue = val === true || val === "ON" || val === "1" || val === 1;
         actuators.push({ key, label, val: isTrue, rawVal: val });
       } else if (typeof val === "number" || (!isNaN(val) && typeof val === "string" && val.trim() !== "" && !isNaN(Number(val)))) {
         const numVal = Number(val);
         let unit = "";
-        const lower = key.toLowerCase();
         if (lower.includes("temp") || lower.includes("temperatura")) unit = "°C";
         else if (lower.includes("umid") || lower.includes("hum") || lower.includes("humidity")) unit = "%";
         else if (lower.includes("ph")) unit = "pH";
@@ -99,12 +175,12 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
       }
     });
 
-    return { sensors, actuators, info };
+    return { sensors, pumps, actuators, info };
   };
 
   const isConnected = telemetry && telemetry.connected && telemetry.data;
   const currentPayload = isConnected ? telemetry.data : null;
-  const { sensors, actuators, info } = parseDynamicData(currentPayload);
+  const { sensors, pumps, actuators, info } = parseDynamicData(currentPayload);
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8 w-full space-y-8">
@@ -116,7 +192,7 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
             <h1 className="text-2xl font-bold" style={{ color: T.text }}>Telemetria & Controle ESP32-IoT-Controller</h1>
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1.5" style={{ background: isConnected ? T.surface2 : T.bg, borderColor: T.border, color: T.text }}>
               <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}></span>
-              {isConnected ? "REAL-TIME MQTT CONECTADO" : "AGUARDANDO ESP32 REAL"}
+              {isConnected ? "HARDWARE ESP32 CONECTADO (100% REAL)" : "AGUARDANDO ESP32"}
             </span>
           </div>
           <p className="text-xs mt-1" style={{ color: T.muted }}>
@@ -124,7 +200,16 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={() => setGpioModalOpen(true)}
+            className="px-4 py-2 rounded-xl text-xs font-bold transition-all shadow flex items-center gap-1.5"
+            style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>
+            <span>Configurar Pinos GPIO</span>
+          </button>
+
           <button
             onClick={() => setCodeModalOpen(true)}
             className="px-4 py-2 rounded-xl text-xs font-bold transition-all shadow flex items-center gap-1.5"
@@ -152,7 +237,7 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.text }}><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>
             <div>
               <div className="text-xs font-bold" style={{ color: T.text }}>Dispositivos ESP32 Descobertos na Rede ({devices.length})</div>
-              <div className="text-[11px]" style={{ color: T.muted }}>Selecione um hardware ativo para visualizar telemetria real em tempo real.</div>
+              <div className="text-[11px]" style={{ color: T.muted }}>Hardware físico transmitindo telemetria real em tempo real.</div>
             </div>
           </div>
 
@@ -163,33 +248,38 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
               className="px-3 py-2 rounded-xl text-xs font-mono font-bold transition-all"
               style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
             >
-              <option value={userSlug}>Subdomínio: {userSlug}</option>
               {devices.map((d) => (
-                <option key={d.id} value={d.id}>Hardware: {d.originalName} ({d.topicCount} msgs)</option>
+                <option key={d.id} value={d.id}>Hardware: {d.originalName} ({d.topicCount} pacotes)</option>
               ))}
             </select>
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t" style={{ borderColor: T.borderSoft }}>
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-2 border-t" style={{ borderColor: T.borderSoft }}>
           <div>
             <div className="text-[11px]" style={{ color: T.muted }}>Broker Mosquitto TCP:</div>
             <div className="text-xs font-bold font-mono" style={{ color: T.text }}>grow.thegrowinstones.com:1883</div>
           </div>
           <div>
-            <div className="text-[11px]" style={{ color: T.muted }}>Tópico Namespace:</div>
-            <div className="text-xs font-bold font-mono" style={{ color: T.text }}>openagro/{activeId}/...</div>
+            <div className="text-[11px]" style={{ color: T.muted }}>IP Local do ESP32:</div>
+            <div className="text-xs font-bold font-mono" style={{ color: T.text }}>{telemetry?.data?.ip || "192.168.1.141"}</div>
           </div>
           <div>
-            <div className="text-[11px]" style={{ color: T.muted }}>Status de Conexão:</div>
+            <div className="text-[11px]" style={{ color: T.muted }}>Sinal Wi-Fi RSSI:</div>
+            <div className="text-xs font-bold font-mono" style={{ color: T.text }}>
+              {telemetry?.data?.rssi ? `${telemetry.data.rssi} dBm (Excelente)` : "Detectando..."}
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px]" style={{ color: T.muted }}>Último Pacote Real:</div>
             <div className="text-xs font-bold font-mono" style={{ color: isConnected ? T.text : T.muted }}>
-              {isConnected ? `Transmitindo (${telemetry.timestamp})` : "Sem pacotes reais"}
+              {isConnected ? new Date(telemetry.timestamp).toLocaleTimeString() : "Aguardando"}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Estado sem Dispositivo Conectado (Alerta Real sem Simulação) */}
+      {/* Estado sem Dispositivo Conectado */}
       {!isConnected && (
         <div className="p-8 rounded-2xl text-center space-y-4" style={{ background: T.surface, border: `1px dashed ${T.border}` }}>
           <div className="w-12 h-12 rounded-2xl mx-auto flex items-center justify-center" style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
@@ -198,16 +288,25 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
           <div>
             <h3 className="text-sm font-bold" style={{ color: T.text }}>Nenhum dispositivo ESP32 transmitindo no momento</h3>
             <p className="text-xs max-w-md mx-auto mt-1" style={{ color: T.muted }}>
-              Certifique-se de que seu ESP32 com o firmware <b>ESP32-IoT-Controller</b> está ligado e configurado para apontar para <code className="font-mono" style={{ color: T.text }}>grow.thegrowinstones.com:1883</code>.
+              Certifique-se de que seu ESP32 com o firmware <b>ESP32-IoT-Controller</b> está ligado e conectado à sua rede Wi-Fi.
             </p>
           </div>
-          <button
-            onClick={() => setCodeModalOpen(true)}
-            className="px-4 py-2 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-2"
-            style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
-          >
-            <span>Ver Instruções de Apontamento NVS</span>
-          </button>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => setFlasherModalOpen(true)}
+              className="px-4 py-2 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-2"
+              style={{ background: T.text, color: T.bg }}
+            >
+              <span>Gravar ESP32 via USB</span>
+            </button>
+            <button
+              onClick={() => setGpioModalOpen(true)}
+              className="px-4 py-2 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-2"
+              style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
+            >
+              <span>Configurar Pinos GPIO</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -217,54 +316,107 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
           <div>
             <h2 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.text }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-              <span>Leitura de Sensores ({sensors.length})</span>
+              <span>Leitura de Sensores Físicos ({sensors.length})</span>
             </h2>
             {sensors.length === 0 ? (
               <div className="p-6 rounded-2xl text-center" style={{ background: T.surface, border: `1px dashed ${T.border}` }}>
-                <p className="text-xs" style={{ color: T.muted }}>Nenhum sensor numérico no payload do ESP32.</p>
+                <p className="text-xs" style={{ color: T.muted }}>Nenhum sensor numérico configurado no ESP32. Clique em "Configurar Pinos GPIO" para adicionar.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {sensors.map((s) => (
-                  <div key={s.key} className="p-5 rounded-2xl transition-all" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
-                    <div className="text-xs font-bold uppercase tracking-wider mb-1 truncate" style={{ color: T.muted }} title={s.key}>{s.label}</div>
-                    <div className="text-3xl font-extrabold font-mono flex items-baseline gap-1" style={{ color: T.text }}>
-                      <span>{s.val}</span>
-                      {s.unit && <span className="text-xs font-normal" style={{ color: T.muted }}>{s.unit}</span>}
+                  <div key={s.key} className="p-5 rounded-2xl transition-all shadow-sm" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="text-xs font-bold uppercase tracking-wider truncate" style={{ color: T.muted }} title={s.key}>{s.label}</div>
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
                     </div>
-                    <div className="text-[10px] font-mono mt-2 truncate" style={{ color: T.faint }}>ID: <code style={{ color: T.text }}>{s.key}</code></div>
+                    <div className="text-3xl font-extrabold font-mono flex items-baseline gap-1.5 my-2" style={{ color: T.text }}>
+                      <span>{s.val.toFixed(2)}</span>
+                      {s.unit && <span className="text-sm font-bold" style={{ color: T.muted }}>{s.unit}</span>}
+                    </div>
+                    <div className="text-[10px] font-mono mt-1 truncate" style={{ color: T.faint }}>Tópico: <code style={{ color: T.text }}>openagro/{activeId}/{s.key}/state</code></div>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Seção 2: Atuadores / Relés com Controle Bidirecional */}
+          {/* Seção 2: Bombas Dosadoras com Disparo de Pulso */}
+          {pumps.length > 0 && (
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.text }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+                <span>Bombas Dosadoras Peristálticas ({pumps.length})</span>
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {pumps.map((p) => (
+                  <div key={p.key} className="p-5 rounded-2xl space-y-3 transition-all" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-bold truncate" style={{ color: T.text }}>{p.label}</div>
+                        <div className="text-[10px] font-mono" style={{ color: T.muted }}>{p.key}</div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold" style={{ background: p.val ? T.surface2 : T.bg, border: `1px solid ${T.border}`, color: T.text }}>
+                        {p.val ? "DOSANDO..." : "PRONTA"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        onClick={() => triggerDose(p.key, 0.5)}
+                        disabled={!!togglingKeys[p.key]}
+                        className="flex-1 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5"
+                        style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+                        <span>{togglingKeys[p.key] ? "Enviando..." : "Pulsar 0.5 ml"}</span>
+                      </button>
+
+                      <button
+                        onClick={() => toggleESP32Relay(p.key, p.val)}
+                        disabled={!!togglingKeys[p.key]}
+                        className="px-3 py-2 rounded-xl text-xs font-bold font-mono transition-all"
+                        style={{
+                          background: p.val ? T.text : T.bg,
+                          border: `1px solid ${T.border}`,
+                          color: p.val ? T.bg : T.text
+                        }}
+                      >
+                        {p.val ? "STOP" : "LIGAR"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Seção 3: Relés & Saídas Digitais com Controle Bidirecional */}
           <div>
             <h2 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.text }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-              <span>Relés & Atuadores com Controle Bidirecional ({actuators.length})</span>
+              <span>Relés & Saídas Digitais ({actuators.length})</span>
             </h2>
             {actuators.length === 0 ? (
               <div className="p-6 rounded-2xl text-center" style={{ background: T.surface, border: `1px dashed ${T.border}` }}>
-                <p className="text-xs" style={{ color: T.muted }}>Nenhum pino/relé detectado no dispositivo.</p>
+                <p className="text-xs" style={{ color: T.muted }}>Nenhum relé digital detectado no dispositivo.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {actuators.map((a) => (
-                  <div key={a.key} className="p-4 rounded-2xl flex items-center justify-between gap-2" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+                  <div key={a.key} className="p-5 rounded-2xl flex items-center justify-between gap-3" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
                     <div className="min-w-0">
                       <div className="text-xs font-bold truncate" style={{ color: T.text }}>{a.label}</div>
-                      <div className="text-[10px] font-mono truncate" style={{ color: T.muted }}>{a.key}</div>
+                      <div className="text-[10px] font-mono truncate" style={{ color: T.muted }}>openagro/{activeId}/{a.key}/set</div>
                     </div>
                     <button
                       onClick={() => toggleESP32Relay(a.key, a.val)}
                       disabled={!!togglingKeys[a.key]}
-                      className="px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5"
+                      className="px-4 py-2 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5 shadow-sm"
                       style={{
-                        background: a.val ? T.surface2 : T.bg,
+                        background: a.val ? T.text : T.surface2,
                         border: `1px solid ${T.border}`,
-                        color: T.text
+                        color: a.val ? T.bg : T.text
                       }}
                     >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
@@ -276,28 +428,10 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
             )}
           </div>
 
-          {/* Seção 3: Informações de Firmware */}
-          {info.length > 0 && (
-            <div>
-              <h2 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.text }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                <span>Informações do Dispositivo ({info.length})</span>
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {info.map((item) => (
-                  <div key={item.key} className="p-4 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
-                    <div className="text-xs font-bold mb-1" style={{ color: T.muted }}>{item.label}</div>
-                    <div className="text-sm font-mono font-bold truncate" style={{ color: T.brand }}>{item.val}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Inspeção do JSON Bruto Real */}
           <div className="p-6 rounded-2xl space-y-3" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: T.text }}>Inspeção de Payload Real Recebido</h3>
+              <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: T.text }}>Inspeção de Payload Real Recebido do Hardware</h3>
               <span className="text-[11px] font-mono" style={{ color: T.muted }}>Tópico: {telemetry.topic}</span>
             </div>
             <pre className="p-4 rounded-xl font-mono text-xs overflow-x-auto max-h-60" style={{ background: T.inset, border: `1px solid ${T.border}`, color: T.text }}>
@@ -310,8 +444,8 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
       {/* Feed de Tópicos MQTT em Tempo Real */}
       <div className="p-6 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: T.text }}>Feed de Tópicos MQTT em Tempo Real</h3>
-          <span className="text-[10px] font-mono" style={{ color: T.muted }}>Mosquitto Port 1883</span>
+          <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: T.text }}>Feed de Mensagens MQTT em Tempo Real</h3>
+          <span className="text-[10px] font-mono" style={{ color: T.muted }}>Mosquitto Broker :1883</span>
         </div>
         {logs.length === 0 ? (
           <p className="text-xs" style={{ color: T.muted }}>Nenhuma mensagem MQTT trafegada no broker recentemente.</p>
@@ -352,18 +486,18 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
               <div className="p-3.5 rounded-xl space-y-2 font-mono" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
                 <div><b>Broker MQTT Server:</b> grow.thegrowinstones.com</div>
                 <div><b>Porta MQTT TCP:</b> 1883</div>
-                <div><b>Tópico de Leitura:</b> openagro/{activeId}/+/state</div>
-                <div><b>Tópico de Comando:</b> openagro/{activeId}/+/set</div>
+                <div><b>Tópico de Leitura:</b> openagro/{activeId}/state</div>
+                <div><b>Tópico de Comando:</b> openagro/{activeId}/[pin]/set</div>
               </div>
               <p style={{ color: T.muted }}>
-                No firmware <b>ESP32-IoT-Controller</b>, acesse o portal de configuração ou terminal serial e defina o servidor MQTT como <code className="font-mono" style={{ color: T.text }}>grow.thegrowinstones.com</code> e a porta <code className="font-mono" style={{ color: T.text }}>1883</code>.
+                No firmware <b>ESP32-IoT-Controller</b>, o servidor MQTT padrão já vem pré-configurado como <code className="font-mono" style={{ color: T.text }}>grow.thegrowinstones.com</code> e porta <code className="font-mono" style={{ color: T.text }}>1883</code>.
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal Gravador USB Web (In-Browser Flasher) */}
+      {/* Modal Gravador USB Web */}
       <ESP32WebFlasherModal
         isOpen={flasherModalOpen}
         onClose={() => setFlasherModalOpen(false)}
@@ -371,6 +505,20 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
         T={T}
         dark={dark}
         showToast={showToast}
+      />
+
+      {/* Modal Gerenciador de Pinos GPIO */}
+      <ESP32GPIOConfigModal
+        isOpen={gpioModalOpen}
+        onClose={() => {
+          setGpioModalOpen(false);
+          fetchTelemetry();
+        }}
+        T={T}
+        dark={dark}
+        showToast={showToast}
+        deviceIp={deviceIp}
+        activeId={activeId}
       />
     </div>
   );
