@@ -2297,36 +2297,47 @@ function GrowinStones() {
           if (Array.isArray(data.presets) && data.presets.length > 0) {
             setAllPresets(data.presets);
             try { localStorage.setItem("growinstones_all_presets_v2", JSON.stringify(data.presets)); } catch(e) {}
+          } else {
+            // Se a nuvem não tem presets salvos mas o dispositivo atual tem, envia para a nuvem
+            const localPresets = allPresets;
+            if (Array.isArray(localPresets) && localPresets.length > 0) {
+              syncAllToCloud(null, localPresets);
+            }
           }
           if (data.setup) {
             loadUserSetupFromData(data.setup);
           }
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Aviso ao buscar sync na nuvem:", e);
+    }
   };
 
   // Carregar dados salvos do usuário ao iniciar/mudar usuário
   useEffect(() => {
-    if (currentUser && currentUser?.username) {
+    if (currentUser && (currentUser?.username || currentUser?.email)) {
       loadUserSetup(currentUser);
-      setSubdomainInput(currentUser?.username);
+      if (currentUser.username) setSubdomainInput(currentUser.username);
       fetchCloudUserSync();
     }
-  }, [currentUser?.username]);
+  }, [currentUser?.username, currentUser?.email]);
 
-  // Sincronizar automaticamente quando a janela ganha foco ou muda de aba
+  // Sincronizar automaticamente quando a janela ganha foco ou muda de aba + polling suave
   useEffect(() => {
-    const handleFocus = () => {
+    const handleSync = () => {
       if (currentUser && (currentUser.email || currentUser.username)) {
         fetchCloudUserSync();
       }
     };
-    window.addEventListener("focus", handleFocus);
-    document.addEventListener("visibilitychange", handleFocus);
+    window.addEventListener("focus", handleSync);
+    document.addEventListener("visibilitychange", handleSync);
+    const syncTimer = setInterval(handleSync, 10000); // Sincroniza em segundo plano a cada 10s entre dispositivos
+
     return () => {
-      window.removeEventListener("focus", handleFocus);
-      document.removeEventListener("visibilitychange", handleFocus);
+      window.removeEventListener("focus", handleSync);
+      document.removeEventListener("visibilitychange", handleSync);
+      clearInterval(syncTimer);
     };
   }, [currentUser]);
 
