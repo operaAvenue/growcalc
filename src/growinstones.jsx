@@ -1644,6 +1644,95 @@ function GrowinStones() {
     }
   });
 
+  // ————— SISTEMA DE PERSISTÊNCIA E ISOLAMENTO DE USUÁRIOS —————
+  const loadUserSetup = (user) => {
+    if (!user || !user.username) return;
+    const key = `growcalc_user_setup_${user.username}`;
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const data = JSON.parse(saved);
+        if (data.growName !== undefined) setGrowName(data.growName);
+        if (data.owner !== undefined) setOwner(data.owner);
+        if (data.strain !== undefined) setStrain(data.strain);
+        if (data.width !== undefined) setWidth(data.width);
+        if (data.depth !== undefined) setDepth(data.depth);
+        if (data.height !== undefined) setHeight(data.height);
+        if (data.potCount !== undefined) setPotCount(data.potCount);
+        if (data.potIdx !== undefined) setPotIdx(data.potIdx);
+        if (data.potShape !== undefined) setPotShape(data.potShape);
+        if (data.potFlipped !== undefined) setPotFlipped(data.potFlipped);
+        if (data.customPotW !== undefined) setCustomPotW(data.customPotW);
+        if (data.customPotL !== undefined) setCustomPotL(data.customPotL);
+        if (data.customPotH !== undefined) setCustomPotH(data.customPotH);
+        if (data.gaugeIdx !== undefined) setGaugeIdx(data.gaugeIdx);
+        if (data.spacing !== undefined) setSpacing(data.spacing);
+        if (data.cols !== undefined) setCols(data.cols);
+        if (data.conn !== undefined) setConn(data.conn);
+        if (data.recirculate !== undefined) setRecirculate(data.recirculate);
+        if (data.equip !== undefined) setEquip(data.equip);
+        if (data.perPot !== undefined) setPerPot(data.perPot);
+        if (data.watts !== undefined) setWatts(data.watts);
+        if (data.equipUrls !== undefined) setEquipUrls(data.equipUrls);
+        if (data.equipShopping !== undefined) setEquipShopping(data.equipShopping);
+        if (data.customItems !== undefined) setCustomItems(data.customItems);
+        if (data.vegaHours !== undefined) setVegaHours(data.vegaHours);
+        if (data.floraHours !== undefined) setFloraHours(data.floraHours);
+        if (data.vegaDays !== undefined) setVegaDays(data.vegaDays);
+        if (data.floraDays !== undefined) setFloraDays(data.floraDays);
+        if (data.yieldPerPlant !== undefined) setYieldPerPlant(data.yieldPerPlant);
+        if (data.priceG !== undefined) setPriceG(data.priceG);
+        if (data.tariff !== undefined) setTariff(data.tariff);
+        if (data.costs !== undefined) setCosts(data.costs);
+        if (data.extraCost !== undefined) setExtraCost(data.extraCost);
+        if (data.monthlyCost !== undefined) setMonthlyCost(data.monthlyCost);
+        if (data.notes !== undefined) setNotes(data.notes);
+        if (data.instructions !== undefined) setInstructions(data.instructions);
+        if (data.terms !== undefined) setTerms(data.terms);
+        if (data.allPresets !== undefined && Array.isArray(data.allPresets)) setAllPresets(data.allPresets);
+      }
+    } catch (e) {
+      console.error("Erro ao carregar configurações do usuário:", e);
+    }
+  };
+
+  // Carregar dados salvos do usuário ao iniciar/mudar usuário
+  useEffect(() => {
+    if (currentUser && currentUser.username) {
+      loadUserSetup(currentUser);
+      setSubdomainInput(currentUser.username);
+    }
+  }, [currentUser?.username]);
+
+  // Salvar automaticamente todas as alterações do usuário
+  useEffect(() => {
+    if (!currentUser || !currentUser.username) return;
+    const userSetup = {
+      growName, owner, strain,
+      width, depth, height,
+      potCount, potIdx, potShape, potFlipped, customPotW, customPotL, customPotH,
+      gaugeIdx, spacing, cols, conn, recirculate,
+      equip, perPot, watts, equipUrls, equipShopping, customItems,
+      vegaHours, floraHours, vegaDays, floraDays, yieldPerPlant, priceG, tariff,
+      costs, extraCost, monthlyCost,
+      notes, instructions, terms,
+      allPresets,
+    };
+    try {
+      localStorage.setItem(`growcalc_user_setup_${currentUser.username}`, JSON.stringify(userSetup));
+    } catch (e) {
+      console.error("Erro ao auto-salvar configurações do usuário:", e);
+    }
+  }, [
+    currentUser, growName, owner, strain, width, depth, height,
+    potCount, potIdx, potShape, potFlipped, customPotW, customPotL, customPotH,
+    gaugeIdx, spacing, cols, conn, recirculate,
+    equip, perPot, watts, equipUrls, equipShopping, customItems,
+    vegaHours, floraHours, vegaDays, floraDays, yieldPerPlant, priceG, tariff,
+    costs, extraCost, monthlyCost, notes, instructions, terms, allPresets
+  ]);
+
+
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [authNameInput, setAuthNameInput] = useState("");
@@ -1714,8 +1803,36 @@ function GrowinStones() {
             
             setAuthNameInput(googleUser.name || "Cultivador");
             setAuthUsernameInput(defaultSlug);
-            setAuthModalOpen(true);
-            showToast(`✓ Google Authenticated: ${googleUser.email}`);
+
+            // Verificar se o usuário já tem conta/configuração salva
+            const existingSetup = localStorage.getItem(`growcalc_user_setup_${defaultSlug}`);
+            const savedUserJson = localStorage.getItem("growcalc_user");
+            let isExisting = false;
+            if (savedUserJson) {
+              try {
+                const parsedUser = JSON.parse(savedUserJson);
+                if (parsedUser.username === defaultSlug || parsedUser.email === googleUser.email) {
+                  isExisting = true;
+                }
+              } catch(e) {}
+            }
+
+            if (existingSetup || isExisting) {
+              const existingUser = {
+                name: googleUser.name || "Cultivador",
+                email: googleUser.email,
+                username: defaultSlug,
+                avatar: googleUser.picture || `https://api.dicebear.com/7.x/bottts/svg?seed=${defaultSlug}`,
+                googleSub: googleUser.sub
+              };
+              localStorage.setItem("growcalc_user", JSON.stringify(existingUser));
+              setCurrentUser(existingUser);
+              setSubdomainInput(defaultSlug);
+              showToast(`✓ Bem-vindo de volta, ${existingUser.name}! Subdomínio @${defaultSlug} carregado.`);
+            } else {
+              setAuthModalOpen(true);
+              showToast(`✓ Google Autenticado: ${googleUser.email}`);
+            }
           } catch (err) {
             console.error("Erro ao obter perfil do Google:", err);
             showToast(`Erro ao obter perfil do Google: ${err.message}`);
