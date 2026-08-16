@@ -3994,8 +3994,8 @@ function GrowinStones() {
     {/* FOTO DE CAPA (BANNER) */}
     <div style="height:200px; width:100%; position:relative; overflow:hidden; background:${isDark ? '#292524' : '#e2dccc'};">
       ${userBannerUrl 
-        ? `<img src="${userBannerUrl}" alt="Capa do Perfil" style="width:100%; height:100%; object-fit:cover; display:block;" />` 
-        : `<div style="width:100%; height:100%; background:${isDark ? 'linear-gradient(135deg, #1c1917 0%, #292524 50%, #44403c 100%)' : 'linear-gradient(135deg, #e2dccc 0%, #d8cfbe 50%, #c4b9a3 100%)'};"></div>`
+        ? `<img id="user-banner-img" src="${userBannerUrl}" alt="Capa do Perfil" style="width:100%; height:100%; object-fit:cover; display:block;" />` 
+        : `<div id="user-banner-placeholder" style="width:100%; height:100%; background:${isDark ? 'linear-gradient(135deg, #1c1917 0%, #292524 50%, #44403c 100%)' : 'linear-gradient(135deg, #e2dccc 0%, #d8cfbe 50%, #c4b9a3 100%)'};"></div>`
       }
     </div>
 
@@ -4003,7 +4003,7 @@ function GrowinStones() {
       {/* AVATAR & BADGES & ÍCONE DO PROJETO */}
       <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-top:-50px; margin-bottom:16px;">
         <div style="width:100px; height:100px; min-width:100px; min-height:100px; max-width:100px; max-height:100px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; border:4px solid ${isDark ? '#1c1917' : '#ffffff'}; background:${isDark ? '#292524' : '#e2dccc'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:32px; color:${isDark ? '#f59e0b' : '#b45309'}; box-shadow:0 10px 25px rgba(0,0,0,0.15);">
-          ${userAvatarUrl ? `<img src="${userAvatarUrl}" alt="Avatar" style="width:100%; height:100%; aspect-ratio:1/1; object-fit:cover; display:block; border-radius:50%;" />` : userDisplayName.charAt(0).toUpperCase()}
+          ${userAvatarUrl ? `<img id="user-avatar-img" src="${userAvatarUrl}" alt="Avatar" style="width:100%; height:100%; aspect-ratio:1/1; object-fit:cover; display:block; border-radius:50%;" />` : `<span id="user-avatar-text">${userDisplayName.charAt(0).toUpperCase()}</span>`}
         </div>
 
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -4023,14 +4023,14 @@ function GrowinStones() {
         </div>
       </div>
 
-      <h1 style="font-size:22px; font-weight:800; margin:0 0 2px; color:${isDark ? '#ffffff' : '#1f1b16'};">${esc(userDisplayName)}</h1>
-      <div style="font-size:12px; font-family:monospace; font-weight:600; color:${isDark ? '#f59e0b' : '#b45309'}; margin-bottom:12px;">@${esc(userHandle)}</div>
-      <p style="font-size:13.5px; line-height:1.6; margin:0 0 16px; color:${isDark ? '#f5f5f4' : '#1f1b16'}; max-width:700px;">${esc(userBio)}</p>
+      <h1 id="user-name-title" style="font-size:22px; font-weight:800; margin:0 0 2px; color:${isDark ? '#ffffff' : '#1f1b16'};">${esc(userDisplayName)}</h1>
+      <div id="user-handle-subtitle" style="font-size:12px; font-family:monospace; font-weight:600; color:${isDark ? '#f59e0b' : '#b45309'}; margin-bottom:12px;">@${esc(userHandle)}</div>
+      <p id="user-bio-text" style="font-size:13.5px; line-height:1.6; margin:0 0 16px; color:${isDark ? '#f5f5f4' : '#1f1b16'}; max-width:700px;">${esc(userBio)}</p>
 
       <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:12px; color:${isDark ? '#a8a29e' : '#6b6354'}; padding-top:12px; border-top:1px solid ${isDark ? '#292524' : '#e2dccc'};">
-        <div>Localização: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(userLocation)}</b></div>
-        <div>Foco: <b style="color:${isDark ? '#f59e0b' : '#b45309'};">${esc(userStrainFocus)}</b></div>
-        <div>Publicações: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${userPosts.length}</b></div>
+        <div>Localização: <b id="user-location-text" style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(userLocation)}</b></div>
+        <div>Foco: <b id="user-strain-text" style="color:${isDark ? '#f59e0b' : '#b45309'};">${esc(userStrainFocus)}</b></div>
+        <div>Publicações: <b id="user-posts-count" style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${userPosts.length}</b></div>
         <div>Automação: <b style="color:#10b981;">Online 24/7</b></div>
       </div>
     </div>
@@ -4159,10 +4159,20 @@ function GrowinStones() {
   </div>
   ` : ""}
 
-  {/* ————————————————— SEÇÃO: LINHA DO TEMPO & DIÁRIO DE CULTIVO ————————————————— */}
+  {/* ————————————————— SEÇÃO: LINHA DO TEMPO & DIÁRIO DE CULTIVO (REAL-TIME FEED) ————————————————— */}
   <div id="posts-timeline-section" style="margin-top:24px; margin-bottom:20px;">
-    <h2 class="sec-title">Linha do Tempo & Diário de Cultivo</h2>
-    ${postsFeedHtml}
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid ${isDark ? '#292524' : '#e2dccc'}; padding-bottom:10px; margin-bottom:16px;">
+      <h2 style="font-size:15px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:${isDark ? '#f59e0b' : '#b45309'}; margin:0;">
+        Linha do Tempo & Diário de Cultivo
+      </h2>
+      <span style="display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; color:#10b981;">
+        <span style="width:7px; height:7px; border-radius:50%; background:#10b981; display:inline-block; box-shadow:0 0 6px #10b981;"></span>
+        <span>Tempo Real</span>
+      </span>
+    </div>
+    <div id="posts-feed-container">
+      ${postsFeedHtml}
+    </div>
   </div>
 
   <div class="footer">
@@ -4170,6 +4180,147 @@ function GrowinStones() {
     Hospedado exclusivamente em <b>https://${displaySlug}.thegrowinstones.com</b>
   </div>
 </div>
+
+<script>
+  (function() {
+    var slug = "${displaySlug}";
+    var syncUrl = "https://grow.thegrowinstones.com/api/user/sync?username=" + encodeURIComponent(slug);
+    var container = document.getElementById("posts-feed-container");
+    var bioEl = document.getElementById("user-bio-text");
+    var bannerEl = document.getElementById("user-banner-img");
+    var avatarEl = document.getElementById("user-avatar-img");
+    var postsCountEl = document.getElementById("user-posts-count");
+    var lastPostsJson = "";
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function timeAgo(dateStr) {
+      if (!dateStr) return "recente";
+      try {
+        var now = new Date();
+        var d = new Date(dateStr);
+        var diffSec = Math.floor((now - d) / 1000);
+        if (diffSec < 60) return "agora há pouco";
+        var diffMin = Math.floor(diffSec / 60);
+        if (diffMin < 60) return "há " + diffMin + " min";
+        var diffHour = Math.floor(diffMin / 60);
+        if (diffHour < 24) return "há " + diffHour + " h";
+        var diffDays = Math.floor(diffHour / 24);
+        if (diffDays < 7) return "há " + diffDays + " d";
+        return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+      } catch (e) {
+        return dateStr;
+      }
+    }
+
+    function renderFeed(posts, user) {
+      if (!container) return;
+      if (!Array.isArray(posts) || posts.length === 0) {
+        container.innerHTML = '<div style="padding:32px 20px; text-align:center; color:${isDark ? '#a8a29e' : '#78716c'}; font-size:13px; background:${isDark ? '#1c1917' : '#ffffff'}; border-radius:16px; border:1px solid ${isDark ? '#292524' : '#e2dccc'};">Nenhuma publicação adicionada ainda ao diário.</div>';
+        return;
+      }
+
+      var html = "";
+      for (var i = 0; i < posts.length; i++) {
+        var p = posts[i];
+        var authorName = (p.author && p.author.name) || (user && user.name) || "${esc(userDisplayName)}";
+        var authorUser = (p.author && p.author.username) || (user && user.username) || slug;
+        var authorAvatar = (p.author && p.author.avatarUrl) || (user && user.avatarUrl) || "${userAvatarUrl}";
+        var pDate = timeAgo(p.createdAt);
+        var pStage = p.stage || "";
+
+        html += '<div class="post-card" style="margin-bottom:20px;">';
+        html += '  <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">';
+        html += '    <div style="width:42px; height:42px; min-width:42px; min-height:42px; max-width:42px; max-height:42px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; background:${isDark ? '#292524' : '#e2dccc'}; border:1px solid ${isDark ? '#44403c' : '#d8cfbe'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; color:${isDark ? '#f59e0b' : '#b45309'};">';
+        if (authorAvatar) {
+          html += '    <img src="' + escapeHtml(authorAvatar) + '" alt="Avatar" style="width:100%; height:100%; aspect-ratio:1/1; object-fit:cover; display:block; border-radius:50%;" />';
+        } else {
+          html += '    ' + escapeHtml(authorName.charAt(0).toUpperCase());
+        }
+        html += '    </div>';
+        html += '    <div style="min-width:0; flex:1;">';
+        html += '      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">';
+        html += '        <b style="font-size:14px; color:${isDark ? '#ffffff' : '#1f1b16'};">' + escapeHtml(authorName) + '</b>';
+        html += '        <span style="font-size:12px; font-family:monospace; color:${isDark ? '#a8a29e' : '#6b6354'};">@' + escapeHtml(authorUser) + '</span>';
+        html += '        <span style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">· ' + escapeHtml(pDate) + '</span>';
+        html += '      </div>';
+        if (pStage) {
+          html += '    <span style="display:inline-block; margin-top:2px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:12px; background:${isDark ? 'rgba(245,158,11,0.15)' : '#fef3c7'}; color:${isDark ? '#f59e0b' : '#b45309'};">' + escapeHtml(pStage) + '</span>';
+        }
+        html += '    </div>';
+        html += '  </div>';
+
+        if (p.text) {
+          html += '  <div style="font-size:13.5px; line-height:1.6; color:${isDark ? '#f5f5f4' : '#1f1b16'}; white-space:pre-wrap; margin-bottom:12px;">' + escapeHtml(p.text) + '</div>';
+        }
+
+        if (Array.isArray(p.images) && p.images.length > 0) {
+          html += '  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:8px; border-radius:14px; overflow:hidden; margin-bottom:12px;">';
+          for (var j = 0; j < p.images.length; j++) {
+            html += '    <img src="' + escapeHtml(p.images[j]) + '" alt="Foto do cultivo" style="width:100%; max-height:360px; object-fit:cover; border-radius:12px; border:1px solid ${isDark ? '#292524' : '#e2dccc'}; display:block;" />';
+          }
+          html += '  </div>';
+        }
+
+        if (Array.isArray(p.videos) && p.videos.length > 0) {
+          html += '  <div style="border-radius:14px; overflow:hidden; margin-bottom:12px; background:#000;">';
+          for (var k = 0; k < p.videos.length; k++) {
+            html += '    <video src="' + escapeHtml(p.videos[k]) + '" controls playsinline style="width:100%; max-height:360px; border-radius:12px; display:block;"></video>';
+          }
+          html += '  </div>';
+        }
+
+        html += '  <div style="display:flex; align-items:center; justify-content:space-between; padding-top:10px; border-top:1px solid ${isDark ? '#292524' : '#e2dccc'}; font-size:12px; color:${isDark ? '#a8a29e' : '#6b6354'};">';
+        html += '    <div style="display:flex; align-items:center; gap:5px; font-weight:700; color:' + (p.liked ? '#f43f5e' : '${isDark ? '#a8a29e' : '#6b6354'}') + ';">';
+        html += '      <svg width="15" height="15" viewBox="0 0 24 24" fill="' + (p.liked ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+        html += '      <span>' + (p.likes || 0) + ' curtidas</span>';
+        html += '    </div>';
+        html += '    <div>' + (p.comments ? p.comments.length : 0) + ' comentários</div>';
+        html += '  </div>';
+        html += '</div>';
+      }
+
+      container.innerHTML = html;
+    }
+
+    async function fetchLiveFeed() {
+      try {
+        var res = await fetch(syncUrl + "&t=" + Date.now());
+        if (!res.ok) return;
+        var data = await res.json();
+        if (data && data.exists) {
+          if (data.user) {
+            if (bioEl && data.user.bio) bioEl.textContent = data.user.bio;
+            if (bannerEl && data.user.bannerUrl) bannerEl.src = data.user.bannerUrl;
+            if (avatarEl && data.user.avatarUrl) avatarEl.src = data.user.avatarUrl;
+          }
+
+          if (Array.isArray(data.posts)) {
+            var postsStr = JSON.stringify(data.posts);
+            if (postsStr !== lastPostsJson) {
+              lastPostsJson = postsStr;
+              renderFeed(data.posts, data.user);
+              if (postsCountEl) postsCountEl.textContent = data.posts.length;
+            }
+          }
+        }
+      } catch (err) {
+        console.log("Sync feed:", err);
+      }
+    }
+
+    fetchLiveFeed();
+    setInterval(fetchLiveFeed, 5000);
+  })();
+</script>
 </body>
 </html>`;
   };
