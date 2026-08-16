@@ -1,27 +1,30 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 
-// ————————————————————————— ESP32 TELEMETRY & DYNAMIC MQTT MONITOR —————————————————————————
+// ————————————————————————— ESP32 TELEMETRY & CONTROLE —————————————————————————
 function MQTTMonitorView({ currentUser, T, dark, showToast }) {
   const [telemetry, setTelemetry] = useState(null);
   const [rawPayload, setRawPayload] = useState(null);
   const [logs, setLogs] = useState([]);
   const [isSimulating, setIsSimulating] = useState(false);
   const [codeModalOpen, setCodeModalOpen] = useState(false);
+  const [togglingKeys, setTogglingKeys] = useState({});
+
+  const userSlug = currentUser?.username || "guest";
 
   const fetchTelemetry = async () => {
     try {
-      const res = await fetch(`https://grow.thegrowinstones.com/api/mqtt/telemetry/${currentUser?.username}`);
+      const res = await fetch(`https://grow.thegrowinstones.com/api/mqtt/telemetry/${userSlug}`);
       if (res.ok) {
         const result = await res.json();
         if (result.data) {
           setTelemetry({
             data: result.data,
-            topic: result.topic || `growinstones/${currentUser?.username}/telemetry`,
+            topic: result.topic || `openagro/${userSlug}/state`,
             timestamp: new Date(result.timestamp || Date.now()).toLocaleTimeString()
           });
           setRawPayload(result.data);
           setLogs((prev) => [
-            { time: new Date().toLocaleTimeString(), topic: result.topic || `growinstones/${currentUser?.username}/telemetry`, payload: JSON.stringify(result.data) },
+            { time: new Date().toLocaleTimeString(), topic: result.topic || `openagro/${userSlug}/state`, payload: JSON.stringify(result.data) },
             ...prev.slice(0, 15)
           ]);
         }
@@ -33,23 +36,48 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
     fetchTelemetry();
     const interval = setInterval(fetchTelemetry, 3000);
     return () => clearInterval(interval);
-  }, [currentUser?.username]);
+  }, [userSlug]);
+
+  const toggleESP32Relay = async (key, currentVal) => {
+    const nextState = (currentVal === true || currentVal === "ON" || currentVal === "1") ? "OFF" : "ON";
+    setTogglingKeys((prev) => ({ ...prev, [key]: true }));
+
+    const cmdTopic = telemetry?.topic?.includes("openagro/")
+      ? telemetry.topic.replace(/\/state$/, "/set")
+      : `openagro/${userSlug}/${key}/set`;
+
+    try {
+      const res = await fetch("https://grow.thegrowinstones.com/api/mqtt/cmd", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: cmdTopic, payload: nextState })
+      });
+      if (res.ok) {
+        showToast(`⚡ Comando enviado ao ESP32: ${key} -> ${nextState}`);
+        fetchTelemetry();
+      }
+    } catch (e) {
+      showToast("⚠️ Erro ao enviar comando para o ESP32.");
+    } finally {
+      setTogglingKeys((prev) => ({ ...prev, [key]: false }));
+    }
+  };
 
   const simulateESP32Payload = async () => {
     setIsSimulating(true);
-    const mockCustomHardwareData = {
-      temperatura_ambiente: (23.5 + Math.random() * 3).toFixed(1),
-      umidade_ar: Math.floor(55 + Math.random() * 15),
-      ph_solucao: (5.8 + Math.random() * 0.4).toFixed(2),
-      ec_condutividade: (1.6 + Math.random() * 0.3).toFixed(2),
-      nivel_reservatorio_litros: Math.floor(85 + Math.random() * 20),
-      co2_ppm: Math.floor(800 + Math.random() * 250),
-      luminosidade_lux: Math.floor(12000 + Math.random() * 3000),
-      bomba_recirculante: true,
-      solenoide_oxigenacao: true,
-      painel_led_principal: true,
-      sistema_exaustao: Math.random() > 0.5,
-      status_esp32: "Online (Hardware Customizado)",
+    const mockESP32IoTControllerData = {
+      firmware: "ESP32-IoT-Controller (openAgro v2.4)",
+      dispositivo: "openAgro-Master",
+      temperatura_ambiente_gpio4: (24.2 + Math.random() * 2).toFixed(1),
+      umidade_ar_gpio5: Math.floor(62 + Math.random() * 8),
+      ph_solucao_gpio33: (5.82 + Math.random() * 0.2).toFixed(2),
+      ec_condutividade_gpio32: (1.65 + Math.random() * 0.1).toFixed(2),
+      nivel_reservatorio_gpio34: Math.floor(88 + Math.random() * 10),
+      co2_ppm_gpio35: Math.floor(820 + Math.random() * 120),
+      bomba_recirculante_gpio27: Math.random() > 0.3 ? "ON" : "OFF",
+      solenoide_oxigenacao_gpio14: "ON",
+      painel_led_gpio12: "ON",
+      exaustor_principal_gpio13: Math.random() > 0.5 ? "ON" : "OFF",
       tensao_bateria_volts: 12.6
     };
 
@@ -58,13 +86,13 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: currentUser?.username,
-          topic: `growinstones/${currentUser?.username}/telemetry`,
-          data: mockCustomHardwareData
+          username: userSlug,
+          topic: `openagro/${userSlug}/state`,
+          data: mockESP32IoTControllerData
         })
       });
       if (res.ok) {
-        showToast("⚡ Pacote de hardware simulado enviado com sucesso!");
+        showToast("⚡ Pacote ESP32-IoT-Controller simulado com sucesso!");
         fetchTelemetry();
       }
     } catch (e) {
@@ -74,7 +102,6 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
     }
   };
 
-  // Funcao para separar dinamicamente qualquer chave recebida do ESP32
   const parseDynamicData = (data) => {
     if (!data || typeof data !== "object") return { sensors: [], actuators: [], info: [] };
 
@@ -82,8 +109,7 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
     const actuators = [];
     const info = [];
 
-    // Colors list for dynamic metric cards
-    const cardColors = ["#38bdf8", "#34d399", "#f59e0b", "#a78bfa", "#f43f5e", "#fb923c", "#2dd4bf", "#818cf8"];
+    const cardColors = ["#d97706", "#059669", "#0284c7", "#7c3aed", "#e11d48", "#ea580c", "#0d9488", "#4f46e5"];
     let colorIdx = 0;
 
     Object.entries(data).forEach(([key, val]) => {
@@ -92,8 +118,11 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
         .replace(/([a-z])([A-Z])/g, "$1 $2")
         .replace(/^./, (str) => str.toUpperCase());
 
-      if (typeof val === "boolean") {
-        actuators.push({ key, label, val });
+      const isBoolVal = typeof val === "boolean" || val === "ON" || val === "OFF" || val === "1" || val === "0";
+
+      if (isBoolVal && (key.includes("gpio") || key.includes("bomba") || key.includes("solenoide") || key.includes("painel") || key.includes("exaustor") || key.includes("relay") || typeof val === "boolean")) {
+        const isTrue = val === true || val === "ON" || val === "1";
+        actuators.push({ key, label, val: isTrue, rawVal: val });
       } else if (typeof val === "number" || (!isNaN(val) && typeof val === "string" && val.trim() !== "" && !isNaN(Number(val)))) {
         const numVal = Number(val);
         let unit = "";
@@ -127,13 +156,13 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold" style={{ color: T.text }}>📡 Inspeção Dinâmica de Telemetria ESP32</h1>
+            <h1 className="text-2xl font-bold" style={{ color: T.text }}>📡 Telemetria & Controle ESP32-IoT-Controller</h1>
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> RECEPTOR DINÂMICO ATIVO
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> OPENAGRO FIRMWARE READY
             </span>
           </div>
           <p className="text-xs mt-1" style={{ color: T.textMuted }}>
-            Este painel escuta e renderiza automaticamente **qualquer chave ou formato de sensor** enviado pelo seu ESP32, sem necessidade de regras pre-setadas.
+            Conexão direta com dispositivos ESP32 rodando a plataforma <b>ESP32-IoT-Controller (openAgro)</b>.
           </p>
         </div>
 
@@ -141,19 +170,19 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
           <button
             onClick={() => setCodeModalOpen(true)}
             className="px-4 py-2 rounded-xl text-xs font-bold transition-all shadow flex items-center gap-1.5"
-            style={{ background: "#0284c7", color: "#ffffff" }}
+            style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
-            <span>Instruções de Envio MQTT/REST</span>
+            <span>Configuração do ESP32</span>
           </button>
 
           <button
             onClick={simulateESP32Payload}
             disabled={isSimulating}
             className="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
-            style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
+            style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}
           >
-            <span>{isSimulating ? "Enviando..." : "⚡ Simular Payload Customizado"}</span>
+            <span>{isSimulating ? "Simulando..." : "⚡ Simular ESP32-IoT-Controller"}</span>
           </button>
         </div>
       </div>
@@ -161,12 +190,12 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
       {/* Connection Info Bar */}
       <div className="p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-3 gap-4" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 shrink-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-amber-500 bg-amber-500/10 border border-amber-500/30 shrink-0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
           </div>
           <div>
-            <div className="text-[11px] text-stone-400">Broker MQTT Nativo (Porta 1883):</div>
-            <div className="text-xs font-bold text-sky-400 font-mono">grow.thegrowinstones.com:1883</div>
+            <div className="text-[11px]" style={{ color: T.textMuted }}>Broker MQTT (ESP32 TCP):</div>
+            <div className="text-xs font-bold font-mono" style={{ color: T.text }}>grow.thegrowinstones.com:1883</div>
           </div>
         </div>
 
@@ -175,143 +204,131 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
             #
           </div>
           <div>
-            <div className="text-[11px] text-stone-400">Tópico MQTT do Usuário:</div>
-            <div className="text-xs font-bold text-emerald-400 font-mono">growinstones/{currentUser?.username}/telemetry</div>
+            <div className="text-[11px]" style={{ color: T.textMuted }}>Tópico / Namespace Firmware:</div>
+            <div className="text-xs font-bold font-mono" style={{ color: T.text }}>openagro/{userSlug}/...</div>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 shrink-0">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 shrink-0">
             ⏱️
           </div>
           <div>
-            <div className="text-[11px] text-stone-400">Última Atualização Detectada:</div>
-            <div className="text-xs font-bold text-amber-400 font-mono">{telemetry ? telemetry.timestamp : "Aguardando..."}</div>
+            <div className="text-[11px]" style={{ color: T.textMuted }}>Última Telemetria:</div>
+            <div className="text-xs font-bold font-mono" style={{ color: T.text }}>{telemetry ? telemetry.timestamp : "Aguardando ESP32..."}</div>
           </div>
         </div>
       </div>
 
-      {/* Seção 1: Sensores / Medições Numéricas Detectadas Dinamicamente */}
+      {/* Seção 1: Sensores / Medições Numéricas */}
       <div>
         <h2 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.text }}>
-          <span>📊 Sensores & Métricas Detectados no ESP32 ({sensors.length})</span>
+          <span>📊 Leitura de Sensores ({sensors.length})</span>
         </h2>
         {sensors.length === 0 ? (
           <div className="p-8 rounded-2xl text-center" style={{ background: T.surface, border: `1px dashed ${T.border}` }}>
-            <p className="text-xs text-stone-400">Nenhum sensor numérico detectado ainda. Envie qualquer payload JSON contendo números a partir do seu ESP32!</p>
+            <p className="text-xs" style={{ color: T.textMuted }}>Aguardando primeira leitura de sensores do ESP32-IoT-Controller...</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {sensors.map((s) => (
               <div key={s.key} className="p-5 rounded-2xl transition-all hover:scale-[1.02]" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
-                <div className="text-xs font-bold uppercase tracking-wider mb-1 text-stone-400 truncate" title={s.key}>{s.label}</div>
+                <div className="text-xs font-bold uppercase tracking-wider mb-1 truncate" style={{ color: T.textMuted }} title={s.key}>{s.label}</div>
                 <div className="text-3xl font-extrabold font-mono flex items-baseline gap-1" style={{ color: s.color }}>
                   <span>{s.val}</span>
-                  {s.unit && <span className="text-xs font-normal text-stone-400">{s.unit}</span>}
+                  {s.unit && <span className="text-xs font-normal" style={{ color: T.textMuted }}>{s.unit}</span>}
                 </div>
-                <div className="text-[10px] font-mono text-stone-500 mt-2 truncate">Chave original: <code className="text-stone-300">{s.key}</code></div>
+                <div className="text-[10px] font-mono mt-2 truncate" style={{ color: T.faint }}>ID: <code style={{ color: T.text }}>{s.key}</code></div>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Seção 2: Atuadores / Relés (Boleanos) Detectados Dinamicamente */}
+      {/* Seção 2: Atuadores / Relés com Controle Bidirecional */}
       <div>
         <h2 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.text }}>
-          <span>🔌 Atuadores & Relés Detectados ({actuators.length})</span>
+          <span>🔌 Relés & Atuadores com Controle Bidirecional ({actuators.length})</span>
         </h2>
         {actuators.length === 0 ? (
           <div className="p-6 rounded-2xl text-center" style={{ background: T.surface, border: `1px dashed ${T.border}` }}>
-            <p className="text-xs text-stone-400">Nenhum relé/chave boleana (`true`/`false`) detectado no payload do ESP32.</p>
+            <p className="text-xs" style={{ color: T.textMuted }}>Nenhum pino/relé detectado no dispositivo.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {actuators.map((a) => (
-              <div key={a.key} className="p-4 rounded-2xl flex items-center justify-between" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
-                <div>
-                  <div className="text-xs font-bold text-white truncate">{a.label}</div>
-                  <div className="text-[10px] font-mono text-stone-400">{a.key}</div>
+              <div key={a.key} className="p-4 rounded-2xl flex items-center justify-between gap-2" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold truncate" style={{ color: T.text }}>{a.label}</div>
+                  <div className="text-[10px] font-mono truncate" style={{ color: T.textMuted }}>{a.key}</div>
                 </div>
-                <span className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono ${a.val ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-stone-500/20 text-stone-400 border border-stone-500/30"}`}>
-                  {a.val ? "LIGADO" : "DESLIGADO"}
-                </span>
+                <button
+                  onClick={() => toggleESP32Relay(a.key, a.val)}
+                  disabled={!!togglingKeys[a.key]}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition-all shadow-sm ${a.val ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30" : "bg-stone-500/20 text-stone-400 border border-stone-500/30 hover:bg-stone-500/30"}`}
+                >
+                  {togglingKeys[a.key] ? "..." : (a.val ? "⚡ LIGADO" : "DESLIGADO")}
+                </button>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Seção 3: Informações de Texto / Metadados do Dispositivo */}
+      {/* Seção 3: Informações de Firmware */}
       {info.length > 0 && (
         <div>
           <h2 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.text }}>
-            <span>ℹ️ Metadados & Informações do Dispositivo ({info.length})</span>
+            <span>ℹ️ Informações de Firmware & Dispositivo ({info.length})</span>
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {info.map((item) => (
               <div key={item.key} className="p-4 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
-                <div className="text-xs font-bold text-stone-400 mb-1">{item.label}</div>
-                <div className="text-sm font-mono font-bold text-sky-400 truncate">{item.val}</div>
+                <div className="text-xs font-bold mb-1" style={{ color: T.textMuted }}>{item.label}</div>
+                <div className="text-sm font-mono font-bold truncate" style={{ color: T.brand }}>{item.val}</div>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Inspeção do JSON Bruto Recebido */}
+      {/* Inspeção do JSON Bruto */}
       <div className="p-6 rounded-2xl space-y-3" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
         <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-stone-300">📦 Inspeção do JSON Bruto Recebido do ESP32</h3>
-          <span className="text-[11px] font-mono text-emerald-400">JSON 100% Válido</span>
+          <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: T.text }}>📦 Inspeção de Dados Recebidos (ESP32-IoT-Controller)</h3>
+          <span className="text-[11px] font-mono text-emerald-400">Status: Conectado</span>
         </div>
-        <pre className="p-4 rounded-xl font-mono text-xs text-emerald-400 overflow-x-auto max-h-60" style={{ background: "#0c0a09", border: "1px solid #292524" }}>
-          {currentPayload ? JSON.stringify(currentPayload, null, 2) : "// Nenhum payload recebido ainda."}
+        <pre className="p-4 rounded-xl font-mono text-xs text-emerald-400 overflow-x-auto max-h-60" style={{ background: T.inset, border: `1px solid ${T.border}` }}>
+          {currentPayload ? JSON.stringify(currentPayload, null, 2) : "// Aguardando payload do ESP32..."}
         </pre>
       </div>
 
-      {/* Histórico de Logs de Payloads Recebidos */}
-      <div className="p-6 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
-        <h3 className="text-xs font-bold uppercase tracking-wider mb-4 text-stone-300">📜 Histórico de Pacotes Recebidos (Feed)</h3>
-        {logs.length === 0 ? (
-          <p className="text-xs text-stone-400">Aguardando primeiras mensagens do ESP32...</p>
-        ) : (
-          <div className="space-y-2">
-            {logs.map((log, i) => (
-              <div key={i} className="p-3 rounded-xl font-mono text-xs flex items-center justify-between gap-3 overflow-x-auto" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
-                <span className="text-stone-400 shrink-0">{log.time}</span>
-                <span className="text-sky-400 shrink-0">{log.topic}</span>
-                <span className="text-stone-200 truncate">{log.payload}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Modal Instruções de Conexão */}
+      {/* Modal Instruções de Conexão ESP32-IoT-Controller */}
       {codeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.88)", backdropFilter: "blur(8px)" }}>
-          <div className="w-full max-w-xl p-6 rounded-2xl text-left shadow-2xl relative space-y-4" style={{ background: "#1c1917", border: "1px solid #383532", color: "#f5f5f4" }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-xl p-6 rounded-2xl text-left shadow-2xl relative space-y-4" style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.text }}>
             <button onClick={() => setCodeModalOpen(false)} className="absolute top-4 right-4 text-stone-400 hover:text-white font-bold text-sm">✕</button>
 
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+            <div className="flex items-center gap-3 border-b pb-3" style={{ borderColor: T.borderSoft }}>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-amber-500 bg-amber-500/10 border border-amber-500/30">
+                ⚡
               </div>
               <div>
-                <h3 className="font-bold text-base text-white">Como Apontar Seu Próprio ESP32</h3>
-                <p className="text-xs text-stone-400">Você não precisa alterar o firmware do seu ESP32. Basta apontar o Broker e Tópico existentes!</p>
+                <h3 className="font-bold text-base" style={{ color: T.text }}>Configuração do ESP32-IoT-Controller</h3>
+                <p className="text-xs" style={{ color: T.textMuted }}>Instruções de apontamento para o firmware openAgro v2.4</p>
               </div>
             </div>
 
-            <div className="space-y-3 text-xs text-stone-300">
-              <div className="p-3.5 rounded-xl bg-stone-900 border border-stone-800 space-y-2 font-mono">
-                <div><b className="text-sky-400">Broker MQTT Server:</b> grow.thegrowinstones.com</div>
+            <div className="space-y-3 text-xs" style={{ color: T.text }}>
+              <div className="p-3.5 rounded-xl space-y-2 font-mono" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
+                <div><b className="text-amber-500">Broker MQTT Host:</b> grow.thegrowinstones.com</div>
                 <div><b className="text-emerald-400">Porta MQTT TCP:</b> 1883</div>
-                <div><b className="text-amber-400">Tópico MQTT:</b> growinstones/{currentUser?.username}/telemetry</div>
-                <div><b className="text-stone-300">Formato do Payload:</b> Qualquer JSON válido (objeto com chaves e valores)</div>
+                <div><b className="text-sky-400">Tópico de Leitura:</b> openagro/{userSlug}/+/state</div>
+                <div><b className="text-sky-400">Tópico de Comando:</b> openagro/{userSlug}/+/set</div>
               </div>
-              <p>O servidor escuta continuamente o tópico <code className="text-emerald-400 font-mono">growinstones/{currentUser?.username}/telemetry</code> na porta **1883** e desenha automaticamente os cartões na tela conforme as chaves enviadas pelo seu ESP32.</p>
+              <p style={{ color: T.textMuted }}>
+                No firmware <b>ESP32-IoT-Controller</b>, configure as credenciais de MQTT nas configurações de rede (NVS) preenchendo o servidor como <code className="font-mono text-amber-500">grow.thegrowinstones.com</code> e a porta <code className="font-mono text-emerald-400">1883</code>.
+              </p>
             </div>
           </div>
         </div>
@@ -319,8 +336,6 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
     </div>
   );
 }
-
-
 
 import Logo, { getLogoSvgString } from "./Logo";
 
@@ -487,45 +502,55 @@ function MoneyInput({ value, onCommit, className, style }) {
 
 function IsometricPotSVG({ potW, potD, potH, potLiters, isRect, isSquare, dark, T }) {
   const svgW = 320;
-  const svgH = 180;
+  const svgH = 200;
   const isBox = isRect || isSquare;
-  const scaleX = 200 / ((potW + potD) * 0.866);
-  const drawW = potW * scaleX;
-  const drawD = potD * scaleX;
-  const drawH = Math.min(80, potH * 1.5);
+
+  // Unificação da escala para garantir proporções 3D perfeitas entre Largura, Profundidade e Altura
+  const maxDim = Math.max(potW || 20, potD || 20, potH || 20);
+  const scale = Math.min(2.5, 110 / maxDim);
+
+  const drawW = Math.max(35, potW * scale);
+  const drawD = Math.max(35, potD * scale);
+  const drawH = Math.max(35, Math.min(95, potH * scale * 0.75)); // Proporção realista de altura
+
   const cx = svgW / 2;
-  const cy = svgH / 2 + drawH / 3;
+  const cy = svgH / 2 + drawH / 4;
 
   if (isBox) {
-    const topP1 = { x: cx, y: cy - drawH - (drawW + drawD) * 0.25 };
-    const topP2 = { x: cx + drawW * 0.866, y: cy - drawH - (drawW - drawD) * 0.5 * 0.5 };
-    const topP3 = { x: cx + (drawW - drawD) * 0.866, y: cy - drawH + (drawW + drawD) * 0.25 };
-    const topP4 = { x: cx - drawD * 0.866, y: cy - drawH + (drawW - drawD) * 0.5 * 0.5 };
+    const rx = drawW * 0.5;
+    const ry = drawD * 0.28;
+    const topY = cy - drawH;
+
+    const topP1 = { x: cx, y: topY - ry };
+    const topP2 = { x: cx + rx, y: topY };
+    const topP3 = { x: cx, y: topY + ry };
+    const topP4 = { x: cx - rx, y: topY };
 
     const botP2 = { x: topP2.x, y: topP2.y + drawH };
     const botP3 = { x: topP3.x, y: topP3.y + drawH };
     const botP4 = { x: topP4.x, y: topP4.y + drawH };
 
     return (
-      <svg width="100%" height="180" viewBox={`0 0 ${svgW} ${svgH}`} fill="none">
-        <path d={`M ${topP1.x} ${topP1.y} L ${topP2.x} ${topP2.y} L ${topP3.x} ${topP3.y} L ${topP4.x} ${topP4.y} Z`} fill={dark ? "#334155" : "#cbd5e1"} stroke={dark ? "#64748b" : "#94a3b8"} strokeWidth="1.5" />
-        <path d={`M ${topP4.x} ${topP4.y} L ${topP3.x} ${topP3.y} L ${botP3.x} ${botP3.y} L ${botP4.x} ${botP4.y} Z`} fill={dark ? "#1e293b" : "#94a3b8"} stroke={dark ? "#475569" : "#64748b"} strokeWidth="1.5" />
-        <path d={`M ${topP3.x} ${topP3.y} L ${topP2.x} ${topP2.y} L ${botP2.x} ${botP2.y} L ${botP3.x} ${botP3.y} Z`} fill={dark ? "#0f172a" : "#64748b"} stroke={dark ? "#334155" : "#475569"} strokeWidth="1.5" />
-        <text x={cx} y={cy - drawH / 2} fill={dark ? "#f8fafc" : "#0f172a"} fontSize="12" fontWeight="bold" textAnchor="middle">{potLiters} L</text>
+      <svg width="100%" height="200" viewBox={`0 0 ${svgW} ${svgH}`} fill="none">
+        <path d={`M ${topP1.x} ${topP1.y} L ${topP2.x} ${topP2.y} L ${topP3.x} ${topP3.y} L ${topP4.x} ${topP4.y} Z`} fill={T.surface2} stroke={T.border} strokeWidth="1.5" />
+        <path d={`M ${topP4.x} ${topP4.y} L ${topP3.x} ${topP3.y} L ${botP3.x} ${botP3.y} L ${botP4.x} ${botP4.y} Z`} fill={T.surface} stroke={T.border} strokeWidth="1.5" />
+        <path d={`M ${topP3.x} ${topP3.y} L ${topP2.x} ${topP2.y} L ${botP2.x} ${botP2.y} L ${botP3.x} ${botP3.y} Z`} fill={T.bg} stroke={T.border} strokeWidth="1.5" />
+        <text x={cx} y={cy - drawH / 2} fill={T.text} fontSize="12" fontWeight="bold" textAnchor="middle">{potLiters} L</text>
       </svg>
     );
   }
 
-  const rx = drawW * 0.8;
-  const ry = drawD * 0.4;
+  // Vaso Cilíndrico proporcional
+  const rx = drawW * 0.45;
+  const ry = drawD * 0.22;
   const topY = cy - drawH;
 
   return (
-    <svg width="100%" height="180" viewBox={`0 0 ${svgW} ${svgH}`} fill="none">
-      <ellipse cx={cx} cy={cy} rx={rx * 0.85} ry={ry * 0.85} fill={dark ? "#1e293b" : "#94a3b8"} />
-      <path d={`M ${cx - rx} ${topY} A ${rx} ${ry} 0 0 0 ${cx + rx} ${topY} L ${cx + rx * 0.85} ${cy} A ${rx * 0.85} ${ry * 0.85} 0 0 1 ${cx - rx * 0.85} ${cy} Z`} fill={dark ? "#0f172a" : "#64748b"} stroke={dark ? "#334155" : "#475569"} strokeWidth="1.5" />
-      <ellipse cx={cx} cy={topY} rx={rx} ry={ry} fill={dark ? "#334155" : "#cbd5e1"} stroke={dark ? "#64748b" : "#94a3b8"} strokeWidth="1.5" />
-      <text x={cx} y={topY + 5} fill={dark ? "#f8fafc" : "#0f172a"} fontSize="12" fontWeight="bold" textAnchor="middle">{potLiters} L</text>
+    <svg width="100%" height="200" viewBox={`0 0 ${svgW} ${svgH}`} fill="none">
+      <ellipse cx={cx} cy={cy} rx={rx * 0.85} ry={ry * 0.85} fill={T.surface2} stroke={T.border} strokeWidth="1.2" />
+      <path d={`M ${cx - rx} ${topY} A ${rx} ${ry} 0 0 0 ${cx + rx} ${topY} L ${cx + rx * 0.85} ${cy} A ${rx * 0.85} ${ry * 0.85} 0 0 1 ${cx - rx * 0.85} ${cy} Z`} fill={T.surface} stroke={T.border} strokeWidth="1.5" />
+      <ellipse cx={cx} cy={topY} rx={rx} ry={ry} fill={T.surface2} stroke={T.border} strokeWidth="1.5" />
+      <text x={cx} y={topY + 4} fill={T.text} fontSize="12" fontWeight="bold" textAnchor="middle">{potLiters} L</text>
     </svg>
   );
 }
