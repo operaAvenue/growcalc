@@ -4277,14 +4277,14 @@ function GrowinStones() {
         {/* CONFIGURADOR & COMPARADOR VIEWS */}
         {(activeTab === "configurator" || activeTab === "comparison") && (
           <div className="max-w-6xl mx-auto px-6 py-6 w-full flex-1 flex flex-col">
-            {/* Título da Seção + Botões em Ícones (Fora do Header Principal) */}
-            <div className="flex items-center justify-between flex-wrap gap-4 pb-4 mb-6" style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+            {/* Cabeçalho Principal com Título e Botões de Ação em Ícones */}
+            <div className="flex items-center justify-between flex-wrap gap-4 pb-5 mb-6" style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
               <div>
-                <h1 className="text-xl font-bold tracking-tight" style={{ color: T.text }}>
-                  {activeTab === "comparison" ? " Comparação de Setups de Cultivo" : " Configurador de Grow"}
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight" style={{ color: T.text }}>
+                  Projete seu grow <span style={{ color: T.muted, fontStyle: "italic", fontWeight: 500 }}>em segundos</span>
                 </h1>
-                <p className="text-xs mt-0.5" style={{ color: T.textMuted }}>
-                  {activeTab === "comparison" ? "Compare múltiplos parâmetros de cultivo lado a lado" : "Dimensionamento hidráulico, elétrico, estrutural e financeiro"}
+                <p className="text-xs sm:text-sm mt-1" style={{ color: T.muted }}>
+                  Estrutura, ligações, custos, produção e retorno — com planta baixa em tempo real e relatório completo em PDF.
                 </p>
               </div>
 
@@ -4386,89 +4386,50 @@ function GrowinStones() {
                 </button>
               </div>
             </div>
-<main className="max-w-6xl mx-auto px-6 py-8">
-        <div className="mb-6">
-          <h1 className="text-4xl font-bold tracking-tight leading-tight">
-            Projete seu grow <span style={{ color: T.muted, fontStyle: "italic", fontWeight: 500 }}>em segundos</span>
-          </h1>
-          <p className="mt-2" style={{ color: T.muted }}>
-            Estrutura, ligações, custos, produção e retorno — com planta baixa em tempo real e relatório completo em PDF.
-          </p>
-        </div>
 
-        {/* Barra de Abas e Chips de Presets */}
-        <div className="space-y-4 mb-8">
-          <div className="flex items-center justify-between gap-4 flex-wrap pb-3"
-            style={{ borderBottom: `1px solid ${T.border}` }}>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setActiveTab("configurator")}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
-                style={activeTab === "configurator"
-                  ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
-                  : { background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-                <span>Projetar Grow</span>
-              </button>
+            {/* Chips removíveis para todos os presets */}
+            <div className="flex flex-wrap gap-2 items-center mb-8">
+              {allPresets.map((p) => (
+                <div key={p.id || p.name} className="flex items-center rounded-full transition-all shrink-0 shadow-sm"
+                  style={{ background: T.surface2, border: `1px solid ${T.accentBorder}`, color: T.text }}>
+                  <button onClick={() => loadPreset(p)}
+                    className="pl-3.5 pr-2 py-1.5 text-xs font-semibold hover:opacity-85 flex items-center gap-1.5"
+                    title={`Carregar setup "${p.name}"`}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.accentBorder }}>
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                    <span>{p.name}</span>
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); removePreset(p.id || p.name, p.name); }}
+                    title={`Remover chip "${p.name}"`}
+                    className="pr-3 pl-1 py-1.5 text-xs font-bold transition-colors hover:text-red-500 rounded-r-full"
+                    style={{ color: T.faint }}>
+                    ×
+                  </button>
+                </div>
+              ))}
 
-              <button onClick={() => setActiveTab("comparison")}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
-                style={activeTab === "comparison"
-                  ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
-                  : { background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-                <span>Comparativo entre Setups</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold"
-                  style={{ background: T.surface, color: T.accentBorder, border: `1px solid ${T.border}` }}>
-                  {allPresets.length}
-                </span>
-              </button>
-            </div>
-          </div>
-
-          {/* Chips removíveis para todos os presets */}
-          <div className="flex flex-wrap gap-2 items-center">
-            {allPresets.map((p) => (
-              <div key={p.id || p.name} className="flex items-center rounded-full transition-all shrink-0 shadow-sm"
-                style={{ background: T.surface2, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-                <button onClick={() => loadPreset(p)}
-                  className="pl-3.5 pr-2 py-1.5 text-xs font-semibold hover:opacity-85 flex items-center gap-1.5"
-                  title={`Carregar setup "${p.name}"`}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.accentBorder }}>
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                  </svg>
-                  <span>{p.name}</span>
-                </button>
-                <button onClick={(e) => { e.stopPropagation(); removePreset(p.id || p.name, p.name); }}
-                  title={`Remover chip "${p.name}"`}
-                  className="pr-3 pl-1 py-1.5 text-xs font-bold transition-colors hover:text-red-500 rounded-r-full"
-                  style={{ color: T.faint }}>
-                  ×
-                </button>
-              </div>
-            ))}
-
-            <button onClick={addCurrentAsPreset}
-              title="Salvar a configuração atual como um novo chip de preset"
-              className="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all hover:opacity-85 flex items-center gap-1.5 shrink-0"
-              style={{ background: T.surface2, border: `1.5px dashed ${T.accentBorder}`, color: T.text }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              <span>Salvar preset atual</span>
-            </button>
-
-            {allPresets.length === 0 && (
-              <button onClick={restoreDefaultPresets}
+              <button onClick={addCurrentAsPreset}
+                title="Salvar a configuração atual como um novo chip de preset"
                 className="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all hover:opacity-85 flex items-center gap-1.5 shrink-0"
-                style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
-                 Restaurar presets padrão
+                style={{ background: T.surface2, border: `1.5px dashed ${T.accentBorder}`, color: T.text }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+                <span>Salvar preset atual</span>
               </button>
-            )}
-          </div>
-        </div>
 
-        {activeTab === "configurator" ? (
+              {allPresets.length === 0 && (
+                <button onClick={restoreDefaultPresets}
+                  className="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all hover:opacity-85 flex items-center gap-1.5 shrink-0"
+                  style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
+                  Restaurar presets padrão
+                </button>
+              )}
+            </div>
+
+            {activeTab === "configurator" ? (
           <div className="grid lg:grid-cols-5 gap-6 items-start">
           {/* ————— Configuração ————— */}
           <div className="lg:col-span-2 space-y-5">
@@ -5323,7 +5284,8 @@ function GrowinStones() {
         <p className="text-xs mt-10 text-center" style={{ color: T.faint }}>
           Estimativas para planejamento — produtividade, preços e consumo variam com genética, manejo e tarifas locais.
         </p>
-      </main>
+      </div>
+    )}
 
       {/* Subdomain Publisher Modal */}
       {publishModalOpen && (
@@ -5414,8 +5376,6 @@ function GrowinStones() {
           {toastMsg}
         </div>
       )}
-          </div>
-        )}
       </div>
     </div>
   );
