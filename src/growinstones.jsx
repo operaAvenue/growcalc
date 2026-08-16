@@ -3834,8 +3834,8 @@ function GrowinStones() {
       return `
         <div class="post-card">
           <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-            <div style="width:42px; height:42px; border-radius:50%; overflow:hidden; background:${isDark ? '#292524' : '#e2dccc'}; border:1px solid ${isDark ? '#44403c' : '#d8cfbe'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; color:${isDark ? '#f59e0b' : '#b45309'}; shrink:0;">
-              ${pAvatar ? `<img src="${pAvatar}" style="width:100%; height:100%; object-fit:cover;" />` : pAuthor.charAt(0).toUpperCase()}
+            <div style="width:42px; height:42px; min-width:42px; min-height:42px; max-width:42px; max-height:42px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; background:${isDark ? '#292524' : '#e2dccc'}; border:1px solid ${isDark ? '#44403c' : '#d8cfbe'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; color:${isDark ? '#f59e0b' : '#b45309'};">
+              ${pAvatar ? `<img src="${pAvatar}" alt="Avatar" style="width:100%; height:100%; aspect-ratio:1/1; object-fit:cover; display:block; border-radius:50%;" />` : pAuthor.charAt(0).toUpperCase()}
             </div>
             <div>
               <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
@@ -4002,8 +4002,8 @@ function GrowinStones() {
     <div style="padding:0 24px 24px; position:relative;">
       {/* AVATAR & BADGES & ÍCONE DO PROJETO */}
       <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-top:-50px; margin-bottom:16px;">
-        <div style="width:100px; height:100px; border-radius:50%; overflow:hidden; border:4px solid ${isDark ? '#1c1917' : '#ffffff'}; background:${isDark ? '#292524' : '#e2dccc'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:32px; color:${isDark ? '#f59e0b' : '#b45309'}; box-shadow:0 10px 25px rgba(0,0,0,0.15); shrink:0;">
-          ${userAvatarUrl ? `<img src="${userAvatarUrl}" alt="Avatar" style="width:100%; height:100%; object-fit:cover; display:block;" />` : userDisplayName.charAt(0).toUpperCase()}
+        <div style="width:100px; height:100px; min-width:100px; min-height:100px; max-width:100px; max-height:100px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; border:4px solid ${isDark ? '#1c1917' : '#ffffff'}; background:${isDark ? '#292524' : '#e2dccc'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:32px; color:${isDark ? '#f59e0b' : '#b45309'}; box-shadow:0 10px 25px rgba(0,0,0,0.15);">
+          ${userAvatarUrl ? `<img src="${userAvatarUrl}" alt="Avatar" style="width:100%; height:100%; aspect-ratio:1/1; object-fit:cover; display:block; border-radius:50%;" />` : userDisplayName.charAt(0).toUpperCase()}
         </div>
 
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
