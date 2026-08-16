@@ -19,11 +19,16 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
   const [attachedVideos, setAttachedVideos] = useState([]);
   const [isPosting, setIsPosting] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
+  const [cropImageSrc, setCropImageSrc] = useState(null);
+  const [isCropperOpen, setIsCropperOpen] = useState(false);
 
   // Close lightbox on Escape key
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === "Escape") setLightboxImage(null);
+      if (e.key === "Escape") {
+        setLightboxImage(null);
+        setIsCropperOpen(false);
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -191,30 +196,51 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
     });
   };
 
-  // Handle Avatar Change (Upload e salvamento instantâneo permanente)
-  const handleAvatarFile = async (e) => {
+  // Handle Avatar Change: Abre modal interativo de ajuste e corte 1:1
+  const handleAvatarFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    showToast("Enviando foto de perfil...");
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setCropImageSrc(ev.target.result);
+      setIsCropperOpen(true);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  // Upload e salvamento instantâneo permanente do avatar cortado
+  const handleAvatarCropComplete = async (croppedDataUrl) => {
+    showToast("Enviando foto de perfil cortada...");
     try {
-      const uploadedUrl = await uploadMediaFile(file, "avatar", 500, 500, 0.85);
-      if (uploadedUrl) {
-        setAvatarPreview(uploadedUrl);
-        const updated = {
-          ...currentUser,
-          avatarUrl: uploadedUrl
-        };
-        setCurrentUser(updated);
-        try { localStorage.setItem("growcalc_user", JSON.stringify(updated)); } catch(e) {}
-        fetch("https://grow.thegrowinstones.com/api/user/sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user: updated, posts })
-        }).catch(() => {});
-        showToast("Foto de perfil atualizada e salva na nuvem!");
-      }
+      const res = await fetch("https://grow.thegrowinstones.com/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: croppedDataUrl, type: "avatar" })
+      });
+      const json = await res.json();
+      const uploadedUrl = (json && json.success && json.url) ? json.url : croppedDataUrl;
+
+      setAvatarPreview(uploadedUrl);
+      const updated = {
+        ...currentUser,
+        avatarUrl: uploadedUrl
+      };
+      setCurrentUser(updated);
+      try { localStorage.setItem("growcalc_user", JSON.stringify(updated)); } catch(e) {}
+      fetch("https://grow.thegrowinstones.com/api/user/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user: updated, posts })
+      }).catch(() => {});
+
+      setIsCropperOpen(false);
+      setCropImageSrc(null);
+      showToast("Foto de perfil atualizada e salva com sucesso!");
     } catch (err) {
+      console.warn("Erro ao salvar avatar:", err);
       showToast("Erro ao processar imagem de avatar.");
+      setIsCropperOpen(false);
     }
   };
 
@@ -831,6 +857,19 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
           </div>
         </div>
       )}
+
+      {/* ————————————————— MODAL DE AJUSTE E CORTE DO AVATAR ————————————————— */}
+      <AvatarCropperModal
+        isOpen={isCropperOpen}
+        imageSrc={cropImageSrc}
+        onClose={() => {
+          setIsCropperOpen(false);
+          setCropImageSrc(null);
+        }}
+        onCropComplete={handleAvatarCropComplete}
+        T={T}
+        dark={dark}
+      />
     </div>
   );
 }
@@ -1027,6 +1066,300 @@ function PostCard({ post, currentUser, T, dark, onToggleLike, onDelete, onAddCom
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ————————————————— MODAL DE AJUSTE E CORTE DE AVATAR (1:1 CIRCULAR CROP) —————————————————
+function AvatarCropperModal({ imageSrc, isOpen, onClose, onCropComplete, T, dark }) {
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const containerRef = useRef(null);
+  const imageRef = useRef(null);
+
+  // Reset when opening with new image
+  useEffect(() => {
+    if (isOpen) {
+      setZoom(1);
+      setRotation(0);
+      setOffset({ x: 0, y: 0 });
+      setIsProcessing(false);
+    }
+  }, [isOpen, imageSrc]);
+
+  if (!isOpen || !imageSrc) return null;
+
+  const handleMouseDown = (e) => {
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y });
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isDragging) return;
+    setOffset({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleTouchStart = (e) => {
+    if (e.touches.length === 1) {
+      setIsDragging(true);
+      setDragStart({
+        x: e.touches[0].clientX - offset.x,
+        y: e.touches[0].clientY - offset.y
+      });
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isDragging || e.touches.length !== 1) return;
+    setOffset({
+      x: e.touches[0].clientX - dragStart.x,
+      y: e.touches[0].clientY - dragStart.y
+    });
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
+  const handleRotate = () => {
+    setRotation((prev) => (prev + 90) % 360);
+  };
+
+  const handleReset = () => {
+    setZoom(1);
+    setRotation(0);
+    setOffset({ x: 0, y: 0 });
+  };
+
+  const handleSaveCrop = async () => {
+    if (!imageRef.current || isProcessing) return;
+    setIsProcessing(true);
+
+    try {
+      const CROP_SIZE = 500; // Output square avatar resolution in px
+      const canvas = document.createElement("canvas");
+      canvas.width = CROP_SIZE;
+      canvas.height = CROP_SIZE;
+      const ctx = canvas.getContext("2d");
+
+      const img = imageRef.current;
+      const cropCircleDiameter = 260; // diameter of preview crop frame in px
+      const scaleFactor = CROP_SIZE / cropCircleDiameter;
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, CROP_SIZE, CROP_SIZE);
+
+      ctx.save();
+      ctx.translate(CROP_SIZE / 2, CROP_SIZE / 2);
+      ctx.translate(offset.x * scaleFactor, offset.y * scaleFactor);
+      ctx.rotate((rotation * Math.PI) / 180);
+
+      const previewImgWidth = img.width || img.naturalWidth;
+      const previewImgHeight = img.height || img.naturalHeight;
+
+      const drawWidth = previewImgWidth * zoom * scaleFactor;
+      const drawHeight = previewImgHeight * zoom * scaleFactor;
+
+      ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+      ctx.restore();
+
+      const croppedDataUrl = canvas.toDataURL("image/jpeg", 0.9);
+      await onCropComplete(croppedDataUrl);
+    } catch (err) {
+      console.error("Erro ao cortar avatar:", err);
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+      <div
+        className="w-full max-w-md rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border flex flex-col"
+        style={{ background: T.surface, borderColor: T.border, color: T.text }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: T.borderSoft }}>
+          <div className="flex items-center gap-2">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/>
+            </svg>
+            <h3 className="font-extrabold text-sm sm:text-base">Ajustar e Cortar Avatar</h3>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={isProcessing}
+            className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm hover:opacity-75"
+            style={{ background: T.surface2, color: T.text, border: `1px solid ${T.border}` }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Viewport / Crop Canvas Area */}
+        <div className="p-4 flex flex-col items-center select-none">
+          <p className="text-[11px] text-center mb-3 font-medium" style={{ color: T.muted }}>
+            Arraste para posicionar e use o slider para ampliar o seu avatar.
+          </p>
+
+          <div
+            ref={containerRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            className="relative w-[280px] h-[280px] sm:w-[300px] sm:h-[300px] rounded-2xl bg-neutral-950 overflow-hidden flex items-center justify-center cursor-grab active:cursor-grabbing border border-neutral-700 shadow-inner"
+          >
+            {/* The Scalable / Draggable Image */}
+            <img
+              ref={imageRef}
+              src={imageSrc}
+              alt="Crop target"
+              draggable={false}
+              style={{
+                transform: `translate(${offset.x}px, ${offset.y}px) rotate(${rotation}deg) scale(${zoom})`,
+                transformOrigin: "center center",
+                maxWidth: "260px",
+                maxHeight: "260px",
+                objectFit: "contain",
+                userSelect: "none",
+                pointerEvents: "none",
+                transition: isDragging ? "none" : "transform 0.05s ease-out"
+              }}
+            />
+
+            {/* Circular Mask Overlay */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.65)",
+                borderRadius: "50%",
+                width: "260px",
+                height: "260px",
+                margin: "auto",
+                border: "2px dashed rgba(255, 255, 255, 0.85)"
+              }}
+            />
+
+            {/* Center target crosshair subtle icon */}
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-30">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="1.5">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </div>
+          </div>
+
+          {/* Controls Bar */}
+          <div className="w-full mt-4 space-y-3 px-2">
+            {/* Zoom Slider */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.1).toFixed(2))))}
+                className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm border"
+                style={{ background: T.surface2, borderColor: T.border, color: T.text }}
+                title="Diminuir Zoom"
+              >
+                −
+              </button>
+              <input
+                type="range"
+                min="0.5"
+                max="3"
+                step="0.02"
+                value={zoom}
+                onChange={(e) => setZoom(parseFloat(e.target.value))}
+                className="flex-1 accent-amber-600 h-1.5 rounded-lg bg-neutral-300 dark:bg-neutral-700 cursor-pointer"
+              />
+              <button
+                type="button"
+                onClick={() => setZoom((z) => Math.min(3, Number((z + 0.1).toFixed(2))))}
+                className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm border"
+                style={{ background: T.surface2, borderColor: T.border, color: T.text }}
+                title="Aumentar Zoom"
+              >
+                +
+              </button>
+              <span className="text-[11px] font-mono w-10 text-right" style={{ color: T.muted }}>
+                {Math.round(zoom * 100)}%
+              </span>
+            </div>
+
+            {/* Rotation & Reset Buttons */}
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleRotate}
+                className="px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 hover:opacity-85"
+                style={{ background: T.surface2, borderColor: T.border, color: T.text }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                <span>Girar 90°</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleReset}
+                className="px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 hover:opacity-85"
+                style={{ background: T.surface2, borderColor: T.border, color: T.muted }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                <span>Centralizar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Actions */}
+        <div className="flex items-center justify-end gap-2 px-5 py-3.5 border-t" style={{ borderColor: T.borderSoft }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isProcessing}
+            className="px-4 py-2 rounded-xl text-xs font-bold hover:opacity-85"
+            style={{ background: T.surface2, color: T.muted }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveCrop}
+            disabled={isProcessing}
+            className="px-5 py-2 rounded-xl text-xs font-extrabold text-white flex items-center gap-2 shadow-md transition-all hover:scale-[1.02] disabled:opacity-50"
+            style={{ background: dark ? "#0284c7" : "#0369a1" }}
+          >
+            {isProcessing ? (
+              <>
+                <svg className="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                </svg>
+                <span>Processando...</span>
+              </>
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Cortar e Salvar</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
