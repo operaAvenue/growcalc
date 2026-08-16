@@ -3164,12 +3164,59 @@ function GrowinStones() {
       <div style="font-size:10.5px; color:#6b6354; margin-top:8px;">Planta baixa (${width} × ${depth} cm) · ${plants} vaso(s) de ${esc(pot.label)} (${esc(potDesc)})<br/>Afastamento paredes: E/D ${layout.wallLeft}/${layout.wallRight} cm, Sup/Inf ${layout.wallTop}/${layout.wallBottom} cm · Entre vasos: ${spacing} cm</div>
     </div>`;
 
+    const presetMetrics = (Array.isArray(allPresets) && allPresets.length > 0)
+      ? allPresets.map((p) => calculatePresetMetrics(p))
+      : [];
+
+    const comparisonReportHtml = presetMetrics.length > 0
+      ? `<h2>8 · Comparativo entre Setups de Cultivo (Chips)</h2>
+         <div style="background:#f5f1e7; border-radius:12px; padding:12px 14px; margin-bottom:16px;">
+           <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;">
+             ${presetMetrics.map((m) => `
+               <span style="display:inline-flex; align-items:center; gap:4px; padding:3px 10px; background:#ffffff; border:1px solid #d8cfbe; border-radius:16px; font-size:10px; font-weight:700; color:#1f1b16;">
+                 <span>${esc(m.name)}</span>
+                 <small style="color:#78716c; font-weight:500;">(${m.width}×${m.depth}cm · ${m.potCount}v)</small>
+               </span>
+             `).join("")}
+           </div>
+           <div style="overflow-x:auto;">
+             <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:left;">
+               <thead>
+                 <tr style="border-bottom:1.5px solid #d8cfbe; color:#78716c; font-size:9.5px; text-transform:uppercase; letter-spacing:0.05em;">
+                   <th style="padding:6px 6px;">Setup</th>
+                   <th style="padding:6px 6px; text-align:right;">Invest. (CAPEX)</th>
+                   <th style="padding:6px 6px; text-align:right;">OPEX / Mês</th>
+                   <th style="padding:6px 6px; text-align:right;">Prod. Anual</th>
+                   <th style="padding:6px 6px; text-align:right;">Custo / g</th>
+                   <th style="padding:6px 6px; text-align:right;">Payback</th>
+                 </tr>
+               </thead>
+               <tbody>
+                 ${presetMetrics.map((m) => `
+                   <tr style="border-bottom:1px dotted #e2dccc;">
+                     <td style="padding:6px 6px; font-weight:700; color:#1f1b16;">
+                       ${esc(m.name)}
+                       <div style="font-size:9px; font-weight:400; color:#78716c;">${m.width}×${m.depth}×${m.height} cm · ${m.potCount}× ${esc(m.potLabel)}</div>
+                     </td>
+                     <td style="padding:6px 6px; text-align:right; font-weight:600; color:#1f1b16;">${fmtBRL(m.capex)}</td>
+                     <td style="padding:6px 6px; text-align:right; color:#78716c;">${fmtBRL(m.opexMonth)}</td>
+                     <td style="padding:6px 6px; text-align:right; font-weight:600; color:#1f1b16;">${fmtG(m.yieldYearG)}</td>
+                     <td style="padding:6px 6px; text-align:right; font-weight:600; color:#b45309;">${fmtBRL(m.costPerGramOpex)}</td>
+                     <td style="padding:6px 6px; text-align:right; font-weight:700; color:#1f1b16;">${m.paybackMonths ? `${m.paybackMonths.toFixed(1)} m` : "—"}</td>
+                   </tr>
+                 `).join("")}
+               </tbody>
+             </table>
+           </div>
+         </div>`
+      : "";
+
     const safeNotes = typeof notes === "string" ? notes.trim() : "";
     const safeInst = typeof instructions === "string" ? instructions.trim() : "";
     const safeTerms = typeof terms === "string" ? terms.trim() : "";
 
     const extraNotesHtml = (safeNotes || safeInst || safeTerms)
-      ? `<h2>8 · Observações, instruções e termos</h2>
+      ? `<h2>9 · Observações, instruções e termos</h2>
          <div style="background:#f5f1e7; border-radius:12px; padding:12px 14px; margin-bottom:16px; font-size:11px; color:#1f1b16;">
            ${safeNotes ? `<div style="margin-bottom:10px;"><b style="display:block; text-transform:uppercase; font-size:9.5px; color:#6b6354; margin-bottom:3px; letter-spacing:0.05em;">Observações</b><div style="white-space:pre-wrap; line-height:1.4;">${esc(safeNotes)}</div></div>` : ""}
            ${safeInst ? `<div style="margin-bottom:10px;"><b style="display:block; text-transform:uppercase; font-size:9.5px; color:#6b6354; margin-bottom:3px; letter-spacing:0.05em;">Instruções de operação</b><div style="white-space:pre-wrap; line-height:1.4;">${esc(safeInst)}</div></div>` : ""}
@@ -3178,7 +3225,7 @@ function GrowinStones() {
       : "";
 
     const shoppingListHtml = (Array.isArray(shoppingListItems) && shoppingListItems.length > 0)
-      ? `<h2>9 · Lista de compras & QR Codes</h2>
+      ? `<h2>10 · Lista de compras & QR Codes</h2>
          <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
            ${shoppingListItems.map((item) => {
              const itemUrl = typeof item?.url === "string" ? item.url.trim() : "";
@@ -3303,6 +3350,7 @@ function GrowinStones() {
   ${revHtml}
   <h2>7 · Diagnóstico do projeto</h2>
   ${alertsHtml}
+  ${comparisonReportHtml}
   ${extraNotesHtml}
   ${shoppingListHtml}
   <p class="ft">Documento gerado pelo GrowinStones em ${today}. Valores estimados para planejamento — produtividade, preços e consumo variam com genética, manejo, fase do cultivo e tarifas locais. Não constitui aconselhamento financeiro.</p>
@@ -3318,6 +3366,56 @@ function GrowinStones() {
     const safeInst = typeof instructions === "string" ? instructions.trim() : "";
     const safeTerms = typeof terms === "string" ? terms.trim() : "";
     const displaySlug = slug || subdomainInput || (currentUser?.username) || "grow";
+
+    const presetMetrics = (Array.isArray(allPresets) && allPresets.length > 0)
+      ? allPresets.map((p) => calculatePresetMetrics(p))
+      : [];
+
+    const webComparisonHtml = presetMetrics.length > 0
+      ? `<div class="sec-card">
+          <h2 class="sec-title"> Comparativo de Setups & Presets Selecionados</h2>
+          <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px;">
+            ${presetMetrics.map((m) => `
+              <span style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; background:#292524; border:1px solid #44403c; border-radius:20px; font-size:12px; font-weight:700; color:#f5f5f4;">
+                <span style="width:6px; height:6px; border-radius:50%; background:#f59e0b;"></span>
+                <span>${esc(m.name)}</span>
+                <span style="font-size:11px; color:#a8a29e; font-weight:400;">(${m.width}×${m.depth}cm · ${m.potCount} vasos)</span>
+              </span>
+            `).join("")}
+          </div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Setup</th>
+                  <th style="text-align:right;">Investimento (CAPEX)</th>
+                  <th style="text-align:right;">OPEX / Mês</th>
+                  <th style="text-align:right;">Produção / Ano</th>
+                  <th style="text-align:right;">Receita / Ano</th>
+                  <th style="text-align:right;">Custo / Grama</th>
+                  <th style="text-align:right;">Payback</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${presetMetrics.map((m) => `
+                  <tr>
+                    <td>
+                      <b style="color:#ffffff; font-size:13.5px;">${esc(m.name)}</b>
+                      <div style="font-size:11px; color:#a8a29e;">${m.width}×${m.depth}×${m.height} cm · ${m.potCount}× ${esc(m.potLabel)}</div>
+                    </td>
+                    <td style="text-align:right; font-weight:700; color:#38bdf8;">${fmtBRL(m.capex)}</td>
+                    <td style="text-align:right; color:#f43f5e;">${fmtBRL(m.opexMonth)}</td>
+                    <td style="text-align:right; font-weight:700; color:#34d399;">${fmtG(m.yieldYearG)}</td>
+                    <td style="text-align:right; font-weight:700; color:#f59e0b;">${m.priceG > 0 ? fmtBRL(m.revYear) : "—"}</td>
+                    <td style="text-align:right; font-weight:700; color:#a3e635;">${fmtBRL(m.costPerGramOpex)}</td>
+                    <td style="text-align:right; font-weight:700; color:#a78bfa;">${m.paybackMonths ? `${m.paybackMonths.toFixed(1)} m` : "—"}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+        </div>`
+      : "";
 
     const rowsHtml = materialRows
       .map((r) => `<tr style="border-bottom:1px solid #e2e8f0;">
@@ -3397,7 +3495,7 @@ function GrowinStones() {
 
     const shoppingListHtml = (Array.isArray(shoppingListItems) && shoppingListItems.length > 0)
       ? `<div style="margin-top:28px;">
-          <h2 style="font-size:14px; text-transform:uppercase; letter-spacing:0.12em; color:#0369a1; border-bottom:2px solid #bae6fd; padding-bottom:8px; margin-bottom:16px;"> Lista de compras com QR Codes</h2>
+          <h2 style="font-size:14px; text-transform:uppercase; letter-spacing:0.12em; color:#0369a1; border-bottom:2px solid #bae6fd; padding-bottom:8px; margin-bottom:16px;">Lista de compras com QR Codes</h2>
           <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:14px;">
             ${shoppingListItems.map((item) => {
               const itemUrl = typeof item?.url === "string" ? item.url.trim() : "";
@@ -3458,7 +3556,10 @@ function GrowinStones() {
 <body>
 <header>
   <div class="header-in">
-    <a href="#" class="brand"> GrowinStones</a>
+    <div style="display:flex; align-items:center; gap:12px;">
+      ${getLogoSvgString(30, "#f59e0b")}
+      <span style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.14em; color:#a8a29e; border-left:1px solid #44403c; padding-left:10px;">Dashboard Interativo</span>
+    </div>
     <a href="https://${displaySlug}.thegrowinstones.com" target="_blank" class="badge-live">https://${displaySlug}.thegrowinstones.com</a>
   </div>
 </header>
@@ -3471,7 +3572,7 @@ function GrowinStones() {
           ${owner ? `Responsável: <b style="color:#f5f5f4;">${esc(owner)}</b> · ` : ""}Genética: <b style="color:#f5f5f4;">${esc(strain || "Não informada")}</b> · Atualizado em ${today}
         </div>
       </div>
-      <button onclick="window.print()" style="background:#0284c7; color:#fff; border:none; padding:10px 18px; border-radius:12px; font:700 13px Inter; cursor:pointer;">️ Exportar PDF</button>
+      <button onclick="window.print()" style="background:#0284c7; color:#fff; border:none; padding:10px 18px; border-radius:12px; font:700 13px Inter; cursor:pointer;">Exportar PDF</button>
     </div>
   </div>
 
@@ -3500,7 +3601,7 @@ function GrowinStones() {
 
   <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:24px;">
     <div class="sec-card">
-      <h2 class="sec-title"> Estrutura & Dimensões</h2>
+      <h2 class="sec-title">Estrutura & Dimensões</h2>
       <div class="kv-row"><span>Dimensões (L × P × A)</span><b>${width} × ${depth} × ${height} cm</b></div>
       <div class="kv-row"><span>Área / Volume</span><b>${areaM2.toFixed(2)} m² · ${volumeM3.toFixed(2)} m³</b></div>
       <div class="kv-row"><span>Vasos</span><b>${plants} × ${pot.label} (${esc(potDesc)})</b></div>
@@ -3512,7 +3613,7 @@ function GrowinStones() {
     </div>
 
     <div class="sec-card">
-      <h2 class="sec-title"> Custos Operacionais & Energia</h2>
+      <h2 class="sec-title">Custos Operacionais & Energia</h2>
       <div class="kv-row"><span>Potência Total Instalada</span><b>${totalWatts} W</b></div>
       <div class="kv-row"><span>Consumo Mensal</span><b>${kwhMonth.toFixed(0)} kWh</b></div>
       <div class="kv-row"><span>Tarifa de Energia</span><b>${fmtBRL(tariff)} / kWh</b></div>
@@ -3525,7 +3626,7 @@ function GrowinStones() {
   </div>
 
   <div class="sec-card">
-    <h2 class="sec-title">️ Planta Baixa Interativa</h2>
+    <h2 class="sec-title">Planta Baixa Interativa</h2>
     <div style="background:#f5f1e7; border-radius:14px; padding:16px; text-align:center;">
       <svg width="${svgW}" height="${totalSvgH}" viewBox="0 0 ${svgW} ${totalSvgH}" style="width:100%; max-width:${svgW}px; height:auto; display:block; margin:0 auto;">
         <rect x="${OX}" y="${OY}" width="${topW}" height="${topH}" rx="10" fill="#ffffff" stroke="#1f1b16" stroke-width="1.5"/>
@@ -3542,7 +3643,7 @@ function GrowinStones() {
   </div>
 
   <div class="sec-card">
-    <h2 class="sec-title"> Equipamentos e Materiais (CAPEX)</h2>
+    <h2 class="sec-title">Equipamentos e Materiais (CAPEX)</h2>
     <table>
       <thead>
         <tr>
@@ -3566,11 +3667,13 @@ function GrowinStones() {
     </table>
   </div>
 
+  ${webComparisonHtml}
+
   ${shoppingListHtml}
 
   ${safeNotes || safeInst || safeTerms ? `
   <div class="sec-card">
-    <h2 class="sec-title"> Notas, Instruções & Termos</h2>
+    <h2 class="sec-title">Notas, Instruções & Termos</h2>
     ${safeNotes ? `<div style="margin-bottom:12px;"><b style="color:#f59e0b; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Observações</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeNotes)}</div></div>` : ""}
     ${safeInst ? `<div style="margin-bottom:12px;"><b style="color:#f59e0b; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Instruções de Operação</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeInst)}</div></div>` : ""}
     ${safeTerms ? `<div><b style="color:#f59e0b; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Termos & Condições</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeTerms)}</div></div>` : ""}
