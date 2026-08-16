@@ -78,58 +78,61 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
   };
 
   const esp32CodeSnippet = `// ——————————————————————————————————————————————————————————
-// CÓDIGO ESP32 PARA GROWINSTONES (HTTP REST / MQTT TELEMETRY)
-// Subdomínio: ${currentUser.username}.thegrowinstones.com
+// OPÇÃO 1: CÓDIGO ESP32 USANDO MQTT NATIVO (PubSubClient - Porta 1883)
 // ——————————————————————————————————————————————————————————
-
 #include <WiFi.h>
-#include <HTTPClient.h>
+#include <PubSubClient.h>
 #include <ArduinoJson.h>
 
-const char* ssid     = "SUA_REDE_WIFI";
-const char* password = "SEU_PASSWORD_WIFI";
+const char* ssid         = "SUA_REDE_WIFI";
+const char* password     = "SENHA_DO_SEU_WIFI";
 
-const char* serverUrl = "https://grow.thegrowinstones.com/api/mqtt/telemetry";
-const char* username  = "${currentUser.username}";
+const char* mqttServer   = "grow.thegrowinstones.com"; // ou IP 34.196.51.10
+const int   mqttPort     = 1883;                        // PORTA MQTT NATIVA
+const char* mqttTopic    = "growinstones/${currentUser.username}/telemetry";
+
+WiFiClient espClient;
+PubSubClient client(espClient);
 
 void setup() {
   Serial.begin(115200);
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nWiFi Conectado!");
+  while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
+  Serial.println("\\nWiFi Conectado!");
+
+  client.setServer(mqttServer, mqttPort);
 }
 
 void loop() {
-  if (WiFi.status() == WL_CONNECTED) {
-    HTTPClient http;
-    http.begin(serverUrl);
-    http.addHeader("Content-Type", "application/json");
-
-    StaticJsonDocument<256> doc;
-    doc["username"] = username;
-    doc["topic"] = "growinstones/${currentUser.username}/telemetry";
-
-    JsonObject data = doc.createNestedObject("data");
-    data["temp"] = 24.5;       // Sensor DHT22 / DS18B20
-    data["humidity"] = 62.0;   // Sensor umidade
-    data["ph"] = 5.85;         // Sensor pH
-    data["ec"] = 1.65;         // Sensor EC
-    data["waterLevel"] = 85;   // Sensor ultrassônico
-    data["pumpWater"] = true;
-    data["pumpAir"] = true;
-    data["led"] = true;
-
-    String jsonString;
-    serializeJson(doc, jsonString);
-
-    int httpResponseCode = http.POST(jsonString);
-    Serial.printf("Telemetria enviada! Código HTTP: %d\n", httpResponseCode);
-    http.end();
+  if (!client.connected()) {
+    while (!client.connected()) {
+      Serial.print("Conectando ao Broker MQTT na porta 1883...");
+      if (client.connect("ESP32_GrowClient_${currentUser.username}")) {
+        Serial.println("Conectado!");
+      } else {
+        delay(2000);
+      }
+    }
   }
-  delay(5000); // Envia a cada 5 segundos
+  client.loop();
+
+  StaticJsonDocument<256> doc;
+  doc["temp"]       = 24.5;
+  doc["humidity"]   = 62.0;
+  doc["ph"]         = 5.85;
+  doc["ec"]         = 1.65;
+  doc["waterLevel"] = 85;
+  doc["pumpWater"]  = true;
+  doc["pumpAir"]    = true;
+  doc["led"]        = true;
+
+  char buffer[256];
+  serializeJson(doc, buffer);
+
+  client.publish(mqttTopic, buffer);
+  Serial.println("Mensagem enviada via MQTT Porta 1883!");
+
+  delay(5000);
 }`;
 
   return (
@@ -138,9 +141,9 @@ void loop() {
       <div className="flex items-center justify-between flex-wrap gap-4 mb-8">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold" style={{ color: T.text }}>📡 Telemetria ESP32 / MQTT</h1>
+            <h1 className="text-2xl font-bold" style={{ color: T.text }}>📡 Telemetria ESP32 / MQTT (Porta 1883)</h1>
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> CONECTADO
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> CONECTADO A PORTA 1883
             </span>
           </div>
           <p className="text-xs mt-1" style={{ color: T.textMuted }}>
@@ -170,18 +173,35 @@ void loop() {
       </div>
 
       {/* Connection info bar */}
-      <div className="p-4 rounded-2xl mb-8 flex items-center justify-between flex-wrap gap-3" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+      <div className="p-4 rounded-2xl mb-8 grid grid-cols-1 sm:grid-cols-3 gap-4" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 shrink-0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
           </div>
           <div>
-            <div className="text-xs font-bold" style={{ color: T.text }}>Topic MQTT: <code className="text-sky-400 font-mono">growinstones/{currentUser.username}/telemetry</code></div>
-            <div className="text-[11px]" style={{ color: T.textMuted }}>Endpoint: <code className="font-mono">https://grow.thegrowinstones.com/api/mqtt/telemetry</code></div>
+            <div className="text-[11px] text-stone-400">Servidor MQTT (Host):</div>
+            <div className="text-xs font-bold text-sky-400 font-mono">grow.thegrowinstones.com</div>
           </div>
         </div>
-        <div className="text-xs font-mono" style={{ color: T.textMuted }}>
-          Última leitura: <b style={{ color: T.text }}>{telemetry.timestamp}</b>
+
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 shrink-0">
+            1883
+          </div>
+          <div>
+            <div className="text-[11px] text-stone-400">Porta MQTT TCP:</div>
+            <div className="text-xs font-bold text-emerald-400 font-mono">1883 (ou 8083 WS)</div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 shrink-0">
+            #
+          </div>
+          <div>
+            <div className="text-[11px] text-stone-400">Tópico MQTT do Usuário:</div>
+            <div className="text-xs font-bold text-amber-400 font-mono">growinstones/{currentUser.username}/telemetry</div>
+          </div>
         </div>
       </div>
 
