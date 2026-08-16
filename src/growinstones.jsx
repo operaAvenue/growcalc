@@ -2069,8 +2069,10 @@ function GrowinStones() {
               // Restaurar setup de cultivo da nuvem se houver
               if (cloudData.setup) {
                 try {
-                  applyPreset(cloudData.setup);
-                } catch(e) {}
+                  loadUserSetupFromData(cloudData.setup);
+                } catch(e) {
+                  console.warn("Aviso ao carregar setup:", e);
+                }
               }
 
               localStorage.setItem("growcalc_user", JSON.stringify(restoredUser));
@@ -2573,11 +2575,25 @@ function GrowinStones() {
   const setCost = (key, v) => setCosts((c) => ({ ...c, [key]: Math.max(0, Number(v) || 0) }));
 
   const applyPreset = (p) => {
-    setWidth(p.apply.width); setDepth(p.apply.depth); setHeight(p.apply.height);
-    setPotCount(p.apply.potCount); setPotIdx(p.apply.potIdx);
-    setGaugeIdx(p.apply.gaugeIdx); setSpacing(p.apply.spacing);
-    setCols(p.apply.cols); setConn(p.apply.conn);
-    setEquip({ ...p.equip });
+    if (!p) return;
+    if (p.apply) {
+      if (p.apply.width !== undefined) setWidth(p.apply.width);
+      if (p.apply.depth !== undefined) setDepth(p.apply.depth);
+      if (p.apply.height !== undefined) setHeight(p.apply.height);
+      if (p.apply.potCount !== undefined) setPotCount(p.apply.potCount);
+      if (p.apply.potIdx !== undefined) setPotIdx(p.apply.potIdx);
+      if (p.apply.gaugeIdx !== undefined) setGaugeIdx(p.apply.gaugeIdx);
+      if (p.apply.spacing !== undefined) setSpacing(p.apply.spacing);
+      if (p.apply.cols !== undefined) setCols(p.apply.cols);
+      if (p.apply.conn !== undefined) setConn(p.apply.conn);
+      if (p.apply.recirculate !== undefined) setRecirculate(p.apply.recirculate);
+      if (p.equip) setEquip({ ...p.equip });
+      if (p.data) loadUserSetupFromData(p.data);
+    } else if (p.data) {
+      loadUserSetupFromData(p.data);
+    } else {
+      loadUserSetupFromData(p);
+    }
   };
 
   // ————— Tema Tom sobre Tom (Duotone Sidebar) —————
