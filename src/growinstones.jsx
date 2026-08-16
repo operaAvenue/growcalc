@@ -3433,6 +3433,45 @@ function GrowinStones() {
     const safeTerms = typeof terms === "string" ? terms.trim() : "";
     const displaySlug = slug || subdomainInput || (currentUser?.username) || "grow";
 
+    // Retrieve user profile information
+    const userDisplayName = currentUser?.name || owner || "Cultivador GrowinStones";
+    const userHandle = currentUser?.username || displaySlug || "grower";
+    const userBio = currentUser?.bio || "Cultivador apaixonado por hidroponia, automação e genéticas de alta performance.";
+    const userLocation = currentUser?.location || "Brasil";
+    const userStrainFocus = currentUser?.strainFocus || strain || "DWC & Living Soil";
+    const userAvatarUrl = currentUser?.avatarUrl || "";
+    const userBannerUrl = currentUser?.bannerUrl || "";
+
+    // Retrieve user posts from localStorage
+    let userPosts = [];
+    try {
+      const postsKey = `growcalc_posts_${currentUser?.username || displaySlug || "default"}`;
+      const savedPosts = localStorage.getItem(postsKey);
+      if (savedPosts) userPosts = JSON.parse(savedPosts);
+    } catch (e) {}
+
+    if (!userPosts || !Array.isArray(userPosts) || userPosts.length === 0) {
+      userPosts = [
+        {
+          id: "post_sub_1",
+          author: {
+            name: userDisplayName,
+            username: userHandle,
+            avatarUrl: userAvatarUrl
+          },
+          createdAt: new Date().toISOString(),
+          text: `Setup oficial do grow "${growName || "GrowinStones"}" publicado e online! Sistema configurado com ${plants} vasos de ${pot.label} (${esc(potDesc)}), iluminação LED de ${ledWatts > 0 ? `${ledWatts}W` : "alta eficiência"} e telemetria 24/7 conectada.`,
+          stage: "Setup & Automação",
+          images: [],
+          videos: [],
+          likes: 28,
+          comments: [
+            { id: "c1", author: "Comunidade GrowinStones", text: "Parabéns pelo projeto! Excelente dimensionamento hidráulico.", time: "recente" }
+          ]
+        }
+      ];
+    }
+
     const presetMetrics = (Array.isArray(allPresets) && allPresets.length > 0)
       ? allPresets.map((p) => calculatePresetMetrics(p))
       : [];
@@ -3600,12 +3639,67 @@ function GrowinStones() {
 
     const logoSvg = getLogoSvgString(30, isDark ? "#f59e0b" : "#1f1b16");
 
+    // Posts HTML generator
+    const postsFeedHtml = userPosts.map((p) => {
+      const pAuthor = p.author?.name || userDisplayName;
+      const pUser = p.author?.username || userHandle;
+      const pAvatar = p.author?.avatarUrl || userAvatarUrl;
+      const pDate = p.createdAt ? new Date(p.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }) : today;
+      const pStage = p.stage || "";
+
+      return `
+        <div class="post-card">
+          <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+            <div style="width:42px; height:42px; border-radius:50%; overflow:hidden; background:${isDark ? '#292524' : '#e2dccc'}; border:1px solid ${isDark ? '#44403c' : '#d8cfbe'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; color:${isDark ? '#f59e0b' : '#b45309'}; shrink:0;">
+              ${pAvatar ? `<img src="${pAvatar}" style="width:100%; height:100%; object-fit:cover;" />` : pAuthor.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                <b style="font-size:14px; color:${isDark ? '#ffffff' : '#1f1b16'};">${esc(pAuthor)}</b>
+                <span style="font-size:12px; font-family:monospace; color:${isDark ? '#a8a29e' : '#6b6354'};">@${esc(pUser)}</span>
+                <span style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">· ${pDate}</span>
+              </div>
+              ${pStage ? `<span style="display:inline-block; margin-top:2px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:12px; background:${isDark ? 'rgba(245,158,11,0.15)' : '#fef3c7'}; color:${isDark ? '#f59e0b' : '#b45309'};">${esc(pStage)}</span>` : ""}
+            </div>
+          </div>
+
+          <div style="font-size:13.5px; line-height:1.6; color:${isDark ? '#f5f5f4' : '#1f1b16'}; white-space:pre-wrap; margin-bottom:12px;">
+            ${esc(p.text)}
+          </div>
+
+          ${p.images && p.images.length > 0 ? `
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:8px; border-radius:14px; overflow:hidden; margin-bottom:12px;">
+              ${p.images.map((img) => `<img src="${img}" alt="Mídia de Cultivo" style="width:100%; max-height:340px; object-fit:cover; border-radius:12px; border:1px solid ${isDark ? '#292524' : '#e2dccc'};" />`).join("")}
+            </div>
+          ` : ""}
+
+          ${p.videos && p.videos.length > 0 ? `
+            <div style="border-radius:14px; overflow:hidden; margin-bottom:12px; background:#000;">
+              ${p.videos.map((vid) => `<video src="${vid}" controls playsinline style="width:100%; max-height:340px; border-radius:12px; display:block;"></video>`).join("")}
+            </div>
+          ` : ""}
+
+          <div style="display:flex; align-items:center; justify-content:space-between; padding-top:10px; border-top:1px solid ${isDark ? '#292524' : '#e2dccc'}; font-size:12px; color:${isDark ? '#a8a29e' : '#6b6354'};">
+            <div style="display:flex; align-items:center; gap:5px; font-weight:700; color:${p.liked ? '#f43f5e' : (isDark ? '#a8a29e' : '#6b6354')};">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="${p.liked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              <span>${p.likes || 0} curtidas</span>
+            </div>
+            <div>${p.comments?.length || 0} comentários</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    const bannerBg = userBannerUrl
+      ? `background-image:url(${userBannerUrl}); background-size:cover; background-position:center;`
+      : `background:${isDark ? 'linear-gradient(135deg, #1c1917 0%, #292524 50%, #44403c 100%)' : 'linear-gradient(135deg, #e2dccc 0%, #d8cfbe 50%, #c4b9a3 100%)'};`;
+
     return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${esc(growName || "GrowinStones")} — Dashboard Interativo</title>
+<title>${esc(growName || "GrowinStones")} — ${esc(userDisplayName)}</title>
 <link href="https://fonts.googleapis.com/css2?family=Berkshire+Swash&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; }
@@ -3639,7 +3733,47 @@ function GrowinStones() {
     text-decoration: none; 
   }
   .badge-live::before { content: ""; width: 7px; height: 7px; background: ${isDark ? '#10b981' : '#059669'}; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px ${isDark ? '#10b981' : '#059669'}; }
-  .container { max-width: 1100px; margin: 24px auto; padding: 0 20px 60px; }
+  
+  .container { max-width: 1100px; margin: 20px auto; padding: 0 20px 60px; }
+  
+  /* TAB NAVIGATION */
+  .tab-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid ${isDark ? '#292524' : '#e2dccc'};
+    padding-bottom: 12px;
+  }
+  .tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    border-radius: 14px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid ${isDark ? '#292524' : '#e2dccc'};
+    transition: all 0.2s ease;
+    background: ${isDark ? '#1c1917' : '#ffffff'};
+    color: ${isDark ? '#a8a29e' : '#6b6354'};
+  }
+  .tab-btn.active {
+    background: ${isDark ? '#292524' : '#f5f1e7'};
+    border-color: ${isDark ? '#f59e0b' : '#b45309'};
+    color: ${isDark ? '#f5f5f4' : '#1f1b16'};
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .tab-badge {
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 10.5px;
+    font-weight: 800;
+    background: ${isDark ? 'rgba(245,158,11,0.2)' : '#fef3c7'};
+    color: ${isDark ? '#f59e0b' : '#b45309'};
+  }
+
   .hero-card { 
     background: ${isDark ? 'linear-gradient(135deg, #1c1917 0%, #292524 100%)' : 'linear-gradient(135deg, #ffffff 0%, #faf7f0 100%)'}; 
     border: 1px solid ${isDark ? '#44403c' : '#e2dccc'}; 
@@ -3683,6 +3817,17 @@ function GrowinStones() {
   table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
   th { text-align: left; padding: 12px; border-bottom: 2px solid ${isDark ? '#292524' : '#e2dccc'}; color: ${isDark ? '#a8a29e' : '#6b6354'}; font-size: 11px; text-transform: uppercase; }
   td { padding: 12px; border-bottom: 1px solid ${isDark ? '#292524' : '#e2dccc'}; color: ${isDark ? '#e7e5e4' : '#1f1b16'}; }
+  
+  /* POST CARD */
+  .post-card {
+    background: ${isDark ? '#1c1917' : '#ffffff'};
+    border: 1px solid ${isDark ? '#292524' : '#e2dccc'};
+    border-radius: 20px;
+    padding: 22px;
+    margin-bottom: 20px;
+    box-shadow: ${isDark ? 'none' : '0 4px 14px rgba(0,0,0,0.02)'};
+  }
+
   .footer { text-align: center; font-size: 12px; color: ${isDark ? '#78716c' : '#a39a87'}; margin-top: 40px; }
 </style>
 </head>
@@ -3696,130 +3841,203 @@ function GrowinStones() {
     <a href="https://${displaySlug}.thegrowinstones.com" target="_blank" class="badge-live">https://${displaySlug}.thegrowinstones.com</a>
   </div>
 </header>
+
 <div class="container">
-  <div class="hero-card">
-    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
-      <div>
-        <h1 style="font-size:28px; font-weight:800; margin:0 0 6px; color:${isDark ? '#ffffff' : '#1f1b16'};">${esc(growName || "GrowinStones")}</h1>
-        <div style="font-size:13px; color:${isDark ? '#a8a29e' : '#6b6354'};">
-          ${owner ? `Responsável: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(owner)}</b> · ` : ""}Genética: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(strain || "Não informada")}</b> · Atualizado em ${today}
+  <!-- TOP SUBDOMAIN TABS -->
+  <div class="tab-nav">
+    <button id="btn-tab-grow" class="tab-btn active" onclick="switchSubTab('grow')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-9"/><path d="M12 13a6 6 0 0 1 6-6c0 6-6 6-6 6z"/><path d="M12 13a6 6 0 0 0-6-6c0 6 6 6 6 6z"/></svg>
+      <span>PROJETO DO GROW</span>
+    </button>
+    <button id="btn-tab-posts" class="tab-btn" onclick="switchSubTab('posts')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      <span>POSTS & DIÁRIO</span>
+      <span class="tab-badge">${userPosts.length}</span>
+    </button>
+  </div>
+
+  <!-- ————————————————— ABA 1: GROW & COMPARATIVOS ————————————————— -->
+  <div id="tab-content-grow">
+    <div class="hero-card">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+        <div>
+          <h1 style="font-size:28px; font-weight:800; margin:0 0 6px; color:${isDark ? '#ffffff' : '#1f1b16'};">${esc(growName || "GrowinStones")}</h1>
+          <div style="font-size:13px; color:${isDark ? '#a8a29e' : '#6b6354'};">
+            ${owner ? `Responsável: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(owner)}</b> · ` : ""}Genética: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(strain || "Não informada")}</b> · Atualizado em ${today}
+          </div>
+        </div>
+        <button onclick="window.print()" style="background:${isDark ? '#0284c7' : '#1f1b16'}; color:#ffffff; border:none; padding:10px 18px; border-radius:12px; font:700 13px Inter; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+          <span>Exportar PDF</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-lbl">Investimento (CAPEX)</div>
+        <div class="kpi-val" style="color:${isDark ? '#38bdf8' : '#0284c7'};">${fmtBRL(capex)}</div>
+        <div style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">≈ ${fmtBRL(capexPerPlant)} / planta</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-lbl">Produção Anual Estimada</div>
+        <div class="kpi-val" style="color:${isDark ? '#34d399' : '#059669'};">${fmtG(yieldYear)}</div>
+        <div style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">${harvestsYear.toFixed(1)} safras/ano (${yieldPerPlant}g/planta)</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-lbl">Receita Estimada / Ano</div>
+        <div class="kpi-val" style="color:${isDark ? '#f59e0b' : '#b45309'};">${priceG > 0 ? fmtBRL(revenueYear) : "—"}</div>
+        <div style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">${priceG > 0 ? `${fmtBRL(priceG)}/g` : "Preço/g não preenchido"}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-lbl">Payback Estimado</div>
+        <div class="kpi-val" style="color:${isDark ? '#a78bfa' : '#7c3aed'};">${paybackMonths ? `${paybackMonths.toFixed(1)} m` : "—"}</div>
+        <div style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">${paybackMonths ? `~${(paybackMonths / (cycleDays / 30)).toFixed(1)} safras` : "Retorno não atingido"}</div>
+      </div>
+    </div>
+
+    ${webComparisonHtml}
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:24px;">
+      <div class="sec-card">
+        <h2 class="sec-title">Estrutura & Dimensões</h2>
+        <div class="kv-row"><span>Dimensões (L × P × A)</span><b>${width} × ${depth} × ${height} cm</b></div>
+        <div class="kv-row"><span>Área / Volume</span><b>${areaM2.toFixed(2)} m² · ${volumeM3.toFixed(2)} m³</b></div>
+        <div class="kv-row"><span>Vasos</span><b>${plants} × ${pot.label} (${esc(potDesc)})</b></div>
+        <div class="kv-row"><span>Sistema Hidráulico</span><b>${esc(connInfo.name)}</b></div>
+        <div class="kv-row"><span>Tubulação / Bitola</span><b>${gauge.label} (${pipeMeters} m)</b></div>
+        <div class="kv-row"><span>Reservatório Mínimo</span><b>≥ ${reservoir} L</b></div>
+        <div class="kv-row"><span>Renovação de Ar</span><b>≥ ${airFlowNeeded} m³/h</b></div>
+        <div class="kv-row"><span>Iluminação LED</span><b>${ledWatts > 0 ? `${ledPerM2} W/m² (${ledWatts} W)` : "Sem LED"}</b></div>
+      </div>
+
+      <div class="sec-card">
+        <h2 class="sec-title">Custos Operacionais & Energia</h2>
+        <div class="kv-row"><span>Potência Total Instalada</span><b>${totalWatts} W</b></div>
+        <div class="kv-row"><span>Consumo Mensal</span><b>${kwhMonth.toFixed(0)} kWh</b></div>
+        <div class="kv-row"><span>Tarifa de Energia</span><b>${fmtBRL(tariff)} / kWh</b></div>
+        <div class="kv-row"><span>Custo de Energia / Mês</span><b>${fmtBRL(energyMonth)}</b></div>
+        <div class="kv-row"><span>Insumos / Mês</span><b>${fmtBRL(monthlyCost)}</b></div>
+        <div class="kv-row"><span>OPEX Mensal Total</span><b style="color:#f43f5e;">${fmtBRL(opexMonth)}</b></div>
+        <div class="kv-row"><span>OPEX por Safra (${cycleDays}d)</span><b style="color:#f43f5e;">${fmtBRL(opexCycle)}</b></div>
+        <div class="kv-row"><span>Custo por Grama Produzida</span><b>${yieldYear > 0 ? fmtBRL(costPerG) : "—"}</b></div>
+      </div>
+    </div>
+
+    <div class="sec-card">
+      <h2 class="sec-title">Planta Baixa Interativa</h2>
+      <div style="background:${isDark ? '#141210' : '#f5f1e7'}; border-radius:14px; padding:16px; text-align:center; border:1px solid ${isDark ? '#292524' : '#e2dccc'};">
+        <svg width="${svgW}" height="${totalSvgH}" viewBox="0 0 ${svgW} ${totalSvgH}" style="width:100%; max-width:${svgW}px; height:auto; display:block; margin:0 auto;">
+          <rect x="${OX}" y="${OY}" width="${topW}" height="${topH}" rx="10" fill="${isDark ? '#1c1917' : '#ffffff'}" stroke="${isDark ? '#57534e' : '#1f1b16'}" stroke-width="1.5"/>
+          <text x="${OX + topW / 2}" y="${OY - 8}" text-anchor="middle" font-size="11" fill="${isDark ? '#a8a29e' : '#6b6354'}">${width} cm</text>
+          <text x="${OX - 10}" y="${OY + topH / 2}" text-anchor="middle" font-size="11" fill="${isDark ? '#a8a29e' : '#6b6354'}" transform="rotate(-90, ${OX - 10}, ${OY + topH / 2})">${depth} cm</text>
+          ${segsSvg}
+          ${dropLineSvgReport}
+          ${potsSvgReport}
+          ${cotasSvg}
+          ${resSvgReport}
+        </svg>
+        <div style="font-size:11px; color:${isDark ? '#a8a29e' : '#6b6354'}; margin-top:10px;">Planta baixa (${width} × ${depth} cm) · ${plants} vaso(s) de ${esc(pot.label)} (${esc(potDesc)})</div>
+      </div>
+    </div>
+
+    <div class="sec-card">
+      <h2 class="sec-title">Equipamentos e Materiais (CAPEX)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th style="text-align:right;">Qtd</th>
+            <th style="text-align:right;">Unitário</th>
+            <th style="text-align:right;">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+          <tr>
+            <td colspan="3" style="font-weight:700;">Custos Extras (frete, estrutura, elétrica)</td>
+            <td style="text-align:right; font-weight:700;">${fmtBRL(extraCost)}</td>
+          </tr>
+          <tr style="font-size:15px; font-weight:800; color:${isDark ? '#38bdf8' : '#0284c7'};">
+            <td colspan="3">INVESTIMENTO TOTAL (CAPEX)</td>
+            <td style="text-align:right;">${fmtBRL(capex)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    ${shoppingListHtml}
+
+    ${safeNotes || safeInst || safeTerms ? `
+    <div class="sec-card">
+      <h2 class="sec-title">Notas, Instruções & Termos</h2>
+      ${safeNotes ? `<div style="margin-bottom:12px;"><b style="color:${isDark ? '#f59e0b' : '#b45309'}; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Observações</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeNotes)}</div></div>` : ""}
+      ${safeInst ? `<div style="margin-bottom:12px;"><b style="color:${isDark ? '#f59e0b' : '#b45309'}; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Instruções de Operação</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeInst)}</div></div>` : ""}
+      ${safeTerms ? `<div><b style="color:${isDark ? '#f59e0b' : '#b45309'}; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Termos & Condições</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeTerms)}</div></div>` : ""}
+    </div>` : ""}
+  </div>
+
+  <!-- ————————————————— ABA 2: POSTS & PERFIL DO CULTIVADOR ————————————————— -->
+  <div id="tab-content-posts" style="display:none;">
+    <!-- PERFIL DO CULTIVADOR (TWITTER STYLE) -->
+    <div class="sec-card" style="padding:0; overflow:hidden; margin-bottom:24px;">
+      <div style="height:160px; width:100%; ${bannerBg}"></div>
+      <div style="padding:0 24px 24px; position:relative;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-top:-50px; margin-bottom:16px;">
+          <div style="width:100px; height:100px; border-radius:50%; overflow:hidden; border:4px solid ${isDark ? '#1c1917' : '#ffffff'}; background:${isDark ? '#292524' : '#e2dccc'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:32px; color:${isDark ? '#f59e0b' : '#b45309'}; box-shadow:0 10px 25px rgba(0,0,0,0.15); shrink:0;">
+            ${userAvatarUrl ? `<img src="${userAvatarUrl}" style="width:100%; height:100%; object-fit:cover;" />` : userDisplayName.charAt(0).toUpperCase()}
+          </div>
+          <div style="display:flex; gap:8px;">
+            <a href="https://${displaySlug}.thegrowinstones.com" class="badge-live">Grower Verificado</a>
+          </div>
+        </div>
+
+        <h2 style="font-size:22px; font-weight:800; margin:0 0 2px; color:${isDark ? '#ffffff' : '#1f1b16'};">${esc(userDisplayName)}</h2>
+        <div style="font-size:12px; font-family:monospace; font-weight:600; color:${isDark ? '#f59e0b' : '#b45309'}; margin-bottom:12px;">@${esc(userHandle)}</div>
+        <p style="font-size:13.5px; line-height:1.6; margin:0 0 16px; color:${isDark ? '#f5f5f4' : '#1f1b16'}; max-width:700px;">${esc(userBio)}</p>
+
+        <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:12px; color:${isDark ? '#a8a29e' : '#6b6354'}; padding-top:12px; border-top:1px solid ${isDark ? '#292524' : '#e2dccc'};">
+          <div>Localização: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(userLocation)}</b></div>
+          <div>Foco: <b style="color:${isDark ? '#f59e0b' : '#b45309'};">${esc(userStrainFocus)}</b></div>
+          <div>Publicações: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${userPosts.length}</b></div>
+          <div>Automação: <b style="color:#10b981;">Online 24/7</b></div>
         </div>
       </div>
-      <button onclick="window.print()" style="background:${isDark ? '#0284c7' : '#1f1b16'}; color:#ffffff; border:none; padding:10px 18px; border-radius:12px; font:700 13px Inter; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-        <span>Exportar PDF</span>
-      </button>
+    </div>
+
+    <!-- LISTA DE POSTAGENS -->
+    <div style="margin-bottom:20px;">
+      <h2 class="sec-title">Linha do Tempo & Atualizações</h2>
+      ${postsFeedHtml}
     </div>
   </div>
-
-  <div class="kpi-grid">
-    <div class="kpi-card">
-      <div class="kpi-lbl">Investimento (CAPEX)</div>
-      <div class="kpi-val" style="color:${isDark ? '#38bdf8' : '#0284c7'};">${fmtBRL(capex)}</div>
-      <div style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">≈ ${fmtBRL(capexPerPlant)} / planta</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-lbl">Produção Anual Estimada</div>
-      <div class="kpi-val" style="color:${isDark ? '#34d399' : '#059669'};">${fmtG(yieldYear)}</div>
-      <div style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">${harvestsYear.toFixed(1)} safras/ano (${yieldPerPlant}g/planta)</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-lbl">Receita Estimada / Ano</div>
-      <div class="kpi-val" style="color:${isDark ? '#f59e0b' : '#b45309'};">${priceG > 0 ? fmtBRL(revenueYear) : "—"}</div>
-      <div style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">${priceG > 0 ? `${fmtBRL(priceG)}/g` : "Preço/g não preenchido"}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-lbl">Payback Estimado</div>
-      <div class="kpi-val" style="color:${isDark ? '#a78bfa' : '#7c3aed'};">${paybackMonths ? `${paybackMonths.toFixed(1)} m` : "—"}</div>
-      <div style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">${paybackMonths ? `~${(paybackMonths / (cycleDays / 30)).toFixed(1)} safras` : "Retorno não atingido"}</div>
-    </div>
-  </div>
-
-  ${webComparisonHtml}
-
-  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:24px;">
-    <div class="sec-card">
-      <h2 class="sec-title">Estrutura & Dimensões</h2>
-      <div class="kv-row"><span>Dimensões (L × P × A)</span><b>${width} × ${depth} × ${height} cm</b></div>
-      <div class="kv-row"><span>Área / Volume</span><b>${areaM2.toFixed(2)} m² · ${volumeM3.toFixed(2)} m³</b></div>
-      <div class="kv-row"><span>Vasos</span><b>${plants} × ${pot.label} (${esc(potDesc)})</b></div>
-      <div class="kv-row"><span>Sistema Hidráulico</span><b>${esc(connInfo.name)}</b></div>
-      <div class="kv-row"><span>Tubulação / Bitola</span><b>${gauge.label} (${pipeMeters} m)</b></div>
-      <div class="kv-row"><span>Reservatório Mínimo</span><b>≥ ${reservoir} L</b></div>
-      <div class="kv-row"><span>Renovação de Ar</span><b>≥ ${airFlowNeeded} m³/h</b></div>
-      <div class="kv-row"><span>Iluminação LED</span><b>${ledWatts > 0 ? `${ledPerM2} W/m² (${ledWatts} W)` : "Sem LED"}</b></div>
-    </div>
-
-    <div class="sec-card">
-      <h2 class="sec-title">Custos Operacionais & Energia</h2>
-      <div class="kv-row"><span>Potência Total Instalada</span><b>${totalWatts} W</b></div>
-      <div class="kv-row"><span>Consumo Mensal</span><b>${kwhMonth.toFixed(0)} kWh</b></div>
-      <div class="kv-row"><span>Tarifa de Energia</span><b>${fmtBRL(tariff)} / kWh</b></div>
-      <div class="kv-row"><span>Custo de Energia / Mês</span><b>${fmtBRL(energyMonth)}</b></div>
-      <div class="kv-row"><span>Insumos / Mês</span><b>${fmtBRL(monthlyCost)}</b></div>
-      <div class="kv-row"><span>OPEX Mensal Total</span><b style="color:#f43f5e;">${fmtBRL(opexMonth)}</b></div>
-      <div class="kv-row"><span>OPEX por Safra (${cycleDays}d)</span><b style="color:#f43f5e;">${fmtBRL(opexCycle)}</b></div>
-      <div class="kv-row"><span>Custo por Grama Produzida</span><b>${yieldYear > 0 ? fmtBRL(costPerG) : "—"}</b></div>
-    </div>
-  </div>
-
-  <div class="sec-card">
-    <h2 class="sec-title">Planta Baixa Interativa</h2>
-    <div style="background:${isDark ? '#141210' : '#f5f1e7'}; border-radius:14px; padding:16px; text-align:center; border:1px solid ${isDark ? '#292524' : '#e2dccc'};">
-      <svg width="${svgW}" height="${totalSvgH}" viewBox="0 0 ${svgW} ${totalSvgH}" style="width:100%; max-width:${svgW}px; height:auto; display:block; margin:0 auto;">
-        <rect x="${OX}" y="${OY}" width="${topW}" height="${topH}" rx="10" fill="${isDark ? '#1c1917' : '#ffffff'}" stroke="${isDark ? '#57534e' : '#1f1b16'}" stroke-width="1.5"/>
-        <text x="${OX + topW / 2}" y="${OY - 8}" text-anchor="middle" font-size="11" fill="${isDark ? '#a8a29e' : '#6b6354'}">${width} cm</text>
-        <text x="${OX - 10}" y="${OY + topH / 2}" text-anchor="middle" font-size="11" fill="${isDark ? '#a8a29e' : '#6b6354'}" transform="rotate(-90, ${OX - 10}, ${OY + topH / 2})">${depth} cm</text>
-        ${segsSvg}
-        ${dropLineSvgReport}
-        ${potsSvgReport}
-        ${cotasSvg}
-        ${resSvgReport}
-      </svg>
-      <div style="font-size:11px; color:${isDark ? '#a8a29e' : '#6b6354'}; margin-top:10px;">Planta baixa (${width} × ${depth} cm) · ${plants} vaso(s) de ${esc(pot.label)} (${esc(potDesc)})</div>
-    </div>
-  </div>
-
-  <div class="sec-card">
-    <h2 class="sec-title">Equipamentos e Materiais (CAPEX)</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Item</th>
-          <th style="text-align:right;">Qtd</th>
-          <th style="text-align:right;">Unitário</th>
-          <th style="text-align:right;">Subtotal</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rowsHtml}
-        <tr>
-          <td colspan="3" style="font-weight:700;">Custos Extras (frete, estrutura, elétrica)</td>
-          <td style="text-align:right; font-weight:700;">${fmtBRL(extraCost)}</td>
-        </tr>
-        <tr style="font-size:15px; font-weight:800; color:${isDark ? '#38bdf8' : '#0284c7'};">
-          <td colspan="3">INVESTIMENTO TOTAL (CAPEX)</td>
-          <td style="text-align:right;">${fmtBRL(capex)}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
-  ${shoppingListHtml}
-
-  ${safeNotes || safeInst || safeTerms ? `
-  <div class="sec-card">
-    <h2 class="sec-title">Notas, Instruções & Termos</h2>
-    ${safeNotes ? `<div style="margin-bottom:12px;"><b style="color:${isDark ? '#f59e0b' : '#b45309'}; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Observações</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeNotes)}</div></div>` : ""}
-    ${safeInst ? `<div style="margin-bottom:12px;"><b style="color:${isDark ? '#f59e0b' : '#b45309'}; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Instruções de Operação</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeInst)}</div></div>` : ""}
-    ${safeTerms ? `<div><b style="color:${isDark ? '#f59e0b' : '#b45309'}; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Termos & Condições</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeTerms)}</div></div>` : ""}
-  </div>` : ""}
 
   <div class="footer">
     Relatório e Dashboard Interativo gerado pelo <b>GrowinStones</b> em ${today}.<br/>
     Hospedado exclusivamente em <b>https://${displaySlug}.thegrowinstones.com</b>
   </div>
 </div>
+
+<script>
+  function switchSubTab(tabName) {
+    var tabGrow = document.getElementById('tab-content-grow');
+    var tabPosts = document.getElementById('tab-content-posts');
+    var btnGrow = document.getElementById('btn-tab-grow');
+    var btnPosts = document.getElementById('btn-tab-posts');
+
+    if (tabName === 'posts') {
+      tabGrow.style.display = 'none';
+      tabPosts.style.display = 'block';
+      btnGrow.classList.remove('active');
+      btnPosts.classList.add('active');
+    } else {
+      tabGrow.style.display = 'block';
+      tabPosts.style.display = 'none';
+      btnPosts.classList.remove('active');
+      btnGrow.classList.add('active');
+    }
+  }
+</script>
 </body>
 </html>`;
   };
