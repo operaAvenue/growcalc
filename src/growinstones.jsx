@@ -688,134 +688,267 @@ function MoneyInput({ value, onCommit, className, style }) {
   );
 }
 
-function IsometricPotSVG({ potW, potD, potH, potLiters, isRect, isSquare, dark, T }) {
-  const svgW = 320;
-  const svgH = 200;
-  const isBox = isRect || isSquare;
+function IsometricPotSVG({ potW, potD, potH, potLiters, isRect, isSquare, isCalha, dark, T }) {
+  const svgW = 340;
+  const svgH = 210;
 
-  // Unificação da escala para garantir proporções 3D perfeitas entre Largura, Profundidade e Altura
-  const maxDim = Math.max(potW || 20, potD || 20, potH || 20);
-  const scale = Math.min(2.5, 110 / maxDim);
+  // Dimensões reais em centímetros
+  const W = Math.max(5, Number(potW) || 20);
+  const L = Math.max(5, Number(potD) || 20);
+  const H = Math.max(5, Number(potH) || 25);
+  const isBox = isRect || isSquare || isCalha;
 
-  const drawW = Math.max(35, potW * scale);
-  const drawD = Math.max(35, potD * scale);
-  const drawH = Math.max(35, Math.min(95, potH * scale * 0.75)); // Proporção realista de altura
+  // Projeção isométrica verdadeira com ângulo de 30 graus
+  // Eixo X (largura): vetor (cos 30°, sin 30°) = (0.866, 0.5)
+  // Eixo Y (comprimento): vetor (-cos 30°, sin 30°) = (-0.866, 0.5)
+  // Eixo Z (altura/profundidade): vetor (0, 1)
+
+  // Cálculo da envergadura total projetada para escala uniforme 1:1:1
+  const projWidth = (W + L) * 0.866;
+  const projHeight = (W + L) * 0.5 + H;
+
+  // Fator de escala estritamente proporcional
+  const maxWAvailable = 250;
+  const maxHAvailable = 135;
+  const scale = Math.min(maxWAvailable / projWidth, maxHAvailable / projHeight, 3.2);
+
+  const wPx = W * scale;
+  const lPx = L * scale;
+  const hPx = H * scale;
 
   const cx = svgW / 2;
-  const cy = svgH / 2 + drawH / 4;
+  const cy = svgH / 2;
 
-  const makeRoundedIsoPath = (pts, cr = 0.12) => {
-    const n = pts.length;
-    let d = "";
-    for (let i = 0; i < n; i++) {
-      const prev = pts[(i - 1 + n) % n];
-      const curr = pts[i];
-      const next = pts[(i + 1) % n];
-
-      const startX = curr.x + (prev.x - curr.x) * cr;
-      const startY = curr.y + (prev.y - curr.y) * cr;
-      const endX = curr.x + (next.x - curr.x) * cr;
-      const endY = curr.y + (next.y - curr.y) * cr;
-
-      if (i === 0) {
-        d += `M ${startX} ${startY} Q ${curr.x} ${curr.y} ${endX} ${endY} `;
-      } else {
-        d += `L ${startX} ${startY} Q ${curr.x} ${curr.y} ${endX} ${endY} `;
-      }
-    }
-    d += "Z";
-    return d;
-  };
+  // Posicionamento vertical para manter o objeto centralizado no viewBox
+  const topCenterY = cy - (hPx / 2) - ((wPx + lPx) * 0.25) + 12;
+  const topCenterX = cx - ((wPx - lPx) * 0.433);
 
   if (isBox) {
-    const rx = drawW * 0.5;
-    const ry = drawD * 0.28;
-    const topY = cy - drawH;
+    // Vértices do topo (plano superior)
+    const T_back = { x: topCenterX, y: topCenterY };
+    const T_right = { x: topCenterX + wPx * 0.866, y: topCenterY + wPx * 0.5 };
+    const T_front = { x: topCenterX + (wPx - lPx) * 0.866, y: topCenterY + (wPx + lPx) * 0.5 };
+    const T_left = { x: topCenterX - lPx * 0.866, y: topCenterY + lPx * 0.5 };
 
-    // Tapering: base é ligeiramente menor que o topo (efeito de vaso afunilado)
-    const taper = 0.78;
-    const botRx = rx * taper;
-    const botRy = ry * taper;
+    // Tapering sutil para vaso afunilado (calha possui paredes retas 0.98)
+    const taper = isCalha ? 0.98 : (isRect ? 0.92 : 0.84);
+    const topCenter = { x: (T_back.x + T_front.x) / 2, y: (T_back.y + T_front.y) / 2 };
+    const botCenter = { x: topCenter.x, y: topCenter.y + hPx };
 
-    const topP1 = { x: cx, y: topY - ry };
-    const topP2 = { x: cx + rx, y: topY };
-    const topP3 = { x: cx, y: topY + ry };
-    const topP4 = { x: cx - rx, y: topY };
+    const getTaperedBot = (pt) => ({
+      x: botCenter.x + (pt.x - topCenter.x) * taper,
+      y: botCenter.y + (pt.y - topCenter.y) * taper
+    });
 
-    const botP1 = { x: cx, y: topY + drawH - botRy };
-    const botP2 = { x: cx + botRx, y: topY + drawH };
-    const botP3 = { x: cx, y: topY + drawH + botRy };
-    const botP4 = { x: cx - botRx, y: topY + drawH };
+    const B_back = getTaperedBot(T_back);
+    const B_right = getTaperedBot(T_right);
+    const B_front = getTaperedBot(T_front);
+    const B_left = getTaperedBot(T_left);
 
-    // Substrato / interior
-    const innerTop = [
-      { x: cx, y: topY - ry * 0.85 },
-      { x: cx + rx * 0.85, y: topY },
-      { x: cx, y: topY + ry * 0.85 },
-      { x: cx - rx * 0.85, y: topY }
-    ];
+    // Interior rebaixado (substrato / solução nutritiva)
+    const inScale = 0.88;
+    const inDrop = Math.min(6, hPx * 0.2);
+    const getInnerPt = (pt) => ({
+      x: topCenter.x + (pt.x - topCenter.x) * inScale,
+      y: topCenter.y + (pt.y - topCenter.y) * inScale + inDrop
+    });
 
-    const topPath = makeRoundedIsoPath([topP1, topP2, topP3, topP4], 0.12);
-    const innerPath = makeRoundedIsoPath(innerTop, 0.12);
-    const botPath = makeRoundedIsoPath([botP1, botP2, botP3, botP4], 0.12);
+    const In_back = getInnerPt(T_back);
+    const In_right = getInnerPt(T_right);
+    const In_front = getInnerPt(T_front);
+    const In_left = getInnerPt(T_left);
+
+    const polyStr = (pts) => pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
 
     return (
-      <svg width="100%" height="200" viewBox={`0 0 ${svgW} ${svgH}`} fill="none">
-        {/* Base e Sombra Inferior */}
-        <path d={botPath} fill={T.surface2} stroke={T.borderSoft} strokeWidth="1" opacity="0.6" strokeLinejoin="round" />
-        
-        {/* Face Lateral Esquerda (Frontal-Esquerda com cantos suavizados e taper) */}
-        <path
-          d={`M ${topP4.x} ${topP4.y} L ${topP3.x} ${topP3.y} L ${botP3.x} ${botP3.y} L ${botP4.x} ${botP4.y} Z`}
-          fill={T.surface}
+      <svg width="100%" height="210" viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="select-none">
+        <defs>
+          <linearGradient id="isoBoxLeft" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={dark ? "#262626" : "#e5e5e5"} />
+            <stop offset="100%" stopColor={dark ? "#171717" : "#d4d4d4"} />
+          </linearGradient>
+          <linearGradient id="isoBoxRight" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={dark ? "#383838" : "#f5f5f5"} />
+            <stop offset="100%" stopColor={dark ? "#262626" : "#e5e5e5"} />
+          </linearGradient>
+          <linearGradient id="isoBoxTop" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={dark ? "#404040" : "#ffffff"} />
+            <stop offset="100%" stopColor={dark ? "#2a2a2a" : "#f0f0f0"} />
+          </linearGradient>
+          <linearGradient id="isoSubstrate" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={dark ? "#1c1917" : "#e7e5e4"} />
+            <stop offset="100%" stopColor={dark ? "#0c0a09" : "#d6d3d1"} />
+          </linearGradient>
+        </defs>
+
+        {/* Sombra de projeção na base */}
+        <polygon
+          points={polyStr([
+            { x: B_back.x, y: B_back.y + 4 },
+            { x: B_right.x + 6, y: B_right.y + 4 },
+            { x: B_front.x, y: B_front.y + 8 },
+            { x: B_left.x - 6, y: B_left.y + 4 }
+          ])}
+          fill={dark ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.08)"}
+        />
+
+        {/* Parede Esquerda (Comprimento / Face Lateral) */}
+        <polygon
+          points={polyStr([T_left, T_front, B_front, B_left])}
+          fill="url(#isoBoxLeft)"
+          stroke={T.border}
+          strokeWidth="1.4"
+          strokeLinejoin="round"
+        />
+
+        {/* Parede Direita (Largura / Face Frontal) */}
+        <polygon
+          points={polyStr([T_front, T_right, B_right, B_front])}
+          fill="url(#isoBoxRight)"
+          stroke={T.border}
+          strokeWidth="1.4"
+          strokeLinejoin="round"
+        />
+
+        {/* Borda / Boca Superior */}
+        <polygon
+          points={polyStr([T_back, T_right, T_front, T_left])}
+          fill="url(#isoBoxTop)"
           stroke={T.border}
           strokeWidth="1.5"
           strokeLinejoin="round"
-          strokeLinecap="round"
         />
 
-        {/* Face Lateral Direita (Frontal-Direita com cantos suavizados e taper) */}
-        <path
-          d={`M ${topP3.x} ${topP3.y} L ${topP2.x} ${topP2.y} L ${botP2.x} ${botP2.y} L ${botP3.x} ${botP3.y} Z`}
-          fill={T.bg}
-          stroke={T.border}
-          strokeWidth="1.5"
+        {/* Interior do Vaso / Calha (Substrato / Solução) */}
+        <polygon
+          points={polyStr([In_back, In_right, In_front, In_left])}
+          fill="url(#isoSubstrate)"
+          stroke={T.borderSoft}
+          strokeWidth="1"
           strokeLinejoin="round"
-          strokeLinecap="round"
         />
 
-        {/* Borda Superior / Boca do Vaso Arredondada */}
-        <path d={topPath} fill={T.surface2} stroke={T.border} strokeWidth="1.5" strokeLinejoin="round" />
+        {/* Cotas Técnicas Isométricas */}
+        {/* Cota Largura (W) */}
+        <line
+          x1={T_right.x + 6} y1={T_right.y - 2}
+          x2={T_front.x + 6} y2={T_front.y - 2}
+          stroke={dark ? "#f59e0b" : "#d97706"}
+          strokeWidth="1.2"
+          strokeDasharray="3 2"
+        />
+        <text
+          x={(T_right.x + T_front.x) / 2 + 14}
+          y={(T_right.y + T_front.y) / 2}
+          fill={dark ? "#fbbf24" : "#b45309"}
+          fontSize="9.5"
+          fontWeight="700"
+          textAnchor="start"
+        >
+          L: {W}cm
+        </text>
 
-        {/* Interior / Substrato Rebaixado com Cantos Arredondados */}
-        <path d={innerPath} fill={T.inset} stroke={T.borderSoft} strokeWidth="1" strokeLinejoin="round" />
+        {/* Cota Comprimento (L) */}
+        <line
+          x1={T_left.x - 6} y1={T_left.y - 2}
+          x2={T_front.x - 6} y2={T_front.y - 2}
+          stroke={dark ? "#f59e0b" : "#d97706"}
+          strokeWidth="1.2"
+          strokeDasharray="3 2"
+        />
+        <text
+          x={(T_left.x + T_front.x) / 2 - 12}
+          y={(T_left.y + T_front.y) / 2}
+          fill={dark ? "#fbbf24" : "#b45309"}
+          fontSize="9.5"
+          fontWeight="700"
+          textAnchor="end"
+        >
+          C: {L}cm
+        </text>
 
-        <text x={cx} y={topY + ry * 0.4} fill={T.text} fontSize="12" fontWeight="bold" textAnchor="middle">{potLiters} L</text>
+        {/* Cota Profundidade / Altura (H) */}
+        <line
+          x1={T_right.x + 4} y1={T_right.y + 4}
+          x2={B_right.x + 4} y2={B_right.y}
+          stroke={dark ? "#38bdf8" : "#0284c7"}
+          strokeWidth="1.2"
+          strokeDasharray="3 2"
+        />
+        <text
+          x={B_right.x + 10}
+          y={(T_right.y + B_right.y) / 2 + 3}
+          fill={dark ? "#38bdf8" : "#0284c7"}
+          fontSize="9.5"
+          fontWeight="700"
+          textAnchor="start"
+        >
+          {isCalha ? "P" : "Alt"}: {H}cm
+        </text>
+
+        {/* Badge Central com Volume */}
+        <g transform={`translate(${topCenter.x}, ${topCenter.y + inDrop})`}>
+          <rect x="-34" y="-9" width="68" height="18" rx="9" fill={dark ? "#1c1917" : "#ffffff"} stroke={T.accentBorder} strokeWidth="1.2" />
+          <text x="0" y="3.5" fill={T.text} fontSize="10.5" fontWeight="800" textAnchor="middle">{potLiters} L</text>
+        </g>
       </svg>
     );
   }
 
-  // Vaso Cilíndrico proporcional
-  const rx = drawW * 0.45;
-  const ry = drawD * 0.22;
-  const topY = cy - drawH;
+  // Vaso Cilíndrico / Redondo com Proporção Isométrica Real
+  const D = W;
+  const radius = (D / 2) * scale;
+  const rx = radius * 0.866;
+  const ry = radius * 0.5;
   const taper = 0.82;
   const botRx = rx * taper;
   const botRy = ry * taper;
+  const topY = cy - (hPx / 2) + 12;
+  const botY = topY + hPx;
 
   return (
-    <svg width="100%" height="200" viewBox={`0 0 ${svgW} ${svgH}`} fill="none">
-      <ellipse cx={cx} cy={cy} rx={botRx} ry={botRy} fill={T.surface2} stroke={T.border} strokeWidth="1.2" />
+    <svg width="100%" height="210" viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="select-none">
+      <defs>
+        <linearGradient id="isoCylBody" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor={dark ? "#1c1917" : "#e5e5e5"} />
+          <stop offset="50%" stopColor={dark ? "#383838" : "#ffffff"} />
+          <stop offset="100%" stopColor={dark ? "#262626" : "#d4d4d4"} />
+        </linearGradient>
+      </defs>
+
+      {/* Sombra base */}
+      <ellipse cx={cx} cy={botY + 4} rx={botRx + 4} ry={botRy + 2} fill={dark ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.08)"} />
+
+      {/* Base */}
+      <ellipse cx={cx} cy={botY} rx={botRx} ry={botRy} fill={T.surface2} stroke={T.border} strokeWidth="1.2" />
+
+      {/* Corpo Cilíndrico com Taper */}
       <path
-        d={`M ${cx - rx} ${topY} A ${rx} ${ry} 0 0 0 ${cx + rx} ${topY} L ${cx + botRx} ${cy} A ${botRx} ${botRy} 0 0 1 ${cx - botRx} ${cy} Z`}
-        fill={T.surface}
+        d={`M ${cx - rx} ${topY} A ${rx} ${ry} 0 0 0 ${cx + rx} ${topY} L ${cx + botRx} ${botY} A ${botRx} ${botRy} 0 0 1 ${cx - botRx} ${botY} Z`}
+        fill="url(#isoCylBody)"
         stroke={T.border}
-        strokeWidth="1.5"
+        strokeWidth="1.4"
         strokeLinejoin="round"
       />
+
+      {/* Borda Superior */}
       <ellipse cx={cx} cy={topY} rx={rx} ry={ry} fill={T.surface2} stroke={T.border} strokeWidth="1.5" />
-      <ellipse cx={cx} cy={topY} rx={rx * 0.85} ry={ry * 0.85} fill={T.inset} stroke={T.borderSoft} strokeWidth="1" />
-      <text x={cx} y={topY + 4} fill={T.text} fontSize="12" fontWeight="bold" textAnchor="middle">{potLiters} L</text>
+
+      {/* Substrato Interior */}
+      <ellipse cx={cx} cy={topY + 3} rx={rx * 0.88} ry={ry * 0.88} fill={T.inset} stroke={T.borderSoft} strokeWidth="1" />
+
+      {/* Cotas */}
+      <line x1={cx - rx} y1={topY - 10} x2={cx + rx} y2={topY - 10} stroke={dark ? "#f59e0b" : "#d97706"} strokeWidth="1.2" strokeDasharray="3 2" />
+      <text x={cx} y={topY - 14} fill={dark ? "#fbbf24" : "#b45309"} fontSize="9.5" fontWeight="700" textAnchor="middle">⌀ {D}cm</text>
+
+      <line x1={cx + rx + 8} y1={topY} x2={cx + botRx + 8} y2={botY} stroke={dark ? "#38bdf8" : "#0284c7"} strokeWidth="1.2" strokeDasharray="3 2" />
+      <text x={cx + rx + 14} y={(topY + botY) / 2 + 3} fill={dark ? "#38bdf8" : "#0284c7"} fontSize="9.5" fontWeight="700" textAnchor="start">Alt: {H}cm</text>
+
+      {/* Badge com Volume */}
+      <g transform={`translate(${cx}, ${topY + 3})`}>
+        <rect x="-30" y="-8" width="60" height="16" rx="8" fill={dark ? "#1c1917" : "#ffffff"} stroke={T.accentBorder} strokeWidth="1.2" />
+        <text x="0" y="3.5" fill={T.text} fontSize="10" fontWeight="800" textAnchor="middle">{potLiters} L</text>
+      </g>
     </svg>
   );
 }
@@ -2568,30 +2701,49 @@ function GrowinStones() {
     e.target.value = "";
   };
 
-  const isCustomPot = potIdx === POT_SIZES.length;
+  const isCustomCalha = potIdx === POT_SIZES.length;
+  const isCustomPot = potIdx >= POT_SIZES.length;
   const customLiters = Math.round(((customPotW * customPotL * customPotH) / 1000) * 10) / 10;
   const customDiameter = Math.round(Math.sqrt((customPotW * customPotL * 4) / Math.PI));
 
-  const pot = isCustomPot
+  const pot = isCustomCalha
     ? {
-        label: `${customLiters} L (Custom)`,
+        label: `Calha ${customLiters} L (${customPotW}×${customPotL}×${customPotH} cm)`,
         liters: customLiters,
         widthCm: customPotW,
         depthCm: customPotL,
         heightCm: customPotH,
         diameter: customDiameter,
-        shape: customPotW === customPotL ? "square" : "rect",
+        shape: "calha",
         isCustom: true,
+        isCalha: true,
+      }
+    : isCustomPot
+    ? {
+        label: potShape === "calha"
+          ? `Calha ${customLiters} L (${customPotW}×${customPotL}×${customPotH} cm)`
+          : `${customLiters} L (Custom)`,
+        liters: customLiters,
+        widthCm: customPotW,
+        depthCm: customPotL,
+        heightCm: customPotH,
+        diameter: customDiameter,
+        shape: potShape,
+        isCustom: true,
+        isCalha: potShape === "calha",
       }
     : (POT_SIZES[potIdx] || POT_SIZES[2]);
 
-  const isRect = pot.shape === "rect" || (pot.isCustom && pot.widthCm !== pot.depthCm);
-  const isSquare = !isRect && potShape === "square";
-  const potW = isRect ? (potFlipped ? (pot.depthCm || 40) : (pot.widthCm || 60)) : (pot.diameter || 26);
-  const potD = isRect ? (potFlipped ? (pot.widthCm || 60) : (pot.depthCm || 40)) : (pot.diameter || 26);
+  const isCalha = pot.shape === "calha" || potShape === "calha" || isCustomCalha;
+  const isRect = isCalha || pot.shape === "rect" || (pot.isCustom && pot.widthCm !== pot.depthCm && potShape !== "circle");
+  const isSquare = !isCalha && !isRect && potShape === "square";
+  const potW = isRect || isCalha ? (potFlipped ? (pot.depthCm || 40) : (pot.widthCm || 60)) : (pot.diameter || 26);
+  const potD = isRect || isCalha ? (potFlipped ? (pot.widthCm || 60) : (pot.depthCm || 40)) : (pot.diameter || 26);
   const potH = pot.heightCm || Math.round(pot.diameter ? pot.diameter * 0.95 : 28);
 
-  const potDesc = isRect
+  const potDesc = isCalha
+    ? `Calha hidropônica ${potW}×${potD} cm (profundidade ${potH} cm)`
+    : isRect
     ? `retangular ${potW}×${potD} cm (alt. ${potH} cm)`
     : isSquare
     ? `quadrado ${potW}×${potD} cm (alt. ${potH} cm)`
@@ -5426,6 +5578,7 @@ function GrowinStones() {
                   potLiters={pot.liters}
                   isRect={isRect}
                   isSquare={isSquare}
+                  isCalha={isCalha}
                   dark={dark}
                   T={T}
                 />
@@ -5435,14 +5588,20 @@ function GrowinStones() {
               <div className="mb-3 p-2.5 rounded-xl space-y-1"
                 style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
                 <label className="text-[11px] font-bold block" style={{ color: T.text }}>
-                  Tipo de vaso
+                  Tipo de vaso / recipiente
                 </label>
                 <select
                   value={potIdx}
                   onChange={(e) => {
                     const idx = Number(e.target.value);
                     setPotIdx(idx);
-                    if (POT_SIZES[idx] && POT_SIZES[idx].shape) setPotShape(POT_SIZES[idx].shape);
+                    if (idx === POT_SIZES.length) {
+                      setPotShape("calha");
+                    } else if (idx === POT_SIZES.length + 1) {
+                      if (potShape === "calha") setPotShape("square");
+                    } else if (POT_SIZES[idx] && POT_SIZES[idx].shape) {
+                      setPotShape(POT_SIZES[idx].shape);
+                    }
                   }}
                   className="w-full h-8 px-2.5 rounded-lg text-xs font-semibold focus:outline-none cursor-pointer transition-all truncate"
                   style={{ background: T.surface, border: `1px solid ${T.accentBorder}`, color: T.text }}>
@@ -5452,18 +5611,28 @@ function GrowinStones() {
                     </option>
                   ))}
                   <option value={POT_SIZES.length}>
-                    Vaso Customizado / Sob Medida
+                    Calha Hidropônica (Sob Medida)
+                  </option>
+                  <option value={POT_SIZES.length + 1}>
+                    Vaso Sob Medida / Customizado
                   </option>
                 </select>
               </div>
 
-              {/* Controles customizados se for vaso sob medida */}
+              {/* Controles customizados se for vaso sob medida ou calha */}
               {isCustomPot && (
                 <div className="space-y-3 mb-3 p-3 rounded-xl"
                   style={{ background: T.surface2, border: `1px dashed ${T.accentBorder}` }}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold" style={{ color: T.text }}>Formato</span>
-                    <div className="flex items-center gap-1">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-xs font-bold" style={{ color: T.text }}>Formato do recipiente</span>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <button onClick={() => setPotShape("calha")}
+                        className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-all"
+                        style={potShape === "calha"
+                          ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
+                          : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
+                        Calha
+                      </button>
                       <button onClick={() => setPotShape("circle")}
                         className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-all"
                         style={potShape === "circle"
@@ -5476,33 +5645,83 @@ function GrowinStones() {
                         style={potShape === "square"
                           ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
                           : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
-                        Quadrado/Ret.
+                        Quadrado
+                      </button>
+                      <button onClick={() => setPotShape("rect")}
+                        className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-all"
+                        style={potShape === "rect"
+                          ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
+                          : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
+                        Retangular
                       </button>
                     </div>
                   </div>
 
-                  {potShape === "circle" ? (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium" style={{ color: T.muted }}>Diâmetro (cm)</span>
-                      {num(customPotW, setCustomPotW, 10, 150, 1)}
-                    </div>
-                  ) : (
-                    <>
+                  {potShape === "calha" ? (
+                    <div className="space-y-2.5 pt-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium" style={{ color: T.muted }}>Largura (cm)</span>
+                        <div>
+                          <span className="text-xs font-semibold block" style={{ color: T.text }}>Largura da calha</span>
+                          <span className="text-[10px]" style={{ color: T.faint }}>Seção transversal</span>
+                        </div>
+                        {num(customPotW, setCustomPotW, 5, 200, 1)}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-semibold block" style={{ color: T.text }}>Comprimento da calha</span>
+                          <span className="text-[10px]" style={{ color: T.faint }}>Extensão longitudinal</span>
+                        </div>
+                        {num(customPotL, setCustomPotL, 10, 1000, 5)}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-semibold block" style={{ color: T.text }}>Profundidade da calha</span>
+                          <span className="text-[10px]" style={{ color: T.faint }}>Altura útil do leito</span>
+                        </div>
+                        {num(customPotH, setCustomPotH, 5, 150, 1)}
+                      </div>
+                      <p className="text-[11px] font-medium pt-1" style={{ color: T.muted }}>
+                        Volume total da calha: <strong style={{ color: T.text }}>{customLiters} Litros</strong>
+                      </p>
+                    </div>
+                  ) : potShape === "circle" ? (
+                    <div className="space-y-2.5 pt-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold" style={{ color: T.text }}>Diâmetro (cm)</span>
                         {num(customPotW, setCustomPotW, 10, 150, 1)}
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium" style={{ color: T.muted }}>Comprimento (cm)</span>
+                        <span className="text-xs font-semibold" style={{ color: T.text }}>Altura (cm)</span>
+                        {num(customPotH, setCustomPotH, 10, 150, 1)}
+                      </div>
+                    </div>
+                  ) : potShape === "square" ? (
+                    <div className="space-y-2.5 pt-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold" style={{ color: T.text }}>Lado / Largura (cm)</span>
+                        {num(customPotW, (v) => { setCustomPotW(v); setCustomPotL(v); }, 10, 150, 1)}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold" style={{ color: T.text }}>Altura (cm)</span>
+                        {num(customPotH, setCustomPotH, 10, 150, 1)}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5 pt-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold" style={{ color: T.text }}>Largura (cm)</span>
+                        {num(customPotW, setCustomPotW, 10, 150, 1)}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold" style={{ color: T.text }}>Comprimento (cm)</span>
                         {num(customPotL, setCustomPotL, 10, 150, 1)}
                       </div>
-                    </>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold" style={{ color: T.text }}>Altura (cm)</span>
+                        {num(customPotH, setCustomPotH, 10, 150, 1)}
+                      </div>
+                    </div>
                   )}
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium" style={{ color: T.muted }}>Altura (cm)</span>
-                    {num(customPotH, setCustomPotH, 10, 150, 1)}
-                  </div>
                 </div>
               )}
 
