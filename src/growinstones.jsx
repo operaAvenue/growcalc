@@ -3,40 +3,36 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 // ————————————————————————— ESP32 TELEMETRY & CONTROLE —————————————————————————
 function MQTTMonitorView({ currentUser, T, dark, showToast }) {
   const [telemetry, setTelemetry] = useState(null);
-  const [rawPayload, setRawPayload] = useState(null);
   const [logs, setLogs] = useState([]);
-  const [isSimulating, setIsSimulating] = useState(false);
+  const [devices, setDevices] = useState([]);
+  const [selectedDevice, setSelectedDevice] = useState(null);
   const [codeModalOpen, setCodeModalOpen] = useState(false);
   const [togglingKeys, setTogglingKeys] = useState({});
+  const [loading, setLoading] = useState(true);
 
   const userSlug = currentUser?.username || "guest";
+  const activeId = selectedDevice || userSlug;
 
   const fetchTelemetry = async () => {
     try {
-      const res = await fetch(`https://grow.thegrowinstones.com/api/mqtt/telemetry/${userSlug}`);
+      const res = await fetch(`https://grow.thegrowinstones.com/api/mqtt/telemetry/${activeId}`);
       if (res.ok) {
         const result = await res.json();
-        if (result.data) {
-          setTelemetry({
-            data: result.data,
-            topic: result.topic || `openagro/${userSlug}/state`,
-            timestamp: new Date(result.timestamp || Date.now()).toLocaleTimeString()
-          });
-          setRawPayload(result.data);
-          setLogs((prev) => [
-            { time: new Date().toLocaleTimeString(), topic: result.topic || `openagro/${userSlug}/state`, payload: JSON.stringify(result.data) },
-            ...prev.slice(0, 15)
-          ]);
-        }
+        setTelemetry(result);
+        if (result.devices) setDevices(result.devices);
+        if (result.recentLogs) setLogs(result.recentLogs);
       }
-    } catch (e) {}
+    } catch (e) {
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchTelemetry();
     const interval = setInterval(fetchTelemetry, 3000);
     return () => clearInterval(interval);
-  }, [userSlug]);
+  }, [activeId]);
 
   const toggleESP32Relay = async (key, currentVal) => {
     const nextState = (currentVal === true || currentVal === "ON" || currentVal === "1") ? "OFF" : "ON";
@@ -44,7 +40,7 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
 
     const cmdTopic = telemetry?.topic?.includes("openagro/")
       ? telemetry.topic.replace(/\/state$/, "/set")
-      : `openagro/${userSlug}/${key}/set`;
+      : `openagro/${activeId}/${key}/set`;
 
     try {
       const res = await fetch("https://grow.thegrowinstones.com/api/mqtt/cmd", {
@@ -53,52 +49,13 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
         body: JSON.stringify({ topic: cmdTopic, payload: nextState })
       });
       if (res.ok) {
-        showToast(`⚡ Comando enviado ao ESP32: ${key} -> ${nextState}`);
+        showToast(`Comando enviado ao ESP32: ${key} -> ${nextState}`);
         fetchTelemetry();
       }
     } catch (e) {
-      showToast("⚠️ Erro ao enviar comando para o ESP32.");
+      showToast("Erro ao enviar comando para o ESP32.");
     } finally {
       setTogglingKeys((prev) => ({ ...prev, [key]: false }));
-    }
-  };
-
-  const simulateESP32Payload = async () => {
-    setIsSimulating(true);
-    const mockESP32IoTControllerData = {
-      firmware: "ESP32-IoT-Controller (openAgro v2.4)",
-      dispositivo: "openAgro-Master",
-      temperatura_ambiente_gpio4: (24.2 + Math.random() * 2).toFixed(1),
-      umidade_ar_gpio5: Math.floor(62 + Math.random() * 8),
-      ph_solucao_gpio33: (5.82 + Math.random() * 0.2).toFixed(2),
-      ec_condutividade_gpio32: (1.65 + Math.random() * 0.1).toFixed(2),
-      nivel_reservatorio_gpio34: Math.floor(88 + Math.random() * 10),
-      co2_ppm_gpio35: Math.floor(820 + Math.random() * 120),
-      bomba_recirculante_gpio27: Math.random() > 0.3 ? "ON" : "OFF",
-      solenoide_oxigenacao_gpio14: "ON",
-      painel_led_gpio12: "ON",
-      exaustor_principal_gpio13: Math.random() > 0.5 ? "ON" : "OFF",
-      tensao_bateria_volts: 12.6
-    };
-
-    try {
-      const res = await fetch("https://grow.thegrowinstones.com/api/mqtt/telemetry", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: userSlug,
-          topic: `openagro/${userSlug}/state`,
-          data: mockESP32IoTControllerData
-        })
-      });
-      if (res.ok) {
-        showToast("⚡ Pacote ESP32-IoT-Controller simulado com sucesso!");
-        fetchTelemetry();
-      }
-    } catch (e) {
-      showToast("Erro ao simular envio.");
-    } finally {
-      setIsSimulating(false);
     }
   };
 
@@ -108,9 +65,6 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
     const sensors = [];
     const actuators = [];
     const info = [];
-
-    const cardColors = ["#d97706", "#059669", "#0284c7", "#7c3aed", "#e11d48", "#ea580c", "#0d9488", "#4f46e5"];
-    let colorIdx = 0;
 
     Object.entries(data).forEach(([key, val]) => {
       const label = key
@@ -137,8 +91,7 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
         else if (lower.includes("vazao") || lower.includes("flow")) unit = "L/min";
         else if (lower.includes("volt") || lower.includes("tensao")) unit = "V";
 
-        sensors.push({ key, label, val: numVal, unit, color: cardColors[colorIdx % cardColors.length] });
-        colorIdx++;
+        sensors.push({ key, label, val: numVal, unit });
       } else if (val !== null && val !== undefined) {
         info.push({ key, label, val: String(val) });
       }
@@ -147,7 +100,8 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
     return { sensors, actuators, info };
   };
 
-  const currentPayload = telemetry ? telemetry.data : null;
+  const isConnected = telemetry && telemetry.connected && telemetry.data;
+  const currentPayload = isConnected ? telemetry.data : null;
   const { sensors, actuators, info } = parseDynamicData(currentPayload);
 
   return (
@@ -156,13 +110,15 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold" style={{ color: T.text }}>📡 Telemetria & Controle ESP32-IoT-Controller</h1>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> OPENAGRO FIRMWARE READY
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.text }}><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9c3.9 3.9 3.9 10.3 0 14.2"/></svg>
+            <h1 className="text-2xl font-bold" style={{ color: T.text }}>Telemetria & Controle ESP32-IoT-Controller</h1>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold border flex items-center gap-1.5" style={{ background: isConnected ? T.surface2 : T.bg, borderColor: T.border, color: T.text }}>
+              <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? "bg-emerald-500 animate-pulse" : "bg-amber-500"}`}></span>
+              {isConnected ? "REAL-TIME MQTT CONECTADO" : "AGUARDANDO ESP32 REAL"}
             </span>
           </div>
-          <p className="text-xs mt-1" style={{ color: T.textMuted }}>
-            Conexão direta com dispositivos ESP32 rodando a plataforma <b>ESP32-IoT-Controller (openAgro)</b>.
+          <p className="text-xs mt-1" style={{ color: T.muted }}>
+            Comunicação bidirecional direta com o firmware <b>ESP32-IoT-Controller (openAgro v2.4)</b> via Mosquitto MQTT nativo.
           </p>
         </div>
 
@@ -172,162 +128,224 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
             className="px-4 py-2 rounded-xl text-xs font-bold transition-all shadow flex items-center gap-1.5"
             style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             <span>Configuração do ESP32</span>
           </button>
-
-          <button
-            onClick={simulateESP32Payload}
-            disabled={isSimulating}
-            className="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
-            style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}
-          >
-            <span>{isSimulating ? "Simulando..." : "⚡ Simular ESP32-IoT-Controller"}</span>
-          </button>
         </div>
       </div>
 
-      {/* Connection Info Bar */}
-      <div className="p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-3 gap-4" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-amber-500 bg-amber-500/10 border border-amber-500/30 shrink-0">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+      {/* Selector de Dispositivos Reais & Connection Info */}
+      <div className="p-5 rounded-2xl space-y-4" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.text }}><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>
+            <div>
+              <div className="text-xs font-bold" style={{ color: T.text }}>Dispositivos ESP32 Descobertos na Rede ({devices.length})</div>
+              <div className="text-[11px]" style={{ color: T.muted }}>Selecione um hardware ativo para visualizar telemetria real em tempo real.</div>
+            </div>
           </div>
+
+          {devices.length > 0 && (
+            <select
+              value={activeId}
+              onChange={(e) => setSelectedDevice(e.target.value)}
+              className="px-3 py-2 rounded-xl text-xs font-mono font-bold transition-all"
+              style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
+            >
+              <option value={userSlug}>Subdomínio: {userSlug}</option>
+              {devices.map((d) => (
+                <option key={d.id} value={d.id}>Hardware: {d.originalName} ({d.topicCount} msgs)</option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t" style={{ borderColor: T.borderSoft }}>
           <div>
-            <div className="text-[11px]" style={{ color: T.textMuted }}>Broker MQTT (ESP32 TCP):</div>
+            <div className="text-[11px]" style={{ color: T.muted }}>Broker Mosquitto TCP:</div>
             <div className="text-xs font-bold font-mono" style={{ color: T.text }}>grow.thegrowinstones.com:1883</div>
           </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 shrink-0">
-            #
+          <div>
+            <div className="text-[11px]" style={{ color: T.muted }}>Tópico Namespace:</div>
+            <div className="text-xs font-bold font-mono" style={{ color: T.text }}>openagro/{activeId}/...</div>
           </div>
           <div>
-            <div className="text-[11px]" style={{ color: T.textMuted }}>Tópico / Namespace Firmware:</div>
-            <div className="text-xs font-bold font-mono" style={{ color: T.text }}>openagro/{userSlug}/...</div>
+            <div className="text-[11px]" style={{ color: T.muted }}>Status de Conexão:</div>
+            <div className="text-xs font-bold font-mono" style={{ color: isConnected ? T.text : T.muted }}>
+              {isConnected ? `Transmitindo (${telemetry.timestamp})` : "Sem pacotes reais"}
+            </div>
           </div>
         </div>
+      </div>
 
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 shrink-0">
-            ⏱️
+      {/* Estado sem Dispositivo Conectado (Alerta Real sem Simulação) */}
+      {!isConnected && (
+        <div className="p-8 rounded-2xl text-center space-y-4" style={{ background: T.surface, border: `1px dashed ${T.border}` }}>
+          <div className="w-12 h-12 rounded-2xl mx-auto flex items-center justify-center" style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           </div>
           <div>
-            <div className="text-[11px]" style={{ color: T.textMuted }}>Última Telemetria:</div>
-            <div className="text-xs font-bold font-mono" style={{ color: T.text }}>{telemetry ? telemetry.timestamp : "Aguardando ESP32..."}</div>
+            <h3 className="text-sm font-bold" style={{ color: T.text }}>Nenhum dispositivo ESP32 transmitindo no momento</h3>
+            <p className="text-xs max-w-md mx-auto mt-1" style={{ color: T.muted }}>
+              Certifique-se de que seu ESP32 com o firmware <b>ESP32-IoT-Controller</b> está ligado e configurado para apontar para <code className="font-mono" style={{ color: T.text }}>grow.thegrowinstones.com:1883</code>.
+            </p>
           </div>
-        </div>
-      </div>
-
-      {/* Seção 1: Sensores / Medições Numéricas */}
-      <div>
-        <h2 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.text }}>
-          <span>📊 Leitura de Sensores ({sensors.length})</span>
-        </h2>
-        {sensors.length === 0 ? (
-          <div className="p-8 rounded-2xl text-center" style={{ background: T.surface, border: `1px dashed ${T.border}` }}>
-            <p className="text-xs" style={{ color: T.textMuted }}>Aguardando primeira leitura de sensores do ESP32-IoT-Controller...</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {sensors.map((s) => (
-              <div key={s.key} className="p-5 rounded-2xl transition-all hover:scale-[1.02]" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
-                <div className="text-xs font-bold uppercase tracking-wider mb-1 truncate" style={{ color: T.textMuted }} title={s.key}>{s.label}</div>
-                <div className="text-3xl font-extrabold font-mono flex items-baseline gap-1" style={{ color: s.color }}>
-                  <span>{s.val}</span>
-                  {s.unit && <span className="text-xs font-normal" style={{ color: T.textMuted }}>{s.unit}</span>}
-                </div>
-                <div className="text-[10px] font-mono mt-2 truncate" style={{ color: T.faint }}>ID: <code style={{ color: T.text }}>{s.key}</code></div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Seção 2: Atuadores / Relés com Controle Bidirecional */}
-      <div>
-        <h2 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.text }}>
-          <span>🔌 Relés & Atuadores com Controle Bidirecional ({actuators.length})</span>
-        </h2>
-        {actuators.length === 0 ? (
-          <div className="p-6 rounded-2xl text-center" style={{ background: T.surface, border: `1px dashed ${T.border}` }}>
-            <p className="text-xs" style={{ color: T.textMuted }}>Nenhum pino/relé detectado no dispositivo.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {actuators.map((a) => (
-              <div key={a.key} className="p-4 rounded-2xl flex items-center justify-between gap-2" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
-                <div className="min-w-0">
-                  <div className="text-xs font-bold truncate" style={{ color: T.text }}>{a.label}</div>
-                  <div className="text-[10px] font-mono truncate" style={{ color: T.textMuted }}>{a.key}</div>
-                </div>
-                <button
-                  onClick={() => toggleESP32Relay(a.key, a.val)}
-                  disabled={!!togglingKeys[a.key]}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition-all shadow-sm ${a.val ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30" : "bg-stone-500/20 text-stone-400 border border-stone-500/30 hover:bg-stone-500/30"}`}
-                >
-                  {togglingKeys[a.key] ? "..." : (a.val ? "⚡ LIGADO" : "DESLIGADO")}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Seção 3: Informações de Firmware */}
-      {info.length > 0 && (
-        <div>
-          <h2 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.text }}>
-            <span>ℹ️ Informações de Firmware & Dispositivo ({info.length})</span>
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {info.map((item) => (
-              <div key={item.key} className="p-4 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
-                <div className="text-xs font-bold mb-1" style={{ color: T.textMuted }}>{item.label}</div>
-                <div className="text-sm font-mono font-bold truncate" style={{ color: T.brand }}>{item.val}</div>
-              </div>
-            ))}
-          </div>
+          <button
+            onClick={() => setCodeModalOpen(true)}
+            className="px-4 py-2 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-2"
+            style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
+          >
+            <span>Ver Instruções de Apontamento NVS</span>
+          </button>
         </div>
       )}
 
-      {/* Inspeção do JSON Bruto */}
-      <div className="p-6 rounded-2xl space-y-3" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
-        <div className="flex items-center justify-between">
-          <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: T.text }}>📦 Inspeção de Dados Recebidos (ESP32-IoT-Controller)</h3>
-          <span className="text-[11px] font-mono text-emerald-400">Status: Conectado</span>
+      {/* Seção 1: Sensores / Medições Numéricas Reais */}
+      {isConnected && (
+        <>
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.text }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              <span>Leitura de Sensores ({sensors.length})</span>
+            </h2>
+            {sensors.length === 0 ? (
+              <div className="p-6 rounded-2xl text-center" style={{ background: T.surface, border: `1px dashed ${T.border}` }}>
+                <p className="text-xs" style={{ color: T.muted }}>Nenhum sensor numérico no payload do ESP32.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {sensors.map((s) => (
+                  <div key={s.key} className="p-5 rounded-2xl transition-all" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+                    <div className="text-xs font-bold uppercase tracking-wider mb-1 truncate" style={{ color: T.muted }} title={s.key}>{s.label}</div>
+                    <div className="text-3xl font-extrabold font-mono flex items-baseline gap-1" style={{ color: T.text }}>
+                      <span>{s.val}</span>
+                      {s.unit && <span className="text-xs font-normal" style={{ color: T.muted }}>{s.unit}</span>}
+                    </div>
+                    <div className="text-[10px] font-mono mt-2 truncate" style={{ color: T.faint }}>ID: <code style={{ color: T.text }}>{s.key}</code></div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Seção 2: Atuadores / Relés com Controle Bidirecional */}
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.text }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              <span>Relés & Atuadores com Controle Bidirecional ({actuators.length})</span>
+            </h2>
+            {actuators.length === 0 ? (
+              <div className="p-6 rounded-2xl text-center" style={{ background: T.surface, border: `1px dashed ${T.border}` }}>
+                <p className="text-xs" style={{ color: T.muted }}>Nenhum pino/relé detectado no dispositivo.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {actuators.map((a) => (
+                  <div key={a.key} className="p-4 rounded-2xl flex items-center justify-between gap-2" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold truncate" style={{ color: T.text }}>{a.label}</div>
+                      <div className="text-[10px] font-mono truncate" style={{ color: T.muted }}>{a.key}</div>
+                    </div>
+                    <button
+                      onClick={() => toggleESP32Relay(a.key, a.val)}
+                      disabled={!!togglingKeys[a.key]}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center gap-1.5"
+                      style={{
+                        background: a.val ? T.surface2 : T.bg,
+                        border: `1px solid ${T.border}`,
+                        color: T.text
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+                      <span>{togglingKeys[a.key] ? "..." : (a.val ? "LIGADO" : "DESLIGADO")}</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Seção 3: Informações de Firmware */}
+          {info.length > 0 && (
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.text }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                <span>Informações do Dispositivo ({info.length})</span>
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {info.map((item) => (
+                  <div key={item.key} className="p-4 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+                    <div className="text-xs font-bold mb-1" style={{ color: T.muted }}>{item.label}</div>
+                    <div className="text-sm font-mono font-bold truncate" style={{ color: T.brand }}>{item.val}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Inspeção do JSON Bruto Real */}
+          <div className="p-6 rounded-2xl space-y-3" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: T.text }}>Inspeção de Payload Real Recebido</h3>
+              <span className="text-[11px] font-mono" style={{ color: T.muted }}>Tópico: {telemetry.topic}</span>
+            </div>
+            <pre className="p-4 rounded-xl font-mono text-xs overflow-x-auto max-h-60" style={{ background: T.inset, border: `1px solid ${T.border}`, color: T.text }}>
+              {JSON.stringify(currentPayload, null, 2)}
+            </pre>
+          </div>
+        </>
+      )}
+
+      {/* Feed de Tópicos MQTT em Tempo Real */}
+      <div className="p-6 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: T.text }}>Feed de Tópicos MQTT em Tempo Real</h3>
+          <span className="text-[10px] font-mono" style={{ color: T.muted }}>Mosquitto Port 1883</span>
         </div>
-        <pre className="p-4 rounded-xl font-mono text-xs text-emerald-400 overflow-x-auto max-h-60" style={{ background: T.inset, border: `1px solid ${T.border}` }}>
-          {currentPayload ? JSON.stringify(currentPayload, null, 2) : "// Aguardando payload do ESP32..."}
-        </pre>
+        {logs.length === 0 ? (
+          <p className="text-xs" style={{ color: T.muted }}>Nenhuma mensagem MQTT trafegada no broker recentemente.</p>
+        ) : (
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {logs.map((log, i) => (
+              <div key={i} className="p-3 rounded-xl font-mono text-xs flex items-center justify-between gap-3 overflow-x-auto" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
+                <span className="shrink-0" style={{ color: T.muted }}>{log.time}</span>
+                <span className="shrink-0 font-bold" style={{ color: T.text }}>{log.topic}</span>
+                <span className="truncate" style={{ color: T.muted }}>{log.payload}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Modal Instruções de Conexão ESP32-IoT-Controller */}
       {codeModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-xl p-6 rounded-2xl text-left shadow-2xl relative space-y-4" style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.text }}>
-            <button onClick={() => setCodeModalOpen(false)} className="absolute top-4 right-4 text-stone-400 hover:text-white font-bold text-sm">✕</button>
+            <button
+              onClick={() => setCodeModalOpen(false)}
+              className="absolute top-4 right-4 w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+              style={{ background: T.surface2, color: T.text, border: `1px solid ${T.border}` }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
 
             <div className="flex items-center gap-3 border-b pb-3" style={{ borderColor: T.borderSoft }}>
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-amber-500 bg-amber-500/10 border border-amber-500/30">
-                ⚡
-              </div>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.text }}><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
               <div>
                 <h3 className="font-bold text-base" style={{ color: T.text }}>Configuração do ESP32-IoT-Controller</h3>
-                <p className="text-xs" style={{ color: T.textMuted }}>Instruções de apontamento para o firmware openAgro v2.4</p>
+                <p className="text-xs" style={{ color: T.muted }}>Instruções de apontamento NVS no firmware openAgro v2.4</p>
               </div>
             </div>
 
             <div className="space-y-3 text-xs" style={{ color: T.text }}>
               <div className="p-3.5 rounded-xl space-y-2 font-mono" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
-                <div><b className="text-amber-500">Broker MQTT Host:</b> grow.thegrowinstones.com</div>
-                <div><b className="text-emerald-400">Porta MQTT TCP:</b> 1883</div>
-                <div><b className="text-sky-400">Tópico de Leitura:</b> openagro/{userSlug}/+/state</div>
-                <div><b className="text-sky-400">Tópico de Comando:</b> openagro/{userSlug}/+/set</div>
+                <div><b>Broker MQTT Server:</b> grow.thegrowinstones.com</div>
+                <div><b>Porta MQTT TCP:</b> 1883</div>
+                <div><b>Tópico de Leitura:</b> openagro/{activeId}/+/state</div>
+                <div><b>Tópico de Comando:</b> openagro/{activeId}/+/set</div>
               </div>
-              <p style={{ color: T.textMuted }}>
-                No firmware <b>ESP32-IoT-Controller</b>, configure as credenciais de MQTT nas configurações de rede (NVS) preenchendo o servidor como <code className="font-mono text-amber-500">grow.thegrowinstones.com</code> e a porta <code className="font-mono text-emerald-400">1883</code>.
+              <p style={{ color: T.muted }}>
+                No firmware <b>ESP32-IoT-Controller</b>, acesse o portal de configuração ou terminal serial e defina o servidor MQTT como <code className="font-mono" style={{ color: T.text }}>grow.thegrowinstones.com</code> e a porta <code className="font-mono" style={{ color: T.text }}>1883</code>.
               </p>
             </div>
           </div>
@@ -898,7 +916,7 @@ function ComparisonView({ allPresets, loadPreset, removePreset, restoreDefaultPr
                   style={isChecked
                     ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text, fontWeight: 700 }
                     : { background: T.surface2, border: `1px solid ${T.border}`, color: T.faint }}>
-                  <span>{isChecked ? "✓" : "○"}</span>
+                  <span>{isChecked ? "" : "○"}</span>
                   <span>{p.name}</span>
                 </button>
               );
@@ -1415,7 +1433,7 @@ function ComparisonView({ allPresets, loadPreset, removePreset, restoreDefaultPr
                         background: isTop ? pastelMintBg : "transparent",
                         borderLeft: `1px solid ${T.borderSoft}`
                       }}>
-                      {fmtG(m.yieldYearG)} {isTop && "★"}
+                      {fmtG(m.yieldYearG)} {isTop && ""}
                     </td>
                   );
                 })}
@@ -1446,7 +1464,7 @@ function ComparisonView({ allPresets, loadPreset, removePreset, restoreDefaultPr
                         background: isLowG ? pastelMintBg : "transparent",
                         borderLeft: `1px solid ${T.borderSoft}`
                       }}>
-                      {fmtBRL(m.costPerGramOpex)} / g {isLowG && "★"}
+                      {fmtBRL(m.costPerGramOpex)} / g {isLowG && ""}
                     </td>
                   );
                 })}
@@ -1470,7 +1488,7 @@ function ComparisonView({ allPresets, loadPreset, removePreset, restoreDefaultPr
                         background: isLow ? pastelMintBg : "transparent",
                         borderLeft: `1px solid ${T.borderSoft}`
                       }}>
-                      {fmtBRL(m.capex)} {isLow && "★"}
+                      {fmtBRL(m.capex)} {isLow && ""}
                     </td>
                   );
                 })}
@@ -1565,7 +1583,7 @@ function ComparisonView({ allPresets, loadPreset, removePreset, restoreDefaultPr
                         background: isBestPayback ? pastelMintBg : "transparent",
                         borderLeft: `1px solid ${T.borderSoft}`
                       }}>
-                      {m.paybackMonths ? `${m.paybackMonths.toFixed(1)} m (${(m.paybackMonths / (m.cDays / 30)).toFixed(1)} safras)` : "—"} {isBestPayback && "★"}
+                      {m.paybackMonths ? `${m.paybackMonths.toFixed(1)} m (${(m.paybackMonths / (m.cDays / 30)).toFixed(1)} safras)` : "—"} {isBestPayback && ""}
                     </td>
                   );
                 })}
@@ -1645,13 +1663,13 @@ function GrowinStones() {
   const removeMaterialRow = (r) => {
     if (r.customId) {
       delCustom(r.customId);
-      showToast(`✓ Item "${r.label}" removido da lista!`);
+      showToast(` Item "${r.label}" removido da lista!`);
     } else if (r.isEquip || EQUIPMENT.some((e) => e.id === r.key)) {
       setEquip((prev) => ({ ...prev, [r.key]: 0 }));
-      showToast(`✓ Equipamento "${r.label}" removido da lista!`);
+      showToast(` Equipamento "${r.label}" removido da lista!`);
     } else {
       setCost(r.key, 0);
-      showToast(`✓ Custo do item "${r.label}" zerado!`);
+      showToast(` Custo do item "${r.label}" zerado!`);
     }
   };
 
@@ -1703,7 +1721,7 @@ function GrowinStones() {
 
   const triggerGoogleOAuth = () => {
     if (typeof window.google === "undefined" || !window.google.accounts) {
-      showToast("⚠️ SDK do Google está carregando... Tente novamente em instantes.");
+      showToast("SDK do Google está carregando... Tente novamente em instantes.");
       return;
     }
 
@@ -1722,7 +1740,7 @@ function GrowinStones() {
               setGoogleClientIdModalOpen(true);
               return;
             }
-            showToast(`⚠️ Falha no Google Auth: ${response.error_description || response.error}`);
+            showToast(`Falha no Google Auth: ${response.error_description || response.error}`);
             return;
           }
           try {
@@ -1767,10 +1785,10 @@ function GrowinStones() {
               localStorage.setItem("growcalc_user", JSON.stringify(existingUser));
               setCurrentUser(existingUser);
               setSubdomainInput(defaultSlug);
-              showToast(`✓ Bem-vindo de volta, ${existingUser.name}! Subdomínio @${defaultSlug} carregado.`);
+              showToast(` Bem-vindo de volta, ${existingUser.name}! Subdomínio @${defaultSlug} carregado.`);
             } else {
               setAuthModalOpen(true);
-              showToast(`✓ Google Autenticado: ${googleUser.email}`);
+              showToast(` Google Autenticado: ${googleUser.email}`);
             }
           } catch (err) {
             console.error("Erro ao obter perfil do Google:", err);
@@ -1818,13 +1836,13 @@ function GrowinStones() {
     if (window.confirm(`Deseja remover o chip "${name}"?`)) {
       const updated = allPresets.filter((p) => (p.id || p.name) !== id);
       saveAllPresetsToStorage(updated);
-      showToast(`✓ Preset "${name}" removido.`);
+      showToast(` Preset "${name}" removido.`);
     }
   };
 
   const restoreDefaultPresets = () => {
     saveAllPresetsToStorage(INITIAL_PRESETS);
-    showToast(`✓ Presets padrão restaurados!`);
+    showToast(` Presets padrão restaurados!`);
   };
 
   const addCurrentAsPreset = () => {
@@ -1841,7 +1859,7 @@ function GrowinStones() {
     };
     const updated = [...allPresets, newPreset];
     saveAllPresetsToStorage(updated);
-    showToast(`✓ Preset "${name.trim()}" adicionado!`);
+    showToast(` Preset "${name.trim()}" adicionado!`);
   };
 
   const loadPreset = (preset) => {
@@ -1852,7 +1870,7 @@ function GrowinStones() {
     if (preset.apply) {
       applyPreset(preset);
     }
-    showToast(`✓ Setup "${preset.name}" carregado!`);
+    showToast(` Setup "${preset.name}" carregado!`);
   };
 
   const fileInputRef = useRef(null);
@@ -2088,10 +2106,10 @@ function GrowinStones() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      showToast("✓ Setup exportado em arquivo JSON!");
+      showToast("Setup exportado em arquivo JSON!");
     } catch (err) {
       console.error("Erro ao exportar JSON", err);
-      showToast("❌ Erro ao exportar o arquivo JSON.");
+      showToast("Erro ao exportar o arquivo JSON.");
     }
   };
 
@@ -2108,14 +2126,14 @@ function GrowinStones() {
           const parsed = JSON.parse(content);
           const success = loadSetupData(parsed);
           if (success) {
-            showToast("✓ Setup importado com sucesso!");
+            showToast("Setup importado com sucesso!");
           } else {
-            showToast("❌ Arquivo JSON inválido.");
+            showToast("Arquivo JSON inválido.");
           }
         }
       } catch (err) {
         console.error("Erro ao ler JSON", err);
-        showToast("❌ Erro ao ler o arquivo JSON.");
+        showToast("Erro ao ler o arquivo JSON.");
       }
     };
     reader.readAsText(file);
@@ -3133,7 +3151,7 @@ function GrowinStones() {
 
     const shoppingListHtml = (Array.isArray(shoppingListItems) && shoppingListItems.length > 0)
       ? `<div style="margin-top:28px;">
-          <h2 style="font-size:14px; text-transform:uppercase; letter-spacing:0.12em; color:#0369a1; border-bottom:2px solid #bae6fd; padding-bottom:8px; margin-bottom:16px;">🛒 Lista de compras com QR Codes</h2>
+          <h2 style="font-size:14px; text-transform:uppercase; letter-spacing:0.12em; color:#0369a1; border-bottom:2px solid #bae6fd; padding-bottom:8px; margin-bottom:16px;"> Lista de compras com QR Codes</h2>
           <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:14px;">
             ${shoppingListItems.map((item) => {
               const itemUrl = typeof item?.url === "string" ? item.url.trim() : "";
@@ -3194,7 +3212,7 @@ function GrowinStones() {
 <body>
 <header>
   <div class="header-in">
-    <a href="#" class="brand">🌱 GrowinStones</a>
+    <a href="#" class="brand"> GrowinStones</a>
     <a href="https://${displaySlug}.thegrowinstones.com" target="_blank" class="badge-live">https://${displaySlug}.thegrowinstones.com</a>
   </div>
 </header>
@@ -3207,7 +3225,7 @@ function GrowinStones() {
           ${owner ? `Responsável: <b style="color:#f5f5f4;">${esc(owner)}</b> · ` : ""}Genética: <b style="color:#f5f5f4;">${esc(strain || "Não informada")}</b> · Atualizado em ${today}
         </div>
       </div>
-      <button onclick="window.print()" style="background:#0284c7; color:#fff; border:none; padding:10px 18px; border-radius:12px; font:700 13px Inter; cursor:pointer;">🖨️ Exportar PDF</button>
+      <button onclick="window.print()" style="background:#0284c7; color:#fff; border:none; padding:10px 18px; border-radius:12px; font:700 13px Inter; cursor:pointer;">️ Exportar PDF</button>
     </div>
   </div>
 
@@ -3236,7 +3254,7 @@ function GrowinStones() {
 
   <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:24px;">
     <div class="sec-card">
-      <h2 class="sec-title">📐 Estrutura & Dimensões</h2>
+      <h2 class="sec-title"> Estrutura & Dimensões</h2>
       <div class="kv-row"><span>Dimensões (L × P × A)</span><b>${width} × ${depth} × ${height} cm</b></div>
       <div class="kv-row"><span>Área / Volume</span><b>${areaM2.toFixed(2)} m² · ${volumeM3.toFixed(2)} m³</b></div>
       <div class="kv-row"><span>Vasos</span><b>${plants} × ${pot.label} (${esc(potDesc)})</b></div>
@@ -3248,7 +3266,7 @@ function GrowinStones() {
     </div>
 
     <div class="sec-card">
-      <h2 class="sec-title">⚡ Custos Operacionais & Energia</h2>
+      <h2 class="sec-title"> Custos Operacionais & Energia</h2>
       <div class="kv-row"><span>Potência Total Instalada</span><b>${totalWatts} W</b></div>
       <div class="kv-row"><span>Consumo Mensal</span><b>${kwhMonth.toFixed(0)} kWh</b></div>
       <div class="kv-row"><span>Tarifa de Energia</span><b>${fmtBRL(tariff)} / kWh</b></div>
@@ -3261,7 +3279,7 @@ function GrowinStones() {
   </div>
 
   <div class="sec-card">
-    <h2 class="sec-title">🗺️ Planta Baixa Interativa</h2>
+    <h2 class="sec-title">️ Planta Baixa Interativa</h2>
     <div style="background:#f5f1e7; border-radius:14px; padding:16px; text-align:center;">
       <svg width="${svgW}" height="${totalSvgH}" viewBox="0 0 ${svgW} ${totalSvgH}" style="width:100%; max-width:${svgW}px; height:auto; display:block; margin:0 auto;">
         <rect x="${OX}" y="${OY}" width="${topW}" height="${topH}" rx="10" fill="#ffffff" stroke="#1f1b16" stroke-width="1.5"/>
@@ -3278,7 +3296,7 @@ function GrowinStones() {
   </div>
 
   <div class="sec-card">
-    <h2 class="sec-title">📋 Equipamentos e Materiais (CAPEX)</h2>
+    <h2 class="sec-title"> Equipamentos e Materiais (CAPEX)</h2>
     <table>
       <thead>
         <tr>
@@ -3306,7 +3324,7 @@ function GrowinStones() {
 
   ${safeNotes || safeInst || safeTerms ? `
   <div class="sec-card">
-    <h2 class="sec-title">📝 Notas, Instruções & Termos</h2>
+    <h2 class="sec-title"> Notas, Instruções & Termos</h2>
     ${safeNotes ? `<div style="margin-bottom:12px;"><b style="color:#f59e0b; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Observações</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeNotes)}</div></div>` : ""}
     ${safeInst ? `<div style="margin-bottom:12px;"><b style="color:#f59e0b; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Instruções de Operação</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeInst)}</div></div>` : ""}
     ${safeTerms ? `<div><b style="color:#f59e0b; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Termos & Condições</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeTerms)}</div></div>` : ""}
@@ -3329,7 +3347,7 @@ function GrowinStones() {
       win.document.write(html);
       win.document.close();
     } else {
-      showToast("⚠️ O seu navegador bloqueou a abertura de abas. Habilite pop-ups para visualizar o PDF.");
+      showToast("O seu navegador bloqueou a abertura de abas. Habilite pop-ups para visualizar o PDF.");
     }
   };
 
@@ -3342,7 +3360,7 @@ function GrowinStones() {
       win.document.write(htmlContent);
       win.document.close();
     } else {
-      showToast("⚠️ O seu navegador bloqueou a abertura de abas. Habilite pop-ups.");
+      showToast("O seu navegador bloqueou a abertura de abas. Habilite pop-ups.");
     }
   };
 
@@ -3435,7 +3453,7 @@ function GrowinStones() {
         {/* Hero Section */}
         <main className="max-w-5xl mx-auto px-6 py-16 text-center flex-1 flex flex-col justify-center items-center">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold mb-6" style={{ background: "rgba(245, 158, 11, 0.12)", border: "1px solid rgba(245, 158, 11, 0.3)", color: "#fbbf24" }}>
-            <span>🌱 Engenharia de Cultivo & Subdomínios Exclusivos</span>
+            <span> Engenharia de Cultivo & Subdomínios Exclusivos</span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-6" style={{ color: "#ffffff", lineHeight: 1.15 }}>
@@ -3465,17 +3483,23 @@ function GrowinStones() {
           {/* Feature Highlights Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-16 text-left w-full">
             <div className="p-6 rounded-2xl" style={{ background: "#1c1917", border: "1px solid #292524" }}>
-              <div className="text-2xl mb-2">📐</div>
+              <div className="mb-2">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+              </div>
               <h3 className="font-bold text-sm mb-1 text-white">Dimensionamento de Vasos</h3>
               <p className="text-xs text-stone-400">Arranjo de linhas e colunas com afastamento ajustável e cálculo exato de milímetros.</p>
             </div>
             <div className="p-6 rounded-2xl" style={{ background: "#1c1917", border: "1px solid #292524" }}>
-              <div className="text-2xl mb-2">💧</div>
+              <div className="mb-2">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-sky-400"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+              </div>
               <h3 className="font-bold text-sm mb-1 text-white">Engenharia Hidráulica</h3>
               <p className="text-xs text-stone-400">Cálculo de bitola de tubos, bombas de água/ar, anéis recirculantes e reservatórios.</p>
             </div>
             <div className="p-6 rounded-2xl" style={{ background: "#1c1917", border: "1px solid #292524" }}>
-              <div className="text-2xl mb-2">🌐</div>
+              <div className="mb-2">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-400"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              </div>
               <h3 className="font-bold text-sm mb-1 text-white">Subdomínio Exclusivo</h3>
               <p className="text-xs text-stone-400">Exportação com um clique para seu subdomínio exclusivo com certificado SSL automático.</p>
             </div>
@@ -3491,11 +3515,13 @@ function GrowinStones() {
         {googleClientIdModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.88)", backdropFilter: "blur(8px)" }}>
             <div className="w-full max-w-lg p-6 rounded-2xl text-left shadow-2xl relative space-y-4" style={{ background: "#1c1917", border: "1px solid #383532", color: "#f5f5f4" }}>
-              <button onClick={() => setGoogleClientIdModalOpen(false)} className="absolute top-4 right-4 text-stone-400 hover:text-white font-bold text-sm">✕</button>
+              <button onClick={() => setGoogleClientIdModalOpen(false)} className="absolute top-4 right-4 text-stone-400 hover:text-white font-bold text-sm flex items-center justify-center w-6 h-6 rounded-md">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
 
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-amber-400 text-lg bg-amber-500/10 border border-amber-500/30 shrink-0">
-                  🔑
+                  
                 </div>
                 <div>
                   <h3 className="font-bold text-base text-white">Configuração do Google OAuth 2.0</h3>
@@ -3504,7 +3530,7 @@ function GrowinStones() {
               </div>
 
               <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 space-y-2">
-                <p className="font-bold text-amber-200">📍 Origem não registrada no Google Cloud (no registered origin)</p>
+                <p className="font-bold text-amber-200"> Origem não registrada no Google Cloud (no registered origin)</p>
                 <p>O seu Client ID <code className="text-amber-200 bg-black/40 px-1 py-0.5 rounded font-mono">447903804008...</code> é válido, mas o domínio <code className="text-white bg-black/40 px-1 py-0.5 rounded font-mono">https://grow.thegrowinstones.com</code> precisa ser adicionado como **Origem JavaScript Autorizada** no Google Cloud.</p>
               </div>
 
@@ -3519,13 +3545,13 @@ function GrowinStones() {
                     }}
                     className="flex-1 py-3 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg flex items-center justify-center gap-2"
                   >
-                    🚀 Entrar no Modo Direto (Acessar Agora)
+                     Entrar no Modo Direto (Acessar Agora)
                   </button>
                 </div>
               </div>
 
               <div className="text-[11px] text-stone-300 pt-3 border-t border-stone-800 space-y-1.5">
-                <p className="font-bold text-sky-400">💡 Como autorizar o domínio no Google Cloud (em 15 segundos):</p>
+                <p className="font-bold text-sky-400"> Como autorizar o domínio no Google Cloud (em 15 segundos):</p>
                 <ol className="list-decimal pl-4 space-y-1 text-stone-300">
                   <li>Acesse **<a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-sky-400 underline font-bold">console.cloud.google.com/apis/credentials</a>**.</li>
                   <li>Clique no seu Client ID (**447903804008...**).</li>
@@ -3546,7 +3572,9 @@ function GrowinStones() {
         {authModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
             <div className="w-full max-w-md p-6 rounded-2xl text-left shadow-2xl relative" style={{ background: "#1c1917", border: "1px solid #383532", color: "#f5f5f4" }}>
-              <button onClick={() => setAuthModalOpen(false)} className="absolute top-4 right-4 text-stone-400 hover:text-white font-bold text-sm">✕</button>
+              <button onClick={() => setAuthModalOpen(false)} className="absolute top-4 right-4 text-stone-400 hover:text-white font-bold text-sm flex items-center justify-center w-6 h-6 rounded-md">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
 
               <div className="flex items-center gap-3 mb-4">
                 {pendingGoogleUser && pendingGoogleUser.picture ? (
@@ -3562,7 +3590,7 @@ function GrowinStones() {
                   </h3>
                   <p className="text-xs text-emerald-400 font-medium truncate flex items-center gap-1">
                     {pendingGoogleUser ? (
-                      <><span>✓ {pendingGoogleUser.email}</span></>
+                      <><span> {pendingGoogleUser.email}</span></>
                     ) : (
                       <span className="text-stone-400">Defina seu usuário e subdomínio exclusivo</span>
                     )}
@@ -3614,12 +3642,12 @@ function GrowinStones() {
                     setCurrentUser(newUser);
                     setSubdomainInput(cleanSlug);
                     setAuthModalOpen(false);
-                    showToast(`✓ Bem-vindo, ${cleanName}! Subdomínio @${cleanSlug} ativado com Google.`);
+                    showToast(` Bem-vindo, ${cleanName}! Subdomínio @${cleanSlug} ativado com Google.`);
                   }}
                   className="w-full py-3 rounded-xl font-bold text-xs transition-all hover:opacity-90 shadow-lg flex items-center justify-center gap-2 mt-2"
                   style={{ background: "#0284c7", color: "#ffffff" }}
                 >
-                  🚀 Confirmar & Acessar Configurador
+                   Confirmar & Acessar Configurador
                 </button>
               </div>
             </div>
@@ -3784,7 +3812,7 @@ function GrowinStones() {
 
         {activeTab === "my_grows" && (
           <div className="max-w-5xl mx-auto px-6 py-8 w-full">
-            <h1 className="text-2xl font-bold mb-2" style={{ color: T.text }}>🌿 Meus Grows & Subdomínios</h1>
+            <h1 className="text-2xl font-bold mb-2" style={{ color: T.text }}> Meus Grows & Subdomínios</h1>
             <p className="text-xs mb-6" style={{ color: T.textMuted }}>Gerencie os setups salvos e seu subdomínio exclusivo em funcionamento.</p>
             
             <div className="p-6 rounded-2xl mb-8" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
@@ -3802,7 +3830,7 @@ function GrowinStones() {
                     className="px-4 py-2 rounded-xl text-xs font-bold text-white shadow"
                     style={{ background: "#0284c7" }}
                   >
-                    🌐 Ver Subdomínio ao Vivo
+                     Ver Subdomínio ao Vivo
                   </a>
                   <button
                     onClick={() => {
@@ -3812,7 +3840,7 @@ function GrowinStones() {
                     className="px-4 py-2 rounded-xl text-xs font-bold"
                     style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
                   >
-                    🚀 Re-publicar Setup Atual
+                     Re-publicar Setup Atual
                   </button>
                 </div>
               </div>
@@ -3830,12 +3858,12 @@ function GrowinStones() {
                     onClick={() => {
                       applyPreset(p);
                       setActiveTab("configurator");
-                      showToast(`✓ Setup "${p.name}" carregado!`);
+                      showToast(` Setup "${p.name}" carregado!`);
                     }}
                     className="w-full py-2 rounded-lg text-xs font-semibold"
                     style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
                   >
-                    ⚡ Carregar no Configurador
+                     Carregar no Configurador
                   </button>
                 </div>
               ))}
@@ -3845,7 +3873,7 @@ function GrowinStones() {
 
         {activeTab === "settings" && (
           <div className="max-w-3xl mx-auto px-6 py-8 w-full">
-            <h1 className="text-2xl font-bold mb-2" style={{ color: T.text }}>⚙️ Configurações da Conta</h1>
+            <h1 className="text-2xl font-bold mb-2" style={{ color: T.text }}> Configurações da Conta</h1>
             <p className="text-xs mb-6" style={{ color: T.textMuted }}>Ajuste seu perfil, subdomínio base e preferências de visualização.</p>
 
             <div className="p-6 rounded-2xl space-y-6" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
@@ -3876,7 +3904,7 @@ function GrowinStones() {
                   className="px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2"
                   style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
                 >
-                  <span>{dark ? "🌙 Tema Escuro (Ativo)" : "☀️ Tema Claro (Ativo)"}</span>
+                  <span>{dark ? " Tema Escuro (Ativo)" : " Tema Claro (Ativo)"}</span>
                 </button>
               </div>
 
@@ -3890,7 +3918,7 @@ function GrowinStones() {
                   }}
                   className="px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700"
                 >
-                  🚪 Desconectar Conta
+                   Desconectar Conta
                 </button>
               </div>
             </div>
@@ -3904,7 +3932,7 @@ function GrowinStones() {
             <div className="flex items-center justify-between flex-wrap gap-4 pb-4 mb-6" style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
               <div>
                 <h1 className="text-xl font-bold tracking-tight" style={{ color: T.text }}>
-                  {activeTab === "comparison" ? "📊 Comparação de Setups de Cultivo" : "🛠️ Configurador de Grow"}
+                  {activeTab === "comparison" ? " Comparação de Setups de Cultivo" : " Configurador de Grow"}
                 </h1>
                 <p className="text-xs mt-0.5" style={{ color: T.textMuted }}>
                   {activeTab === "comparison" ? "Compare múltiplos parâmetros de cultivo lado a lado" : "Dimensionamento hidráulico, elétrico, estrutural e financeiro"}
@@ -4085,7 +4113,7 @@ function GrowinStones() {
               <button onClick={restoreDefaultPresets}
                 className="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all hover:opacity-85 flex items-center gap-1.5 shrink-0"
                 style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
-                🔄 Restaurar presets padrão
+                 Restaurar presets padrão
               </button>
             )}
           </div>
@@ -4276,7 +4304,7 @@ function GrowinStones() {
                   <button onClick={() => setPotFlipped((f) => !f)}
                     className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:opacity-85 flex items-center gap-1.5 shrink-0"
                     style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-                    🔄 Girar ({potW}×{potD})
+                     Girar ({potW}×{potD})
                   </button>
                 </div>
               )}
@@ -4957,7 +4985,9 @@ function GrowinStones() {
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.71 1.26-1.5 1.74-2.3L4.5 16.5z"/><path d="M12 15l-3-3 7.5-7.5c1.4-1.4 3.7-1.4 5.1 0s1.4 3.7 0 5.1L12 15z"/></svg>
                 <span>Publicar Grow em Subdomínio</span>
               </h3>
-              <button onClick={() => { setPublishModalOpen(false); setPublishResult(null); }} className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm" style={{ background: T.surface2, color: T.muted }}>✕</button>
+              <button onClick={() => { setPublishModalOpen(false); setPublishResult(null); }} className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all" style={{ background: T.surface2, color: T.text, border: `1px solid ${T.border}` }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
             </div>
 
             <p className="text-xs" style={{ color: T.muted }}>
@@ -4989,7 +5019,7 @@ function GrowinStones() {
                 {publishResult.success ? (
                   <div>
                     <div className="font-extrabold text-xs flex items-center gap-1.5 text-emerald-400">
-                      <span>✓ Subdomínio Publicado com Sucesso!</span>
+                      <span> Subdomínio Publicado com Sucesso!</span>
                     </div>
                     <p className="text-xs mt-1" style={{ color: T.text }}>
                       Seu projeto já está online e acessível em:
@@ -4997,17 +5027,17 @@ function GrowinStones() {
                     <div className="mt-3 flex items-center gap-2 flex-wrap">
                       <a href={publishResult.url} target="_blank" rel="noopener noreferrer"
                         className="px-3.5 py-1.5 rounded-lg text-xs font-extrabold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition-colors flex items-center gap-1">
-                        <span>🚀 Abrir {publishResult.slug}.thegrowinstones.com</span>
+                        <span> Abrir {publishResult.slug}.thegrowinstones.com</span>
                       </a>
-                      <button onClick={() => { navigator.clipboard.writeText(publishResult.url); showToast("✓ URL copiada!"); }}
+                      <button onClick={() => { navigator.clipboard.writeText(publishResult.url); showToast("URL copiada!"); }}
                         className="px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors" style={{ background: T.surface, borderColor: T.border, color: T.text }}>
-                        📋 Copiar Link
+                         Copiar Link
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div className="text-xs font-semibold text-red-400">
-                    ⚠️ {publishResult.error}
+                     {publishResult.error}
                   </div>
                 )}
               </div>
@@ -5022,7 +5052,7 @@ function GrowinStones() {
                 disabled={isPublishing || !subdomainInput.trim()}
                 className="px-5 py-2 rounded-xl text-xs font-extrabold transition-all shadow-md disabled:opacity-50"
                 style={{ background: dark ? "#0284c7" : "#0369a1", color: "#ffffff" }}>
-                {isPublishing ? "Publicando no Servidor..." : "🚀 Publicar Agora"}
+                {isPublishing ? "Publicando no Servidor..." : " Publicar Agora"}
               </button>
             </div>
           </div>
