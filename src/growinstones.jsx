@@ -1,3 +1,5 @@
+import React, { useState, useEffect, useRef, useMemo } from "react";
+
 // ————————————————————————— ESP32 TELEMETRY & DYNAMIC MQTT MONITOR —————————————————————————
 function MQTTMonitorView({ currentUser, T, dark, showToast }) {
   const [telemetry, setTelemetry] = useState(null);
