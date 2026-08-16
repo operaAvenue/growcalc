@@ -1475,6 +1475,76 @@ export default function GrowinStones() {
   const [authNameInput, setAuthNameInput] = useState("");
   const [authUsernameInput, setAuthUsernameInput] = useState("");
 
+  // Google OAuth 2.0 & Identity Services
+  const [googleClientId, setGoogleClientId] = useState(() => {
+    return localStorage.getItem("growcalc_google_client_id") || "717208226500-1k3u639v7p665p1b90u29k0989069v.apps.googleusercontent.com";
+  });
+  const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
+
+  useEffect(() => {
+    if (!document.getElementById("google-gsi-script")) {
+      const script = document.createElement("script");
+      script.id = "google-gsi-script";
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+  }, []);
+
+  const triggerGoogleOAuth = () => {
+    if (typeof window.google === "undefined" || !window.google.accounts) {
+      showToast("⚠️ SDK do Google está carregando... Tente novamente em instantes.");
+      return;
+    }
+
+    try {
+      const tokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: googleClientId,
+        scope: "email profile",
+        callback: async (response) => {
+          if (response.error) {
+            console.error("Erro no Google OAuth:", response);
+            showToast(`⚠️ Falha no Google Auth: ${response.error_description || response.error}`);
+            return;
+          }
+          try {
+            const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+              headers: { Authorization: `Bearer ${response.access_token}` }
+            });
+            const googleUser = await userInfoRes.json();
+            
+            if (!googleUser.email) {
+              throw new Error("Não foi possível obter o e-mail da conta do Google.");
+            }
+
+            setPendingGoogleUser(googleUser);
+            const defaultSlug = (googleUser.email ? googleUser.email.split("@")[0] : "grow")
+              .toLowerCase()
+              .replace(/[^a-z0-9-]/g, "");
+            
+            setAuthNameInput(googleUser.name || "Cultivador");
+            setAuthUsernameInput(defaultSlug);
+            setAuthModalOpen(true);
+            showToast(`✓ Google Authenticated: ${googleUser.email}`);
+          } catch (err) {
+            console.error("Erro ao obter perfil do Google:", err);
+            showToast(`Erro ao obter perfil do Google: ${err.message}`);
+          }
+        }
+      });
+
+      tokenClient.requestAccessToken({ prompt: "select_account" });
+    } catch (err) {
+      console.error("Erro ao inicializar token client:", err);
+      // Fallback modal if client_id error
+      setAuthNameInput("Cultivador");
+      setAuthUsernameInput("meu-grow");
+      setAuthModalOpen(true);
+    }
+  };
+
+
   const [activeTab, setActiveTab] = useState("configurator"); // "configurator" | "my_grows" | "comparison" | "settings"
  // "configurator" | "comparison"
 
@@ -3021,11 +3091,7 @@ export default function GrowinStones() {
               <Logo height={38} color="#f59e0b" />
             </div>
             <button
-              onClick={() => {
-                setAuthNameInput("Cultivador");
-                setAuthUsernameInput("meu-grow");
-                setAuthModalOpen(true);
-              }}
+              onClick={triggerGoogleOAuth}
               className="px-5 py-2.5 rounded-xl font-bold text-xs transition-all hover:scale-105 shadow-lg flex items-center gap-2"
               style={{ background: "#0284c7", color: "#ffffff" }}
             >
@@ -3052,11 +3118,7 @@ export default function GrowinStones() {
           </p>
 
           <button
-            onClick={() => {
-              setAuthNameInput("Cultivador");
-              setAuthUsernameInput("meu-grow");
-              setAuthModalOpen(true);
-            }}
+            onClick={triggerGoogleOAuth}
             className="px-8 py-4 rounded-2xl font-bold text-sm transition-all hover:scale-105 shadow-2xl flex items-center gap-3"
             style={{ background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)", color: "#ffffff" }}
           >
@@ -3100,12 +3162,24 @@ export default function GrowinStones() {
               <button onClick={() => setAuthModalOpen(false)} className="absolute top-4 right-4 text-stone-400 hover:text-white font-bold text-sm">✕</button>
 
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-lg" style={{ background: "#0284c7" }}>
-                  G
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-white">Entrar com o Google</h3>
-                  <p className="text-xs text-stone-400">Defina seu usuário e subdomínio exclusivo</p>
+                {pendingGoogleUser && pendingGoogleUser.picture ? (
+                  <img src={pendingGoogleUser.picture} alt="Google Avatar" className="w-11 h-11 rounded-full border-2 border-emerald-500 shadow shrink-0" />
+                ) : (
+                  <div className="w-11 h-11 rounded-full flex items-center justify-center font-bold text-white text-lg shrink-0" style={{ background: "#0284c7" }}>
+                    G
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <h3 className="font-bold text-base text-white truncate">
+                    {pendingGoogleUser ? pendingGoogleUser.name : "Entrar com o Google"}
+                  </h3>
+                  <p className="text-xs text-emerald-400 font-medium truncate flex items-center gap-1">
+                    {pendingGoogleUser ? (
+                      <><span>✓ {pendingGoogleUser.email}</span></>
+                    ) : (
+                      <span className="text-stone-400">Defina seu usuário e subdomínio exclusivo</span>
+                    )}
+                  </p>
                 </div>
               </div>
 
@@ -3141,18 +3215,19 @@ export default function GrowinStones() {
                 <button
                   onClick={() => {
                     const cleanSlug = authUsernameInput.trim().toLowerCase().replace(/[^a-z0-9-]/g, "") || "cultivador";
-                    const cleanName = authNameInput.trim() || "Cultivador";
+                    const cleanName = authNameInput.trim() || (pendingGoogleUser ? pendingGoogleUser.name : "Cultivador");
                     const newUser = {
                       name: cleanName,
-                      email: `${cleanSlug}@gmail.com`,
+                      email: pendingGoogleUser ? pendingGoogleUser.email : `${cleanSlug}@gmail.com`,
                       username: cleanSlug,
-                      avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanSlug}`
+                      avatar: pendingGoogleUser && pendingGoogleUser.picture ? pendingGoogleUser.picture : `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanSlug}`,
+                      googleSub: pendingGoogleUser ? pendingGoogleUser.sub : null
                     };
                     localStorage.setItem("growcalc_user", JSON.stringify(newUser));
                     setCurrentUser(newUser);
                     setSubdomainInput(cleanSlug);
                     setAuthModalOpen(false);
-                    showToast(`✓ Bem-vindo, ${cleanName}! Subdomínio configurado.`);
+                    showToast(`✓ Bem-vindo, ${cleanName}! Subdomínio @${cleanSlug} ativado com Google.`);
                   }}
                   className="w-full py-3 rounded-xl font-bold text-xs transition-all hover:opacity-90 shadow-lg flex items-center justify-center gap-2 mt-2"
                   style={{ background: "#0284c7", color: "#ffffff" }}
