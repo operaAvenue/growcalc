@@ -4693,7 +4693,7 @@ function GrowinStones() {
 
 // ————————————————————————— LAYOUT COM SIDEBAR LATERAL & TOPBAR MOBILE —————————————————————————
   return (
-    <div className="min-h-screen flex flex-col md:flex-row w-full max-w-full overflow-x-hidden" style={{ background: T.bg, color: T.text, fontFamily: "'Inter', system-ui, sans-serif", transition: "background 0.3s, color 0.3s" }}>
+    <div className="min-h-screen flex flex-col md:flex-row w-full max-w-full relative" style={{ background: T.bg, color: T.text, fontFamily: "'Inter', system-ui, sans-serif", transition: "background 0.3s, color 0.3s" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Berkshire+Swash&display=swap');
         input[type=number]::-webkit-inner-spin-button{ -webkit-appearance:none; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -4854,7 +4854,7 @@ function GrowinStones() {
 
       {/* SIDEBAR LATERAL DESKTOP (hidden on mobile, flex on md+) */}
       <aside
-        className={`hidden md:flex sticky top-0 h-screen flex-col justify-between transition-all duration-300 z-40 shrink-0 ${sidebarCollapsed ? "w-16 px-2 py-4" : "w-64 px-4 py-4"}`}
+        className={`hidden md:flex sticky top-0 h-screen max-h-screen overflow-y-auto no-scrollbar self-start flex-col justify-between transition-all duration-300 z-40 shrink-0 ${sidebarCollapsed ? "w-16 px-2 py-4" : "w-64 px-4 py-4"}`}
         style={{ background: T.surface, borderRight: `1px solid ${T.border}` }}
       >
         {/* Top Header Sidebar */}
