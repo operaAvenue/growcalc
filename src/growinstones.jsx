@@ -823,7 +823,7 @@ function IsometricPotSVG({ potW, potD, potH, potLiters, isRect, isSquare, dark, 
 function CollapsibleCard({ title, subtitle, defaultOpen = true, children, action, className = "", T, dark }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section className={`rounded-2xl transition-all duration-200 ${open ? "p-5" : "px-5 py-3.5"} ${className}`}
+    <section className={`rounded-2xl transition-all duration-200 w-full max-w-full overflow-hidden min-w-0 ${open ? "p-3.5 sm:p-5" : "px-3.5 sm:px-5 py-3 sm:py-3.5"} ${className}`}
       style={{
         background: T.surface,
         border: `1px solid ${T.borderSoft}`,
@@ -5043,9 +5043,9 @@ function GrowinStones() {
             </div>
 
             {activeTab === "configurator" ? (
-          <div className="grid lg:grid-cols-5 gap-6 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6 items-start w-full max-w-full min-w-0">
           {/* ————— Configuração ————— */}
-          <div className="lg:col-span-2 space-y-5">
+          <div className="lg:col-span-2 space-y-4 sm:space-y-5 w-full max-w-full min-w-0">
             <CollapsibleCard
               title="Identificação"
               subtitle={growName || owner || strain ? `${growName || "Grow"}${strain ? ` · ${strain}` : ""}` : undefined}
@@ -5205,7 +5205,7 @@ function GrowinStones() {
                         ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
                         : { background: "transparent", border: `1px solid ${T.border}`, color: T.muted }}>
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="4.5" y="4.5" width="15" height="15" rx="2" />
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
                       </svg>
                       Quadrado
                     </button>
@@ -5234,95 +5234,97 @@ function GrowinStones() {
             </CollapsibleCard>
 
             <CollapsibleCard
-              title="3 · Fases do ciclo de cultivo"
-              subtitle={`${cycleDays}d ciclo total (${vegaDays}d V / ${floraDays}d F)`}
+              title="3 · Iluminação & fotoperíodo"
+              subtitle={`${ledWatts}W LED · ${vegaHours}h/${floraHours}h · ${fmtG(yieldHarvest)}/safra`}
               T={T} dark={dark}>
-              <div className="space-y-3">
-                <div className="p-3 rounded-xl space-y-2.5" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
-                  <span className="text-xs font-bold flex items-center gap-1.5" style={{ color: T.text }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M12 22v-9" />
-                      <path d="M12 13C7 13 4 8.5 4 4c4.5 0 8 3 8 9" />
-                      <path d="M12 13c5 0 8-4.5 8-8.5-4.5 0-8 3-8 8.5" />
-                    </svg>
-                    Fase Vegetativa (Vega)
-                  </span>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs" style={{ color: T.muted }}>Duração (dias)</span>
-                    {num(vegaDays, setVegaDays, 0, 180, 5)}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-sm font-medium block" style={{ color: T.text }}>Potência do LED</span>
+                    <span className="text-xs" style={{ color: T.faint }}>Consumo total de iluminação</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs" style={{ color: T.muted }}>Ciclo de luz (horas/dia)</span>
-                    {num(vegaHours, setVegaHours, 1, 24, 1)}
+                  <div className="flex items-center gap-1.5">
+                    <NumInput value={ledWatts} onCommit={setLedWatts} min={0} max={10000}
+                      className={`w-20 h-8 ${inputCls}`} style={inputStyle} />
+                    <span className="text-xs font-medium" style={{ color: T.muted }}>W</span>
                   </div>
                 </div>
 
-                <div className="p-3 rounded-xl space-y-2.5" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
-                  <span className="text-xs font-bold flex items-center gap-1.5" style={{ color: T.text }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="3" />
-                      <path d="M12 2a4 4 0 0 0-4 4c0 2 2 4 4 6 2-2 4-4 4-6a4 4 0 0 0-4-4z" />
-                      <path d="M12 22a4 4 0 0 0 4-4c0-2-2-4-4-6-2 2-4 4-4 6a4 4 0 0 0 4 4z" />
-                      <path d="M22 12a4 4 0 0 0-4-4c-2 0-4 2-6 4 2 2 4 4 6 4a4 4 0 0 0 4 4z" />
-                      <path d="M2 12a4 4 0 0 0 4 4c2 0 4-2 6-4-2-2-4-4-6-4a4 4 0 0 0-4 4z" />
-                    </svg>
-                    Fase de Floração (Flora)
-                  </span>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs" style={{ color: T.muted }}>Duração (dias)</span>
-                    {num(floraDays, setFloraDays, 0, 180, 5)}
+                <div className="grid grid-cols-2 gap-3 pt-2" style={{ borderTop: `1px solid ${T.borderSoft}` }}>
+                  <div>
+                    <span className="text-xs font-medium block mb-1" style={{ color: T.muted }}>Vegetativo</span>
+                    <div className="flex items-center justify-between p-2 rounded-xl" style={{ background: T.surface2 }}>
+                      <span className="text-xs" style={{ color: T.faint }}>Luz</span>
+                      {numSm(vegaHours, setVegaHours, 0, 24, 1)}
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs" style={{ color: T.muted }}>Ciclo de luz (horas/dia)</span>
-                    {num(floraHours, setFloraHours, 1, 24, 1)}
+                  <div>
+                    <span className="text-xs font-medium block mb-1" style={{ color: T.muted }}>Floração</span>
+                    <div className="flex items-center justify-between p-2 rounded-xl" style={{ background: T.surface2 }}>
+                      <span className="text-xs" style={{ color: T.faint }}>Luz</span>
+                      {numSm(floraHours, setFloraHours, 0, 24, 1)}
+                    </div>
                   </div>
                 </div>
 
-                <p className="text-xs rounded-lg px-3 py-2" style={{ background: T.surface2, color: T.muted }}>
-                  Ciclo total: <strong style={{ color: T.text }}>{cycleDays} dias</strong> ({vegaDays}d vega + {floraDays}d flora) · <strong style={{ color: T.text }}>{harvestsYear.toFixed(1)} safras/ano</strong>
-                </p>
+                <div className="grid grid-cols-2 gap-3 pt-2" style={{ borderTop: `1px solid ${T.borderSoft}` }}>
+                  <div>
+                    <span className="text-xs font-medium block mb-1" style={{ color: T.muted }}>Duração Vega</span>
+                    <div className="flex items-center justify-between p-2 rounded-xl" style={{ background: T.surface2 }}>
+                      <span className="text-xs" style={{ color: T.faint }}>Dias</span>
+                      {numSm(vegaDays, setVegaDays, 1, 180, 5)}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium block mb-1" style={{ color: T.muted }}>Duração Flora</span>
+                    <div className="flex items-center justify-between p-2 rounded-xl" style={{ background: T.surface2 }}>
+                      <span className="text-xs" style={{ color: T.faint }}>Dias</span>
+                      {numSm(floraDays, setFloraDays, 1, 180, 5)}
+                    </div>
+                  </div>
+                </div>
               </div>
             </CollapsibleCard>
 
             <CollapsibleCard
-              title="4 · Equipamentos & consumo"
-              subtitle={`${totalWatts} W · ${fmtBRL(opexMonth)}/mês`}
+              title="4 · Equipamentos & custos"
+              subtitle={`${activeEquipCount} ativos · ${fmtBRL(capex)} CAPEX`}
               T={T} dark={dark}>
-              <div className="space-y-1.5">
+              <div className="space-y-3">
                 {EQUIPMENT.map((e) => {
                   const on = equip[e.id] > 0;
                   const isPerPot = !!perPot[e.id];
+                  const effQty = isPerPot ? equip[e.id] * layout.placed : equip[e.id];
                   return (
-                    <div key={e.id} className="rounded-xl px-3 py-2 transition-colors"
-                      style={{ background: on ? T.surface2 : "transparent", border: `1px solid ${on ? T.border : "transparent"}` }}>
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <p className="text-sm font-medium truncate" style={{ color: on ? T.text : T.faint }}>{e.name}</p>
-                          {on && isPerPot && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0"
-                              style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-                              {equip[e.id] * layout.placed} un ({equip[e.id]}/vaso)
-                            </span>
-                          )}
+                    <div key={e.id} className="rounded-xl p-3 transition-colors"
+                      style={{ background: on ? T.surface2 : "transparent", border: `1px solid ${on ? T.border : T.borderSoft}` }}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" checked={on}
+                            onChange={(ev) => setEquip((prev) => ({ ...prev, [e.id]: ev.target.checked ? (prev[e.id] || 1) : 0 }))}
+                            className="rounded w-4 h-4 accent-amber-500 cursor-pointer" />
+                          <span className="text-xs font-medium" style={{ color: on ? T.text : T.muted }}>
+                            {e.name}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button onClick={() => setEq(e.id, -1, e.max)}
-                            className="w-7 h-7 rounded-lg text-sm transition-colors"
-                            style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>−</button>
-                          <span className="w-5 text-center text-sm font-bold">{equip[e.id]}</span>
-                          <button onClick={() => setEq(e.id, +1, e.max)}
-                            className="w-7 h-7 rounded-lg text-sm transition-colors"
-                            style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>+</button>
-                        </div>
+                        {on && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px]" style={{ color: T.faint }}>qtd</span>
+                            <NumInput value={equip[e.id]} min={1} max={99}
+                              onCommit={(n) => setEquip((prev) => ({ ...prev, [e.id]: n }))}
+                              className={`w-12 h-7 ${inputCls}`} style={inputStyle} />
+                          </div>
+                        )}
                       </div>
+
                       {on && (
-                        <div className="mt-2 pt-2 border-t flex flex-col gap-2" style={{ borderColor: T.borderSoft }}>
-                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="mt-3 pt-3 space-y-2" style={{ borderTop: `1px solid ${T.borderSoft}` }}>
+                          <div className="flex items-center gap-3 flex-wrap">
                             <div className="flex items-center gap-1">
                               <NumInput value={watts[e.id]} min={0} max={5000}
-                                onCommit={(n) => setW(e.id, n)}
+                                onCommit={(n) => setWatt(e.id, n)}
                                 className={`w-16 h-7 ${inputCls}`} style={inputStyle} />
-                              <span className="text-[11px] font-medium" style={{ color: T.muted }}>W{e.hours ? ` · ${e.hours} h/dia` : ""}</span>
+                              <span className="text-[11px] font-medium" style={{ color: T.muted }}>W</span>
                             </div>
                             <div className="flex items-center gap-1">
                               <span className="text-[11px]" style={{ color: T.faint }}>R$/un</span>
@@ -5331,144 +5333,11 @@ function GrowinStones() {
                                 className={`w-20 h-7 ${inputCls}`} style={inputStyle} />
                             </div>
                           </div>
-
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-medium shrink-0 flex items-center gap-1" style={{ color: T.faint }}>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                              </svg>
-                              Link
-                            </span>
-                            <input type="url" value={equipUrls[e.id] || ""} placeholder="https://link-de-compra.com..."
-                              onChange={(ev) => setEquipUrl(e.id, ev.target.value)}
-                              className="flex-1 min-w-0 h-7 px-2.5 rounded-lg text-xs focus:outline-none" style={inputStyle} />
-                          </div>
-
-                          <div className="flex flex-col gap-1.5 pt-0.5">
-                            <label className="flex items-center gap-2 cursor-pointer select-none text-[11px] font-medium transition-colors"
-                              style={{ color: isPerPot ? T.text : T.faint }}>
-                              <input type="checkbox" checked={isPerPot}
-                                onChange={() => togglePerPot(e.id)}
-                                className="rounded w-3.5 h-3.5 accent-amber-500 cursor-pointer" />
-                              <span>Multiplicar quantidade pelo total de vasos ({layout.placed} vasos)</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer select-none text-[11px] font-semibold transition-colors"
-                              style={{ color: equipShopping[e.id] ? T.text : T.faint }}>
-                              <input type="checkbox" checked={!!equipShopping[e.id]}
-                                onChange={() => toggleEquipShopping(e.id)}
-                                className="rounded w-3.5 h-3.5 accent-amber-500 cursor-pointer" />
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <circle cx="9" cy="21" r="1" />
-                                <circle cx="20" cy="21" r="1" />
-                                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-                              </svg>
-                              <span>Incluir na Lista de Compras (PDF)</span>
-                            </label>
-                          </div>
                         </div>
                       )}
                     </div>
                   );
                 })}
-              </div>
-
-              {/* Itens extras do usuário */}
-              <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${T.borderSoft}` }}>
-                <p className="text-[11px] font-semibold uppercase mb-2" style={{ color: T.faint, letterSpacing: "0.14em" }}>
-                  Itens extras
-                </p>
-                <div className="space-y-2">
-                  {customItems.map((it) => (
-                    <div key={it.id} className="rounded-xl px-3 py-2.5"
-                      style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <input type="text" value={it.name} placeholder="Nome do item (ex.: Controlador, CO₂…)"
-                          onChange={(ev) => updCustom(it.id, { name: ev.target.value })}
-                          className="flex-1 min-w-0 h-8 px-3 rounded-lg text-sm font-medium focus:outline-none"
-                          style={inputStyle} />
-                        <button onClick={() => delCustom(it.id)} aria-label="Excluir item"
-                          className="w-8 h-8 rounded-lg text-sm font-bold shrink-0 transition-opacity hover:opacity-70 flex items-center justify-center"
-                          style={{ background: T.surface, border: `1px solid ${T.border}`, color: dark ? "#e0a0a0" : "#8c3b3b" }}>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                          </svg>
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-x-3 gap-y-2 flex-wrap">
-                        <div className="flex items-center gap-1">
-                          <span className="text-[11px]" style={{ color: T.faint }}>qtd</span>
-                          <NumInput value={it.qty} min={0} max={99}
-                            onCommit={(n) => updCustom(it.id, { qty: n })}
-                            className={`w-12 h-7 ${inputCls}`} style={inputStyle} />
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <NumInput value={it.watts} min={0} max={5000}
-                            onCommit={(n) => updCustom(it.id, { watts: n })}
-                            className={`w-16 h-7 ${inputCls}`} style={inputStyle} />
-                          <span className="text-[11px] font-medium" style={{ color: T.muted }}>W</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <NumInput value={it.hours} min={0} max={24}
-                            onCommit={(n) => updCustom(it.id, { hours: n })}
-                            className={`w-12 h-7 ${inputCls}`} style={inputStyle} />
-                          <span className="text-[11px] font-medium" style={{ color: T.muted }}>h/dia</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <span className="text-[11px]" style={{ color: T.faint }}>R$/un</span>
-                          <MoneyInput value={it.cost}
-                            onCommit={(n) => updCustom(it.id, { cost: n })}
-                            className={`w-20 h-7 ${inputCls}`} style={inputStyle} />
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-[11px] font-medium shrink-0 flex items-center gap-1" style={{ color: T.faint }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                          </svg>
-                          Link
-                        </span>
-                        <input type="url" value={it.url || ""} placeholder="https://link-de-compra.com..."
-                          onChange={(ev) => updCustom(it.id, { url: ev.target.value })}
-                          className="flex-1 min-w-0 h-7 px-2.5 rounded-lg text-xs focus:outline-none" style={inputStyle} />
-                      </div>
-
-                      <div className="flex flex-col gap-1.5 mt-2">
-                        <label className="flex items-center gap-2 cursor-pointer select-none text-[11px] font-medium transition-colors"
-                          style={{ color: it.perPot ? T.text : T.faint }}>
-                          <input type="checkbox" checked={!!it.perPot}
-                            onChange={(ev) => updCustom(it.id, { perPot: ev.target.checked })}
-                            className="rounded w-3.5 h-3.5 accent-amber-500 cursor-pointer" />
-                          <span>Multiplicar por vaso ({layout.placed} vasos) {it.perPot ? `(${it.qty * layout.placed} un)` : ""}</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer select-none text-[11px] font-semibold transition-colors"
-                          style={{ color: it.inShoppingList ? T.text : T.faint }}>
-                          <input type="checkbox" checked={!!it.inShoppingList}
-                            onChange={(ev) => updCustom(it.id, { inShoppingList: ev.target.checked })}
-                            className="rounded w-3.5 h-3.5 accent-amber-500 cursor-pointer" />
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="9" cy="21" r="1" />
-                            <circle cx="20" cy="21" r="1" />
-                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-                          </svg>
-                          <span>Incluir na Lista de Compras (PDF)</span>
-                        </label>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <button onClick={addCustom}
-                  className="mt-2 w-full py-2 rounded-xl text-xs font-semibold transition-opacity hover:opacity-80 flex items-center justify-center gap-1.5"
-                  style={{ background: "transparent", border: `1.5px dashed ${T.accentBorder}`, color: T.muted }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                  <span>Adicionar item extra</span>
-                </button>
               </div>
             </CollapsibleCard>
 
@@ -5515,7 +5384,7 @@ function GrowinStones() {
           </div>
 
           {/* ————— Planta + resumo ————— */}
-          <div className="lg:col-span-3 space-y-5">
+          <div className="lg:col-span-3 space-y-4 sm:space-y-5 w-full max-w-full min-w-0">
             <CollapsibleCard
               title={growName ? growName : "Planta baixa"}
               subtitle={`${layout.nRows} × ${Math.min(layout.useCols, layout.placed)} · ${plants} vasos · ${width} × ${depth} cm`}
@@ -5555,9 +5424,13 @@ function GrowinStones() {
                 </div>
               </div>
 
-              <div className="flex justify-center rounded-xl p-4 overflow-x-auto"
+              <div className="flex justify-center rounded-xl p-2 sm:p-4 overflow-x-auto w-full max-w-full"
                 style={{ background: T.inset, border: `1px solid ${T.borderSoft}` }}>
-                <svg width={svgW} height={showRes ? svgH : topH + OY * 2} className="max-w-full">
+                <svg
+                  viewBox={`0 0 ${svgW} ${showRes ? svgH : topH + OY * 2}`}
+                  className="w-full h-auto max-w-full"
+                  style={{ maxWidth: `${svgW}px`, maxHeight: 420 }}
+                >
                   <rect x={OX} y={OY} width={topW} height={topH} rx={10}
                     fill={T.surface} stroke={T.text} strokeWidth={1.5} />
                   <text x={OX + topW / 2} y={OY - 8} textAnchor="middle" fontSize="11" fill={T.faint}>{width} cm</text>
