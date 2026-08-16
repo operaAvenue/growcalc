@@ -2816,185 +2816,117 @@ function GrowinStones() {
 
         {/* CONFIGURADOR & COMPARADOR VIEWS */}
         {(activeTab === "configurator" || activeTab === "comparison") && (
-          <>
-            <header style={{ borderBottom: `1px solid ${T.borderSoft}`, background: T.bg }}>
-              <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <span className="font-bold text-sm" style={{ color: T.text }}>{activeTab === "comparison" ? "📊 Comparação de Setups" : "🛠️ Configurador de Grow"}</span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <input type="file" ref={fileInputRef} accept=".json,application/json" onChange={handleImportJson} className="hidden" />
-                  <button onClick={() => fileInputRef.current?.click()}
-                    className="px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-80 flex items-center gap-1.5"
-                    style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="7 10 12 15 17 10" />
-                      <line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
-                    <span>Importar JSON</span>
-                  </button>
-                  <button onClick={exportSetupJson}
-                    className="px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-80 flex items-center gap-1.5"
-                    style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="17 8 12 3 7 8" />
-                      <line x1="12" y1="3" x2="12" y2="15" />
-                    </svg>
-                    <span>Exportar JSON</span>
-                  </button>
-                  <button onClick={openStaticDashboardHtml}
-                    title="Abrir Dashboard Estático HTML em uma nova aba"
-                    className="px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-85 flex items-center gap-1.5"
-                    style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                      <line x1="3" y1="9" x2="21" y2="9" />
-                      <line x1="9" y1="21" x2="9" y2="9" />
-                    </svg>
-                    <span>Dashboard HTML</span>
-                  </button>
+          <div className="max-w-6xl mx-auto px-6 py-6 w-full flex-1 flex flex-col">
+            {/* Título da Seção + Botões em Ícones (Fora do Header Principal) */}
+            <div className="flex items-center justify-between flex-wrap gap-4 pb-4 mb-6" style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+              <div>
+                <h1 className="text-xl font-bold tracking-tight" style={{ color: T.text }}>
+                  {activeTab === "comparison" ? "📊 Comparação de Setups de Cultivo" : "🛠️ Configurador de Grow"}
+                </h1>
+                <p className="text-xs mt-0.5" style={{ color: T.textMuted }}>
+                  {activeTab === "comparison" ? "Compare múltiplos parâmetros de cultivo lado a lado" : "Dimensionamento hidráulico, elétrico, estrutural e financeiro"}
+                </p>
+              </div>
 
-                  <button onClick={() => {
+              {/* Botões de Ação Apenas em ÍCONES */}
+              <div className="flex items-center gap-2">
+                <input type="file" ref={fileInputRef} accept=".json,application/json" onChange={handleImportJson} className="hidden" />
+                
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Importar Configuração JSON"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-85 shadow-sm"
+                  style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                </button>
+
+                <button
+                  onClick={exportSetupJson}
+                  title="Exportar Configuração JSON"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-85 shadow-sm"
+                  style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                </button>
+
+                <button
+                  onClick={openStaticDashboardHtml}
+                  title="Abrir Web Dashboard HTML Interativo (Nova Aba)"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-85 shadow-sm"
+                  style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.brand }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <line x1="3" y1="9" x2="21" y2="9" />
+                    <line x1="9" y1="21" x2="9" y2="9" />
+                  </svg>
+                </button>
+
+                <button
+                  onClick={() => {
                     if (!subdomainInput && currentUser?.username) setSubdomainInput(currentUser.username);
                     setPublishModalOpen(true);
                   }}
-                    title="Publicar este setup em um subdomínio exclusivo (ex: meu-grow.thegrowinstones.com)"
-                    className="px-3.5 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-90 flex items-center gap-1.5 shadow-sm"
-                    style={{ background: dark ? "#0284c7" : "#0369a1", color: "#ffffff" }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.71 1.26-1.5 1.74-2.3L4.5 16.5z"/>
-                      <path d="M12 15l-3-3 7.5-7.5c1.4-1.4 3.7-1.4 5.1 0s1.4 3.7 0 5.1L12 15z"/>
+                  title="Publicar Grow no Subdomínio Exclusivo (*Publicar Grow)"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-90 shadow-sm"
+                  style={{ background: dark ? "#0284c7" : "#0369a1", color: "#ffffff" }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.71 1.26-1.5 1.74-2.3L4.5 16.5z"/>
+                    <path d="M12 15l-3-3 7.5-7.5c1.4-1.4 3.7-1.4 5.1 0s1.4 3.7 0 5.1L12 15z"/>
+                  </svg>
+                </button>
+
+                <button
+                  onClick={openReportHtml}
+                  title="Exportar Relatório em PDF (Impressão)"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-85 shadow-sm"
+                  style={{ background: T.text, color: T.bg }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                  </svg>
+                </button>
+
+                <button
+                  onClick={() => setDark((d) => !d)}
+                  title={dark ? "Alternar para Tema Claro" : "Alternar para Tema Escuro"}
+                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors shrink-0"
+                  style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
+                >
+                  {dark ? (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="5" />
+                      <line x1="12" y1="1" x2="12" y2="3" />
+                      <line x1="12" y1="21" x2="12" y2="23" />
+                      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                      <line x1="1" y1="12" x2="3" y2="12" />
+                      <line x1="21" y1="12" x2="23" y2="12" />
+                      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
                     </svg>
-                    <span>*Publicar Grow</span>
-                  </button>
-                  <button onClick={openReportHtml}
-                    className="px-4 py-2 rounded-xl text-xs font-bold transition-opacity hover:opacity-85 flex items-center gap-1.5"
-                    style={{ background: T.text, color: T.bg }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                      <line x1="16" y1="13" x2="8" y2="13" />
-                      <line x1="16" y1="17" x2="8" y2="17" />
+                  ) : (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                     </svg>
-                    <span>Exportar relatório (PDF)</span>
-                  </button>
-                  <button onClick={() => setDark((d) => !d)} aria-label="Alternar tema"
-                    className="w-9 h-9 rounded-full flex items-center justify-center transition-colors shrink-0"
-                    style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}>
-                    {dark ? (
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="5" />
-                        <line x1="12" y1="1" x2="12" y2="3" />
-                        <line x1="12" y1="21" x2="12" y2="23" />
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                        <line x1="1" y1="12" x2="3" y2="12" />
-                        <line x1="21" y1="12" x2="23" y2="12" />
-                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                      </svg>
-                    ) : (
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                      </svg>
-                    )}
-                  </button>
-                </div>
+                  )}
+                </button>
               </div>
-            </header>
-
-    <div className="min-h-screen" style={{ background: T.bg, color: T.text, fontFamily: "'Inter', system-ui, sans-serif", transition: "background 0.3s, color 0.3s" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Berkshire+Swash&display=swap');
-        input[type=number]::-webkit-inner-spin-button{ -webkit-appearance:none; }`}</style>
-
-      <header style={{ borderBottom: `1px solid ${T.borderSoft}`, background: T.bg }}>
-        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Logo height={34} color={T.brand} />
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <input type="file" ref={fileInputRef} accept=".json,application/json" onChange={handleImportJson} className="hidden" />
-            <button onClick={() => fileInputRef.current?.click()}
-              className="px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-80 flex items-center gap-1.5"
-              style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              <span>Importar JSON</span>
-            </button>
-            <button onClick={exportSetupJson}
-              className="px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-80 flex items-center gap-1.5"
-              style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-              <span>Exportar JSON</span>
-            </button>
-            <button onClick={openStaticDashboardHtml}
-              title="Abrir Dashboard Estático HTML em uma nova aba"
-              className="px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-85 flex items-center gap-1.5"
-              style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <line x1="3" y1="9" x2="21" y2="9" />
-                <line x1="9" y1="21" x2="9" y2="9" />
-              </svg>
-              <span>Dashboard HTML</span>
-            </button>
-
-            <button onClick={() => setPublishModalOpen(true)}
-              title="Publicar este setup em um subdomínio exclusivo (ex: meu-grow.thegrowinstones.com)"
-              className="px-3.5 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-90 flex items-center gap-1.5 shadow-sm"
-              style={{ background: dark ? "#0284c7" : "#0369a1", color: "#ffffff" }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.71 1.26-1.5 1.74-2.3L4.5 16.5z"/>
-                <path d="M12 15l-3-3 7.5-7.5c1.4-1.4 3.7-1.4 5.1 0s1.4 3.7 0 5.1L12 15z"/>
-              </svg>
-              <span>*Publicar Grow</span>
-            </button>
-            <button onClick={() => setShowReport(true)}
-              className="px-4 py-2 rounded-xl text-xs font-bold transition-opacity hover:opacity-85 flex items-center gap-1.5"
-              style={{ background: T.text, color: T.bg }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-              </svg>
-              <span>Exportar relatório (PDF)</span>
-            </button>
-            <button onClick={() => setDark((d) => !d)} aria-label="Alternar tema"
-              className="w-9 h-9 rounded-full flex items-center justify-center transition-colors shrink-0"
-              style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}>
-              {dark ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="5" />
-                  <line x1="12" y1="1" x2="12" y2="3" />
-                  <line x1="12" y1="21" x2="12" y2="23" />
-                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                  <line x1="1" y1="12" x2="3" y2="12" />
-                  <line x1="21" y1="12" x2="23" y2="12" />
-                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                </svg>
-              ) : (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-                </svg>
-              )}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-6 py-8">
+            </div>
+<main className="max-w-6xl mx-auto px-6 py-8">
         <div className="mb-6">
           <h1 className="text-4xl font-bold tracking-tight leading-tight">
             Projete seu grow <span style={{ color: T.muted, fontStyle: "italic", fontWeight: 500 }}>em segundos</span>
@@ -4021,7 +3953,6 @@ function GrowinStones() {
         </div>
       )}
           </div>
-          </>
         )}
       </div>
     </div>
