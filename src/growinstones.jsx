@@ -2675,10 +2675,13 @@ export default function GrowinStones() {
       setupData = getSetupData();
     } catch (e) {
       console.error("Erro ao gerar relatório HTML:", e);
+      setPublishResult({ success: false, error: `Erro ao gerar relatório HTML: ${e.message}` });
+      setIsPublishing(false);
+      return;
     }
 
     if (!html || typeof html !== "string" || html.trim().length < 100) {
-      setPublishResult({ success: false, error: "Erro ao gerar a versão estática do relatório HTML." });
+      setPublishResult({ success: false, error: "O conteúdo HTML do relatório foi gerado em branco." });
       setIsPublishing(false);
       return;
     }
