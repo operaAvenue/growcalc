@@ -10,18 +10,18 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
 
   const fetchTelemetry = async () => {
     try {
-      const res = await fetch(`https://grow.thegrowinstones.com/api/mqtt/telemetry/${currentUser.username}`);
+      const res = await fetch(`https://grow.thegrowinstones.com/api/mqtt/telemetry/${currentUser?.username}`);
       if (res.ok) {
         const result = await res.json();
         if (result.data) {
           setTelemetry({
             data: result.data,
-            topic: result.topic || `growinstones/${currentUser.username}/telemetry`,
+            topic: result.topic || `growinstones/${currentUser?.username}/telemetry`,
             timestamp: new Date(result.timestamp || Date.now()).toLocaleTimeString()
           });
           setRawPayload(result.data);
           setLogs((prev) => [
-            { time: new Date().toLocaleTimeString(), topic: result.topic || `growinstones/${currentUser.username}/telemetry`, payload: JSON.stringify(result.data) },
+            { time: new Date().toLocaleTimeString(), topic: result.topic || `growinstones/${currentUser?.username}/telemetry`, payload: JSON.stringify(result.data) },
             ...prev.slice(0, 15)
           ]);
         }
@@ -33,7 +33,7 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
     fetchTelemetry();
     const interval = setInterval(fetchTelemetry, 3000);
     return () => clearInterval(interval);
-  }, [currentUser.username]);
+  }, [currentUser?.username]);
 
   const simulateESP32Payload = async () => {
     setIsSimulating(true);
@@ -58,8 +58,8 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: currentUser.username,
-          topic: `growinstones/${currentUser.username}/telemetry`,
+          username: currentUser?.username,
+          topic: `growinstones/${currentUser?.username}/telemetry`,
           data: mockCustomHardwareData
         })
       });
@@ -176,7 +176,7 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
           </div>
           <div>
             <div className="text-[11px] text-stone-400">Tópico MQTT do Usuário:</div>
-            <div className="text-xs font-bold text-emerald-400 font-mono">growinstones/{currentUser.username}/telemetry</div>
+            <div className="text-xs font-bold text-emerald-400 font-mono">growinstones/{currentUser?.username}/telemetry</div>
           </div>
         </div>
 
@@ -308,10 +308,10 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
               <div className="p-3.5 rounded-xl bg-stone-900 border border-stone-800 space-y-2 font-mono">
                 <div><b className="text-sky-400">Broker MQTT Server:</b> grow.thegrowinstones.com</div>
                 <div><b className="text-emerald-400">Porta MQTT TCP:</b> 1883</div>
-                <div><b className="text-amber-400">Tópico MQTT:</b> growinstones/{currentUser.username}/telemetry</div>
+                <div><b className="text-amber-400">Tópico MQTT:</b> growinstones/{currentUser?.username}/telemetry</div>
                 <div><b className="text-stone-300">Formato do Payload:</b> Qualquer JSON válido (objeto com chaves e valores)</div>
               </div>
-              <p>O servidor escuta continuamente o tópico <code className="text-emerald-400 font-mono">growinstones/{currentUser.username}/telemetry</code> na porta **1883** e desenha automaticamente os cartões na tela conforme as chaves enviadas pelo seu ESP32.</p>
+              <p>O servidor escuta continuamente o tópico <code className="text-emerald-400 font-mono">growinstones/{currentUser?.username}/telemetry</code> na porta **1883** e desenha automaticamente os cartões na tela conforme as chaves enviadas pelo seu ESP32.</p>
             </div>
           </div>
         </div>
@@ -1644,93 +1644,7 @@ function GrowinStones() {
     }
   });
 
-  // ————— SISTEMA DE PERSISTÊNCIA E ISOLAMENTO DE USUÁRIOS —————
-  const loadUserSetup = (user) => {
-    if (!user || !user.username) return;
-    const key = `growcalc_user_setup_${user.username}`;
-    try {
-      const saved = localStorage.getItem(key);
-      if (saved) {
-        const data = JSON.parse(saved);
-        if (data.growName !== undefined) setGrowName(data.growName);
-        if (data.owner !== undefined) setOwner(data.owner);
-        if (data.strain !== undefined) setStrain(data.strain);
-        if (data.width !== undefined) setWidth(data.width);
-        if (data.depth !== undefined) setDepth(data.depth);
-        if (data.height !== undefined) setHeight(data.height);
-        if (data.potCount !== undefined) setPotCount(data.potCount);
-        if (data.potIdx !== undefined) setPotIdx(data.potIdx);
-        if (data.potShape !== undefined) setPotShape(data.potShape);
-        if (data.potFlipped !== undefined) setPotFlipped(data.potFlipped);
-        if (data.customPotW !== undefined) setCustomPotW(data.customPotW);
-        if (data.customPotL !== undefined) setCustomPotL(data.customPotL);
-        if (data.customPotH !== undefined) setCustomPotH(data.customPotH);
-        if (data.gaugeIdx !== undefined) setGaugeIdx(data.gaugeIdx);
-        if (data.spacing !== undefined) setSpacing(data.spacing);
-        if (data.cols !== undefined) setCols(data.cols);
-        if (data.conn !== undefined) setConn(data.conn);
-        if (data.recirculate !== undefined) setRecirculate(data.recirculate);
-        if (data.equip !== undefined) setEquip(data.equip);
-        if (data.perPot !== undefined) setPerPot(data.perPot);
-        if (data.watts !== undefined) setWatts(data.watts);
-        if (data.equipUrls !== undefined) setEquipUrls(data.equipUrls);
-        if (data.equipShopping !== undefined) setEquipShopping(data.equipShopping);
-        if (data.customItems !== undefined) setCustomItems(data.customItems);
-        if (data.vegaHours !== undefined) setVegaHours(data.vegaHours);
-        if (data.floraHours !== undefined) setFloraHours(data.floraHours);
-        if (data.vegaDays !== undefined) setVegaDays(data.vegaDays);
-        if (data.floraDays !== undefined) setFloraDays(data.floraDays);
-        if (data.yieldPerPlant !== undefined) setYieldPerPlant(data.yieldPerPlant);
-        if (data.priceG !== undefined) setPriceG(data.priceG);
-        if (data.tariff !== undefined) setTariff(data.tariff);
-        if (data.costs !== undefined) setCosts(data.costs);
-        if (data.extraCost !== undefined) setExtraCost(data.extraCost);
-        if (data.monthlyCost !== undefined) setMonthlyCost(data.monthlyCost);
-        if (data.notes !== undefined) setNotes(data.notes);
-        if (data.instructions !== undefined) setInstructions(data.instructions);
-        if (data.terms !== undefined) setTerms(data.terms);
-        if (data.allPresets !== undefined && Array.isArray(data.allPresets)) setAllPresets(data.allPresets);
-      }
-    } catch (e) {
-      console.error("Erro ao carregar configurações do usuário:", e);
-    }
-  };
 
-  // Carregar dados salvos do usuário ao iniciar/mudar usuário
-  useEffect(() => {
-    if (currentUser && currentUser.username) {
-      loadUserSetup(currentUser);
-      setSubdomainInput(currentUser.username);
-    }
-  }, [currentUser?.username]);
-
-  // Salvar automaticamente todas as alterações do usuário
-  useEffect(() => {
-    if (!currentUser || !currentUser.username) return;
-    const userSetup = {
-      growName, owner, strain,
-      width, depth, height,
-      potCount, potIdx, potShape, potFlipped, customPotW, customPotL, customPotH,
-      gaugeIdx, spacing, cols, conn, recirculate,
-      equip, perPot, watts, equipUrls, equipShopping, customItems,
-      vegaHours, floraHours, vegaDays, floraDays, yieldPerPlant, priceG, tariff,
-      costs, extraCost, monthlyCost,
-      notes, instructions, terms,
-      allPresets,
-    };
-    try {
-      localStorage.setItem(`growcalc_user_setup_${currentUser.username}`, JSON.stringify(userSetup));
-    } catch (e) {
-      console.error("Erro ao auto-salvar configurações do usuário:", e);
-    }
-  }, [
-    currentUser, growName, owner, strain, width, depth, height,
-    potCount, potIdx, potShape, potFlipped, customPotW, customPotL, customPotH,
-    gaugeIdx, spacing, cols, conn, recirculate,
-    equip, perPot, watts, equipUrls, equipShopping, customItems,
-    vegaHours, floraHours, vegaDays, floraDays, yieldPerPlant, priceG, tariff,
-    costs, extraCost, monthlyCost, notes, instructions, terms, allPresets
-  ]);
 
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -1918,6 +1832,94 @@ function GrowinStones() {
 
   const fileInputRef = useRef(null);
   const [toastMsg, setToastMsg] = useState("");
+
+  // ————— SISTEMA DE PERSISTÊNCIA E ISOLAMENTO DE USUÁRIOS —————
+  const loadUserSetup = (user) => {
+    if (!user || !user.username) return;
+    const key = `growcalc_user_setup_${user.username}`;
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const data = JSON.parse(saved);
+        if (data.growName !== undefined) setGrowName(data.growName);
+        if (data.owner !== undefined) setOwner(data.owner);
+        if (data.strain !== undefined) setStrain(data.strain);
+        if (data.width !== undefined) setWidth(data.width);
+        if (data.depth !== undefined) setDepth(data.depth);
+        if (data.height !== undefined) setHeight(data.height);
+        if (data.potCount !== undefined) setPotCount(data.potCount);
+        if (data.potIdx !== undefined) setPotIdx(data.potIdx);
+        if (data.potShape !== undefined) setPotShape(data.potShape);
+        if (data.potFlipped !== undefined) setPotFlipped(data.potFlipped);
+        if (data.customPotW !== undefined) setCustomPotW(data.customPotW);
+        if (data.customPotL !== undefined) setCustomPotL(data.customPotL);
+        if (data.customPotH !== undefined) setCustomPotH(data.customPotH);
+        if (data.gaugeIdx !== undefined) setGaugeIdx(data.gaugeIdx);
+        if (data.spacing !== undefined) setSpacing(data.spacing);
+        if (data.cols !== undefined) setCols(data.cols);
+        if (data.conn !== undefined) setConn(data.conn);
+        if (data.recirculate !== undefined) setRecirculate(data.recirculate);
+        if (data.equip !== undefined) setEquip(data.equip);
+        if (data.perPot !== undefined) setPerPot(data.perPot);
+        if (data.watts !== undefined) setWatts(data.watts);
+        if (data.equipUrls !== undefined) setEquipUrls(data.equipUrls);
+        if (data.equipShopping !== undefined) setEquipShopping(data.equipShopping);
+        if (data.customItems !== undefined) setCustomItems(data.customItems);
+        if (data.vegaHours !== undefined) setVegaHours(data.vegaHours);
+        if (data.floraHours !== undefined) setFloraHours(data.floraHours);
+        if (data.vegaDays !== undefined) setVegaDays(data.vegaDays);
+        if (data.floraDays !== undefined) setFloraDays(data.floraDays);
+        if (data.yieldPerPlant !== undefined) setYieldPerPlant(data.yieldPerPlant);
+        if (data.priceG !== undefined) setPriceG(data.priceG);
+        if (data.tariff !== undefined) setTariff(data.tariff);
+        if (data.costs !== undefined) setCosts(data.costs);
+        if (data.extraCost !== undefined) setExtraCost(data.extraCost);
+        if (data.monthlyCost !== undefined) setMonthlyCost(data.monthlyCost);
+        if (data.notes !== undefined) setNotes(data.notes);
+        if (data.instructions !== undefined) setInstructions(data.instructions);
+        if (data.terms !== undefined) setTerms(data.terms);
+        if (data.allPresets !== undefined && Array.isArray(data.allPresets)) setAllPresets(data.allPresets);
+      }
+    } catch (e) {
+      console.error("Erro ao carregar configurações do usuário:", e);
+    }
+  };
+
+  // Carregar dados salvos do usuário ao iniciar/mudar usuário
+  useEffect(() => {
+    if (currentUser && currentUser?.username) {
+      loadUserSetup(currentUser);
+      setSubdomainInput(currentUser?.username);
+    }
+  }, [currentUser?.username]);
+
+  // Salvar automaticamente todas as alterações do usuário
+  useEffect(() => {
+    if (!currentUser || !currentUser?.username) return;
+    const userSetup = {
+      growName, owner, strain,
+      width, depth, height,
+      potCount, potIdx, potShape, potFlipped, customPotW, customPotL, customPotH,
+      gaugeIdx, spacing, cols, conn, recirculate,
+      equip, perPot, watts, equipUrls, equipShopping, customItems,
+      vegaHours, floraHours, vegaDays, floraDays, yieldPerPlant, priceG, tariff,
+      costs, extraCost, monthlyCost,
+      notes, instructions, terms,
+      allPresets,
+    };
+    try {
+      localStorage.setItem(`growcalc_user_setup_${currentUser?.username}`, JSON.stringify(userSetup));
+    } catch (e) {
+      console.error("Erro ao auto-salvar configurações do usuário:", e);
+    }
+  }, [
+    currentUser, growName, owner, strain, width, depth, height,
+    potCount, potIdx, potShape, potFlipped, customPotW, customPotL, customPotH,
+    gaugeIdx, spacing, cols, conn, recirculate,
+    equip, perPot, watts, equipUrls, equipShopping, customItems,
+    vegaHours, floraHours, vegaDays, floraDays, yieldPerPlant, priceG, tariff,
+    costs, extraCost, monthlyCost, notes, instructions, terms, allPresets
+  ]);
 
   const showToast = (msg) => {
     setToastMsg(msg);
@@ -3641,13 +3643,13 @@ function GrowinStones() {
           {/* Subdomain Badge link */}
           {!sidebarCollapsed && (
             <a
-              href={`https://${currentUser.username}.thegrowinstones.com`}
+              href={`https://${currentUser?.username}.thegrowinstones.com`}
               target="_blank"
               rel="noreferrer"
               className="flex items-center justify-between px-3 py-2 rounded-xl mb-6 text-xs font-mono transition-opacity hover:opacity-85"
               style={{ background: dark ? "rgba(16,185,129,0.1)" : "#ecfdf5", border: "1px solid #10b981", color: "#10b981" }}
             >
-              <span className="truncate">https://{currentUser.username}.grow...</span>
+              <span className="truncate">https://{currentUser?.username}.grow...</span>
               <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse"></span>
             </a>
           )}
@@ -3742,11 +3744,11 @@ function GrowinStones() {
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0" style={{ background: "#0284c7" }}>
-                  {currentUser.name.charAt(0).toUpperCase()}
+                  {currentUser?.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <div className="text-xs font-bold truncate" style={{ color: T.text }}>{currentUser.name}</div>
-                  <div className="text-[11px] font-mono truncate" style={{ color: T.textMuted }}>@{currentUser.username}</div>
+                  <div className="text-xs font-bold truncate" style={{ color: T.text }}>{currentUser?.name}</div>
+                  <div className="text-[11px] font-mono truncate" style={{ color: T.textMuted }}>@{currentUser?.username}</div>
                 </div>
               </div>
               <button
@@ -3795,12 +3797,12 @@ function GrowinStones() {
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div>
                   <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">SUBDOMÍNIO ATIVO</span>
-                  <h3 className="text-lg font-extrabold mt-2 font-mono" style={{ color: T.brand }}>https://{currentUser.username}.thegrowinstones.com</h3>
+                  <h3 className="text-lg font-extrabold mt-2 font-mono" style={{ color: T.brand }}>https://{currentUser?.username}.thegrowinstones.com</h3>
                   <p className="text-xs mt-1" style={{ color: T.textMuted }}>Status: Online com Certificado SSL (HTTPS) Let's Encrypt</p>
                 </div>
                 <div className="flex gap-2">
                   <a
-                    href={`https://${currentUser.username}.thegrowinstones.com`}
+                    href={`https://${currentUser?.username}.thegrowinstones.com`}
                     target="_blank"
                     rel="noreferrer"
                     className="px-4 py-2 rounded-xl text-xs font-bold text-white shadow"
@@ -3810,7 +3812,7 @@ function GrowinStones() {
                   </a>
                   <button
                     onClick={() => {
-                      setSubdomainInput(currentUser.username);
+                      setSubdomainInput(currentUser?.username);
                       setPublishModalOpen(true);
                     }}
                     className="px-4 py-2 rounded-xl text-xs font-bold"
@@ -3859,7 +3861,7 @@ function GrowinStones() {
                   <span className="text-xs text-stone-400 font-mono">https://</span>
                   <input
                     type="text"
-                    value={currentUser.username}
+                    value={currentUser?.username}
                     onChange={(e) => {
                       const clean = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
                       const updated = { ...currentUser, username: clean };
@@ -3960,7 +3962,7 @@ function GrowinStones() {
 
                 <button
                   onClick={() => {
-                    if (!subdomainInput && currentUser?.username) setSubdomainInput(currentUser.username);
+                    if (!subdomainInput && currentUser?.username) setSubdomainInput(currentUser?.username);
                     setPublishModalOpen(true);
                   }}
                   title="Publicar Grow no Subdomínio Exclusivo (*Publicar Grow)"
