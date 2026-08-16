@@ -5245,7 +5245,7 @@ function GrowinStones() {
               </div>
 
               {/* Linha Principal com Título e Subtítulo */}
-              <div>
+              <div className="mb-6">
                 <h1 className="text-xl sm:text-3xl font-bold tracking-tight leading-tight" style={{ color: T.text }}>
                   Projete seu grow <span style={{ color: T.muted, fontStyle: "italic", fontWeight: 500 }}>em segundos</span>
                 </h1>
@@ -5253,48 +5253,6 @@ function GrowinStones() {
                   Estrutura, ligações, custos, produção e retorno — com planta baixa em tempo real e relatório completo em PDF.
                 </p>
               </div>
-            </div>
-
-            {/* Chips removíveis para todos os presets */}
-            <div className="flex flex-wrap gap-2 items-center mb-8">
-              {allPresets.map((p) => (
-                <div key={p.id || p.name} className="flex items-center rounded-full transition-all shrink-0 shadow-sm"
-                  style={{ background: T.surface2, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-                  <button onClick={() => loadPreset(p)}
-                    className="pl-3.5 pr-2 py-1.5 text-xs font-semibold hover:opacity-85 flex items-center gap-1.5"
-                    title={`Carregar setup "${p.name}"`}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.accentBorder }}>
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                    </svg>
-                    <span>{p.name}</span>
-                  </button>
-                  <button onClick={(e) => { e.stopPropagation(); removePreset(p.id || p.name, p.name); }}
-                    title={`Remover chip "${p.name}"`}
-                    className="pr-3 pl-1 py-1.5 text-xs font-bold transition-colors hover:text-red-500 rounded-r-full"
-                    style={{ color: T.faint }}>
-                    ×
-                  </button>
-                </div>
-              ))}
-
-              <button onClick={addCurrentAsPreset}
-                title="Salvar a configuração atual como um novo chip de preset"
-                className="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all hover:opacity-85 flex items-center gap-1.5 shrink-0"
-                style={{ background: T.surface2, border: `1.5px dashed ${T.accentBorder}`, color: T.text }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                <span>Salvar preset atual</span>
-              </button>
-
-              {allPresets.length === 0 && (
-                <button onClick={restoreDefaultPresets}
-                  className="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all hover:opacity-85 flex items-center gap-1.5 shrink-0"
-                  style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
-                  Restaurar presets padrão
-                </button>
-              )}
             </div>
 
             {activeTab === "configurator" ? (
@@ -5345,6 +5303,55 @@ function GrowinStones() {
                       className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isGrowPublic ? "translate-x-5" : "translate-x-0"}`}
                     />
                   </button>
+                </div>
+              </div>
+            </CollapsibleCard>
+
+            <CollapsibleCard
+              title="Setups & Presets"
+              subtitle={`${allPresets.length} setups salvos`}
+              defaultOpen={true}
+              T={T} dark={dark}>
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2 items-center">
+                  {allPresets.map((p) => (
+                    <div key={p.id || p.name} className="flex items-center rounded-full transition-all shrink-0 shadow-sm"
+                      style={{ background: T.surface2, border: `1px solid ${T.accentBorder}`, color: T.text }}>
+                      <button onClick={() => loadPreset(p)}
+                        className="pl-3.5 pr-2 py-1.5 text-xs font-semibold hover:opacity-85 flex items-center gap-1.5 cursor-pointer"
+                        title={`Carregar setup "${p.name}"`}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.accentBorder }}>
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                        </svg>
+                        <span>{p.name}</span>
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); removePreset(p.id || p.name, p.name); }}
+                        title={`Remover chip "${p.name}"`}
+                        className="pr-3 pl-1 py-1.5 text-xs font-bold transition-colors hover:text-red-500 rounded-r-full cursor-pointer"
+                        style={{ color: T.faint }}>
+                        ×
+                      </button>
+                    </div>
+                  ))}
+
+                  <button onClick={addCurrentAsPreset}
+                    title="Salvar a configuração atual como um novo chip de preset"
+                    className="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all hover:opacity-85 flex items-center gap-1.5 shrink-0 cursor-pointer"
+                    style={{ background: T.surface2, border: `1.5px dashed ${T.accentBorder}`, color: T.text }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="12" y1="5" x2="12" y2="19" />
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    <span>Salvar preset atual</span>
+                  </button>
+
+                  {allPresets.length === 0 && (
+                    <button onClick={restoreDefaultPresets}
+                      className="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all hover:opacity-85 flex items-center gap-1.5 shrink-0 cursor-pointer"
+                      style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
+                      Restaurar presets padrão
+                    </button>
+                  )}
                 </div>
               </div>
             </CollapsibleCard>
