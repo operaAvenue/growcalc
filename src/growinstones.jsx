@@ -2737,7 +2737,7 @@ export default function GrowinStones() {
                 <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.71 1.26-1.5 1.74-2.3L4.5 16.5z"/>
                 <path d="M12 15l-3-3 7.5-7.5c1.4-1.4 3.7-1.4 5.1 0s1.4 3.7 0 5.1L12 15z"/>
               </svg>
-              <span>Publicar Subdomínio</span>
+              <span>*Publicar Grow</span>
             </button>
             <button onClick={() => setShowReport(true)}
               className="px-4 py-2 rounded-xl text-xs font-bold transition-opacity hover:opacity-85 flex items-center gap-1.5"
@@ -3713,6 +3713,87 @@ export default function GrowinStones() {
           Estimativas para planejamento — produtividade, preços e consumo variam com genética, manejo e tarifas locais.
         </p>
       </main>
+
+      {/* Subdomain Publisher Modal */}
+      {publishModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg p-6 rounded-2xl shadow-2xl space-y-5" style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.text }}>
+            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: T.borderSoft }}>
+              <h3 className="text-lg font-extrabold flex items-center gap-2" style={{ color: T.text }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.71 1.26-1.5 1.74-2.3L4.5 16.5z"/><path d="M12 15l-3-3 7.5-7.5c1.4-1.4 3.7-1.4 5.1 0s1.4 3.7 0 5.1L12 15z"/></svg>
+                <span>Publicar Grow em Subdomínio</span>
+              </h3>
+              <button onClick={() => { setPublishModalOpen(false); setPublishResult(null); }} className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm" style={{ background: T.surface2, color: T.muted }}>✕</button>
+            </div>
+
+            <p className="text-xs" style={{ color: T.muted }}>
+              Crie um subdomínio exclusivo e um link permanente para visualizar este dashboard interativo e mapa hidráulico em qualquer dispositivo.
+            </p>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold block" style={{ color: T.text }}>Nome do Subdomínio:</label>
+              <div className="flex items-center rounded-xl overflow-hidden border" style={{ background: T.surface2, borderColor: T.border }}>
+                <span className="pl-3 text-xs font-bold" style={{ color: T.muted }}>https://</span>
+                <input
+                  type="text"
+                  value={subdomainInput}
+                  onChange={(e) => setSubdomainInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                  placeholder="meu-setup-dwc"
+                  maxLength={35}
+                  className="flex-1 px-2 py-2.5 text-xs font-bold outline-none bg-transparent"
+                  style={{ color: T.text }}
+                />
+                <span className="pr-3 text-xs font-bold" style={{ color: T.muted }}>.thegrowinstones.com</span>
+              </div>
+              <div className="text-[10.5px]" style={{ color: T.faint }}>
+                Apenas letras minúsculas, números e hífens. Ex: <code style={{ color: T.text }}>projeto-organico-01</code>
+              </div>
+            </div>
+
+            {publishResult && (
+              <div className={`p-4 rounded-xl border space-y-2 ${publishResult.success ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-red-500/10 border-red-500/30 text-red-400"}`}>
+                {publishResult.success ? (
+                  <div>
+                    <div className="font-extrabold text-xs flex items-center gap-1.5 text-emerald-400">
+                      <span>✓ Subdomínio Publicado com Sucesso!</span>
+                    </div>
+                    <p className="text-xs mt-1" style={{ color: T.text }}>
+                      Seu projeto já está online e acessível em:
+                    </p>
+                    <div className="mt-3 flex items-center gap-2 flex-wrap">
+                      <a href={publishResult.url} target="_blank" rel="noopener noreferrer"
+                        className="px-3.5 py-1.5 rounded-lg text-xs font-extrabold bg-emerald-500 text-slate-950 hover:bg-emerald-400 transition-colors flex items-center gap-1">
+                        <span>🚀 Abrir {publishResult.slug}.thegrowinstones.com</span>
+                      </a>
+                      <button onClick={() => { navigator.clipboard.writeText(publishResult.url); showToast("✓ URL copiada!"); }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors" style={{ background: T.surface, borderColor: T.border, color: T.text }}>
+                        📋 Copiar Link
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-xs font-semibold text-red-400">
+                    ⚠️ {publishResult.error}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t" style={{ borderColor: T.borderSoft }}>
+              <button onClick={() => { setPublishModalOpen(false); setPublishResult(null); }} className="px-4 py-2 rounded-xl text-xs font-bold" style={{ background: T.surface2, color: T.muted }}>
+                Cancelar
+              </button>
+              <button
+                onClick={handlePublishSubdomain}
+                disabled={isPublishing || !subdomainInput.trim()}
+                className="px-5 py-2 rounded-xl text-xs font-extrabold transition-all shadow-md disabled:opacity-50"
+                style={{ background: dark ? "#0284c7" : "#0369a1", color: "#ffffff" }}>
+                {isPublishing ? "Publicando no Servidor..." : "🚀 Publicar Agora"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toastMsg && (
         <div className="fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-xl text-xs font-bold transition-all animate-bounce"
