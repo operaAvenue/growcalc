@@ -142,7 +142,7 @@ export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, 
         flashFreq: "keep",
         flashSize: "keep",
         eraseAll: false,
-        compress: true,
+        compress: false,
         reportProgress: (fileIndex, written, total) => {
           const pct = Math.round((written / total) * 100);
           setProgressPercent(pct);
