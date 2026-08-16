@@ -2483,21 +2483,26 @@ export default function GrowinStones() {
       <div style="font-size:10.5px; color:#6b6354; margin-top:8px;">Planta baixa (${width} × ${depth} cm) · ${plants} vaso(s) de ${esc(pot.label)} (${esc(potDesc)})<br/>Afastamento paredes: E/D ${layout.wallLeft}/${layout.wallRight} cm, Sup/Inf ${layout.wallTop}/${layout.wallBottom} cm · Entre vasos: ${spacing} cm</div>
     </div>`;
 
-    const extraNotesHtml = (notes.trim() || instructions.trim() || terms.trim())
+    const safeNotes = typeof notes === "string" ? notes.trim() : "";
+    const safeInst = typeof instructions === "string" ? instructions.trim() : "";
+    const safeTerms = typeof terms === "string" ? terms.trim() : "";
+
+    const extraNotesHtml = (safeNotes || safeInst || safeTerms)
       ? `<h2>8 · Observações, instruções e termos</h2>
          <div style="background:#f5f1e7; border-radius:12px; padding:12px 14px; margin-bottom:16px; font-size:11px; color:#1f1b16;">
-           ${notes.trim() ? `<div style="margin-bottom:10px;"><b style="display:block; text-transform:uppercase; font-size:9.5px; color:#6b6354; margin-bottom:3px; letter-spacing:0.05em;">Observações</b><div style="white-space:pre-wrap; line-height:1.4;">${esc(notes)}</div></div>` : ""}
-           ${instructions.trim() ? `<div style="margin-bottom:10px;"><b style="display:block; text-transform:uppercase; font-size:9.5px; color:#6b6354; margin-bottom:3px; letter-spacing:0.05em;">Instruções de operação</b><div style="white-space:pre-wrap; line-height:1.4;">${esc(instructions)}</div></div>` : ""}
-           ${terms.trim() ? `<div><b style="display:block; text-transform:uppercase; font-size:9.5px; color:#6b6354; margin-bottom:3px; letter-spacing:0.05em;">Termos & Condições</b><div style="white-space:pre-wrap; line-height:1.4;">${esc(terms)}</div></div>` : ""}
+           ${safeNotes ? `<div style="margin-bottom:10px;"><b style="display:block; text-transform:uppercase; font-size:9.5px; color:#6b6354; margin-bottom:3px; letter-spacing:0.05em;">Observações</b><div style="white-space:pre-wrap; line-height:1.4;">${esc(safeNotes)}</div></div>` : ""}
+           ${safeInst ? `<div style="margin-bottom:10px;"><b style="display:block; text-transform:uppercase; font-size:9.5px; color:#6b6354; margin-bottom:3px; letter-spacing:0.05em;">Instruções de operação</b><div style="white-space:pre-wrap; line-height:1.4;">${esc(safeInst)}</div></div>` : ""}
+           ${safeTerms ? `<div><b style="display:block; text-transform:uppercase; font-size:9.5px; color:#6b6354; margin-bottom:3px; letter-spacing:0.05em;">Termos & Condições</b><div style="white-space:pre-wrap; line-height:1.4;">${esc(safeTerms)}</div></div>` : ""}
          </div>`
       : "";
 
-    const shoppingListHtml = shoppingListItems.length > 0
+    const shoppingListHtml = (Array.isArray(shoppingListItems) && shoppingListItems.length > 0)
       ? `<h2>9 · Lista de compras & QR Codes</h2>
          <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
            ${shoppingListItems.map((item) => {
-             const qrImg = item.url.trim()
-               ? `<img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(item.url.trim())}&size=200x200" alt="QR Code" style="width:108px; height:108px; max-width:100%; border-radius:8px; border:1px solid #e2e8f0; background:#ffffff; padding:4px;" />`
+             const itemUrl = typeof item?.url === "string" ? item.url.trim() : "";
+             const qrImg = itemUrl
+               ? `<img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(itemUrl)}&size=200x200" alt="QR Code" style="width:108px; height:108px; max-width:100%; border-radius:8px; border:1px solid #e2e8f0; background:#ffffff; padding:4px;" />`
                : `<div style="width:108px; height:108px; max-width:100%; border-radius:8px; background:#f1f5f9; border:1px solid #e2e8f0; display:flex; align-items:center; justify-content:center; font-size:10px; color:#94a3b8; text-align:center;">Sem link</div>`;
              return `
                <div style="display:flex; align-items:center; justify-content:space-between; gap:14px; background:#f5f1e7; border-radius:12px; padding:12px 14px;">
