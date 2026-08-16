@@ -1,3 +1,308 @@
+// ————————————————————————— ESP32 TELEMETRY & MQTT MONITOR —————————————————————————
+function MQTTMonitorView({ currentUser, T, dark, showToast }) {
+  const [telemetry, setTelemetry] = useState({
+    temp: 24.5,
+    humidity: 62.0,
+    ph: 5.85,
+    ec: 1.65,
+    waterLevel: 85,
+    pumpWater: true,
+    pumpAir: true,
+    led: true,
+    exhaust: false,
+    timestamp: new Date().toLocaleTimeString()
+  });
+
+  const [logs, setLogs] = useState([]);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [codeModalOpen, setCodeModalOpen] = useState(false);
+
+  const fetchTelemetry = async () => {
+    try {
+      const res = await fetch(`https://grow.thegrowinstones.com/api/mqtt/telemetry/${currentUser.username}`);
+      if (res.ok) {
+        const result = await res.json();
+        if (result.data) {
+          setTelemetry({
+            ...result.data,
+            timestamp: new Date(result.timestamp || Date.now()).toLocaleTimeString()
+          });
+          setLogs((prev) => [
+            { time: new Date().toLocaleTimeString(), topic: result.topic || `growinstones/${currentUser.username}/telemetry`, payload: JSON.stringify(result.data) },
+            ...prev.slice(0, 15)
+          ]);
+        }
+      }
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    fetchTelemetry();
+    const interval = setInterval(fetchTelemetry, 4000);
+    return () => clearInterval(interval);
+  }, [currentUser.username]);
+
+  const simulateESP32Payload = async () => {
+    setIsSimulating(true);
+    const mockData = {
+      temp: (23 + Math.random() * 3).toFixed(1),
+      humidity: (58 + Math.random() * 8).toFixed(1),
+      ph: (5.7 + Math.random() * 0.4).toFixed(2),
+      ec: (1.5 + Math.random() * 0.4).toFixed(2),
+      waterLevel: Math.floor(80 + Math.random() * 15),
+      pumpWater: true,
+      pumpAir: true,
+      led: true,
+      exhaust: Math.random() > 0.5
+    };
+
+    try {
+      const res = await fetch("https://grow.thegrowinstones.com/api/mqtt/telemetry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: currentUser.username,
+          topic: `growinstones/${currentUser.username}/telemetry`,
+          data: mockData
+        })
+      });
+      if (res.ok) {
+        showToast("⚡ Mensagem ESP32 simulada enviada com sucesso!");
+        fetchTelemetry();
+      }
+    } catch (e) {
+      showToast("Erro ao simular envio do ESP32.");
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
+  const esp32CodeSnippet = `// ——————————————————————————————————————————————————————————
+// CÓDIGO ESP32 PARA GROWINSTONES (HTTP REST / MQTT TELEMETRY)
+// Subdomínio: ${currentUser.username}.thegrowinstones.com
+// ——————————————————————————————————————————————————————————
+
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+const char* ssid     = "SUA_REDE_WIFI";
+const char* password = "SEU_PASSWORD_WIFI";
+
+const char* serverUrl = "https://grow.thegrowinstones.com/api/mqtt/telemetry";
+const char* username  = "${currentUser.username}";
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi Conectado!");
+}
+
+void loop() {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(serverUrl);
+    http.addHeader("Content-Type", "application/json");
+
+    StaticJsonDocument<256> doc;
+    doc["username"] = username;
+    doc["topic"] = "growinstones/${currentUser.username}/telemetry";
+
+    JsonObject data = doc.createNestedObject("data");
+    data["temp"] = 24.5;       // Sensor DHT22 / DS18B20
+    data["humidity"] = 62.0;   // Sensor umidade
+    data["ph"] = 5.85;         // Sensor pH
+    data["ec"] = 1.65;         // Sensor EC
+    data["waterLevel"] = 85;   // Sensor ultrassônico
+    data["pumpWater"] = true;
+    data["pumpAir"] = true;
+    data["led"] = true;
+
+    String jsonString;
+    serializeJson(doc, jsonString);
+
+    int httpResponseCode = http.POST(jsonString);
+    Serial.printf("Telemetria enviada! Código HTTP: %d\n", httpResponseCode);
+    http.end();
+  }
+  delay(5000); // Envia a cada 5 segundos
+}`;
+
+  return (
+    <div className="max-w-6xl mx-auto px-6 py-8 w-full">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-4 mb-8">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-bold" style={{ color: T.text }}>📡 Telemetria ESP32 / MQTT</h1>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> CONECTADO
+            </span>
+          </div>
+          <p className="text-xs mt-1" style={{ color: T.textMuted }}>
+            Acompanhe a leitura dos sensores e estado dos relés enviados pelo microcontrolador ESP32 apontado para seu subdomínio.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCodeModalOpen(true)}
+            className="px-4 py-2 rounded-xl text-xs font-bold transition-all shadow flex items-center gap-1.5"
+            style={{ background: "#0284c7", color: "#ffffff" }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            <span>Código ESP32</span>
+          </button>
+
+          <button
+            onClick={simulateESP32Payload}
+            disabled={isSimulating}
+            className="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+            style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
+          >
+            <span>{isSimulating ? "Enviando..." : "⚡ Simular Mensagem ESP32"}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Connection info bar */}
+      <div className="p-4 rounded-2xl mb-8 flex items-center justify-between flex-wrap gap-3" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
+          </div>
+          <div>
+            <div className="text-xs font-bold" style={{ color: T.text }}>Topic MQTT: <code className="text-sky-400 font-mono">growinstones/{currentUser.username}/telemetry</code></div>
+            <div className="text-[11px]" style={{ color: T.textMuted }}>Endpoint: <code className="font-mono">https://grow.thegrowinstones.com/api/mqtt/telemetry</code></div>
+          </div>
+        </div>
+        <div className="text-xs font-mono" style={{ color: T.textMuted }}>
+          Última leitura: <b style={{ color: T.text }}>{telemetry.timestamp}</b>
+        </div>
+      </div>
+
+      {/* Sensor Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="p-5 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+          <div className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: T.textMuted }}>Temperatura Ar</div>
+          <div className="text-3xl font-extrabold font-mono" style={{ color: "#38bdf8" }}>{telemetry.temp} °C</div>
+          <div className="text-[11px] mt-2" style={{ color: T.textMuted }}>Ideal: 21.0°C – 26.0°C</div>
+        </div>
+
+        <div className="p-5 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+          <div className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: T.textMuted }}>Umidade Relativa</div>
+          <div className="text-3xl font-extrabold font-mono" style={{ color: "#34d399" }}>{telemetry.humidity} %</div>
+          <div className="text-[11px] mt-2" style={{ color: T.textMuted }}>Ideal: 55% – 70%</div>
+        </div>
+
+        <div className="p-5 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+          <div className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: T.textMuted }}>pH da Solução</div>
+          <div className="text-3xl font-extrabold font-mono" style={{ color: "#f59e0b" }}>{telemetry.ph} pH</div>
+          <div className="text-[11px] mt-2" style={{ color: T.textMuted }}>Faixa ideal: 5.5 – 6.5</div>
+        </div>
+
+        <div className="p-5 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+          <div className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: T.textMuted }}>Condutividade (EC)</div>
+          <div className="text-3xl font-extrabold font-mono" style={{ color: "#a78bfa" }}>{telemetry.ec} mS/cm</div>
+          <div className="text-[11px] mt-2" style={{ color: T.textMuted }}>Faixa ideal: 1.2 – 2.2</div>
+        </div>
+      </div>
+
+      {/* Actuators & Relays Section */}
+      <div className="p-6 rounded-2xl mb-8" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+        <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: T.text }}>Estado dos Atuadores (Relés ESP32)</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="p-3.5 rounded-xl border flex items-center justify-between" style={{ background: T.surface2, borderColor: T.border }}>
+            <span className="text-xs font-bold" style={{ color: T.text }}>Bomba d'Água</span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${telemetry.pumpWater ? "bg-emerald-500/20 text-emerald-400" : "bg-stone-500/20 text-stone-400"}`}>
+              {telemetry.pumpWater ? "LIGADO" : "DESLIGADO"}
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-xl border flex items-center justify-between" style={{ background: T.surface2, borderColor: T.border }}>
+            <span className="text-xs font-bold" style={{ color: T.text }}>Bomba de Ar</span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${telemetry.pumpAir ? "bg-emerald-500/20 text-emerald-400" : "bg-stone-500/20 text-stone-400"}`}>
+              {telemetry.pumpAir ? "LIGADO" : "DESLIGADO"}
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-xl border flex items-center justify-between" style={{ background: T.surface2, borderColor: T.border }}>
+            <span className="text-xs font-bold" style={{ color: T.text }}>Painel LED</span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${telemetry.led ? "bg-emerald-500/20 text-emerald-400" : "bg-stone-500/20 text-stone-400"}`}>
+              {telemetry.led ? "LIGADO" : "DESLIGADO"}
+            </span>
+          </div>
+
+          <div className="p-3.5 rounded-xl border flex items-center justify-between" style={{ background: T.surface2, borderColor: T.border }}>
+            <span className="text-xs font-bold" style={{ color: T.text }}>Exaustor</span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${telemetry.exhaust ? "bg-emerald-500/20 text-emerald-400" : "bg-stone-500/20 text-stone-400"}`}>
+              {telemetry.exhaust ? "LIGADO" : "DESLIGADO"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Incoming JSON Payload Logs Table */}
+      <div className="p-6 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+        <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: T.text }}>Histórico de Payloads Recebidos (Feed)</h3>
+        {logs.length === 0 ? (
+          <p className="text-xs" style={{ color: T.textMuted }}>Aguardando primeira mensagem do ESP32 ou clique em "Simular Mensagem ESP32".</p>
+        ) : (
+          <div className="space-y-2">
+            {logs.map((log, i) => (
+              <div key={i} className="p-3 rounded-xl font-mono text-xs flex items-center justify-between gap-3 overflow-x-auto" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
+                <span className="text-stone-400 shrink-0">{log.time}</span>
+                <span className="text-sky-400 shrink-0">{log.topic}</span>
+                <span className="text-stone-200 truncate">{log.payload}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Code Modal */}
+      {codeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
+          <div className="w-full max-w-2xl p-6 rounded-2xl text-left shadow-2xl relative space-y-4" style={{ background: "#1c1917", border: "1px solid #383532", color: "#f5f5f4" }}>
+            <button onClick={() => setCodeModalOpen(false)} className="absolute top-4 right-4 text-stone-400 hover:text-white font-bold text-sm">✕</button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-white">Código C++ para ESP32 (Arduino IDE)</h3>
+                <p className="text-xs text-stone-400">Pré-configurado para enviar dados diretamente para o seu subdomínio</p>
+              </div>
+            </div>
+
+            <div className="relative">
+              <pre className="p-4 rounded-xl font-mono text-xs text-emerald-400 overflow-x-auto max-h-96" style={{ background: "#0c0a09", border: "1px solid #292524" }}>
+                {esp32CodeSnippet}
+              </pre>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(esp32CodeSnippet);
+                  showToast("✓ Código ESP32 copiado para a área de transferência!");
+                }}
+                className="absolute top-3 right-3 px-3 py-1.5 rounded-lg text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white shadow"
+              >
+                📋 Copiar Código
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
 import { useState, useMemo, useEffect, useRef } from "react";
 import Logo, { getLogoSvgString } from "./Logo";
 
@@ -3357,7 +3662,7 @@ export default function GrowinStones() {
             </a>
           )}
 
-          {/* Menu Items */}
+          {/* Menu Items com Ícones Vetoriais Monocromáticos */}
           <nav className="space-y-1.5">
             <button
               onClick={() => setActiveTab("configurator")}
@@ -3367,7 +3672,9 @@ export default function GrowinStones() {
                 color: activeTab === "configurator" ? "#ffffff" : T.text
               }}
             >
-              <span className="text-base">🛠️</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>
+              </svg>
               {!sidebarCollapsed && <span>Configurador de Grow</span>}
             </button>
 
@@ -3379,7 +3686,9 @@ export default function GrowinStones() {
                 color: activeTab === "my_grows" ? "#ffffff" : T.text
               }}
             >
-              <span className="text-base">🌿</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                <path d="M12 22v-9"/><path d="M12 13a6 6 0 0 1 6-6c0 6-6 6-6 6z"/><path d="M12 13a6 6 0 0 0-6-6c0 6 6 6 6 6z"/>
+              </svg>
               {!sidebarCollapsed && (
                 <div className="flex items-center justify-between w-full">
                   <span>Meus Grows</span>
@@ -3396,8 +3705,29 @@ export default function GrowinStones() {
                 color: activeTab === "comparison" ? "#ffffff" : T.text
               }}
             >
-              <span className="text-base">📊</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+              </svg>
               {!sidebarCollapsed && <span>Comparar Setups</span>}
+            </button>
+
+            <button
+              onClick={() => setActiveTab("mqtt")}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === "mqtt" ? "shadow-sm" : "hover:opacity-80"}`}
+              style={{
+                background: activeTab === "mqtt" ? (dark ? "#0284c7" : "#0369a1") : T.surface2,
+                color: activeTab === "mqtt" ? "#ffffff" : T.text
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                <rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/>
+              </svg>
+              {!sidebarCollapsed && (
+                <div className="flex items-center justify-between w-full">
+                  <span>Telemetria ESP32</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-sky-500/20 text-sky-400 font-bold font-mono">MQTT</span>
+                </div>
+              )}
             </button>
 
             <button
@@ -3408,7 +3738,9 @@ export default function GrowinStones() {
                 color: activeTab === "settings" ? "#ffffff" : T.text
               }}
             >
-              <span className="text-base">⚙️</span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
               {!sidebarCollapsed && <span>Configurações</span>}
             </button>
           </nav>
@@ -3437,7 +3769,7 @@ export default function GrowinStones() {
                 className="p-1.5 rounded-lg text-xs font-semibold transition-colors hover:bg-red-500/20 text-red-400 shrink-0"
                 title="Sair da Conta"
               >
-                🚪
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               </button>
             </div>
           ) : (
@@ -3451,7 +3783,7 @@ export default function GrowinStones() {
               className="w-full py-2 rounded-lg text-xs text-red-400 hover:bg-red-500/20 text-center"
               title="Sair"
             >
-              🚪
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             </button>
           )}
         </div>
@@ -3460,6 +3792,10 @@ export default function GrowinStones() {
       {/* ÁREA PRINCIPAL DA APLICAÇÃO */}
       <div className="flex-1 min-w-0 flex flex-col">
         {/* Render Tab Content */}
+                {activeTab === "mqtt" && (
+          <MQTTMonitorView currentUser={currentUser} T={T} dark={dark} showToast={showToast} />
+        )}
+
         {activeTab === "my_grows" && (
           <div className="max-w-5xl mx-auto px-6 py-8 w-full">
             <h1 className="text-2xl font-bold mb-2" style={{ color: T.text }}>🌿 Meus Grows & Subdomínios</h1>
