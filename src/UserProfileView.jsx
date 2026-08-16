@@ -391,8 +391,8 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
   };
 
   // Toggle Like
-  const handleToggleLike = (postId) => {
-    setPosts(posts.map((p) => {
+  const handleToggleLike = async (postId) => {
+    const updatedPosts = posts.map((p) => {
       if (p.id === postId) {
         return {
           ...p,
@@ -401,21 +401,66 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
         };
       }
       return p;
-    }));
+    });
+    setPosts(updatedPosts);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(updatedPosts));
+    } catch (e) {}
+
+    if (currentUser && (currentUser.email || currentUser.username)) {
+      try {
+        fetch("https://grow.thegrowinstones.com/api/user/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user: currentUser, posts: updatedPosts })
+        }).catch(() => {});
+      } catch (e) {}
+    }
   };
 
-  // Delete Post
-  const handleDeletePost = (postId) => {
-    if (window.confirm("Deseja excluir esta publicação?")) {
-      setPosts(posts.filter((p) => p.id !== postId));
-      showToast("Publicação removida.");
+  // Delete Post (Exclusão definitiva local e na nuvem)
+  const handleDeletePost = async (postId) => {
+    if (window.confirm("Deseja excluir esta publicação definitivamente?")) {
+      const updatedPosts = posts.filter((p) => String(p.id) !== String(postId));
+      setPosts(updatedPosts);
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(updatedPosts));
+      } catch (e) {}
+
+      // Sincronizar exclusão definitiva no servidor imediatamente
+      if (currentUser && (currentUser.email || currentUser.username)) {
+        try {
+          await fetch("https://grow.thegrowinstones.com/api/post/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              user: currentUser,
+              email: currentUser.email,
+              username: currentUser.username,
+              postId
+            })
+          });
+        } catch (err) {
+          console.warn("Erro ao deletar post:", err);
+        }
+
+        try {
+          await fetch("https://grow.thegrowinstones.com/api/user/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user: currentUser, posts: updatedPosts })
+          });
+        } catch (e) {}
+      }
+
+      showToast("Publicação removida com sucesso!");
     }
   };
 
   // Add Comment
-  const handleAddComment = (postId, commentText) => {
+  const handleAddComment = async (postId, commentText) => {
     if (!commentText || !commentText.trim()) return;
-    setPosts(posts.map((p) => {
+    const updatedPosts = posts.map((p) => {
       if (p.id === postId) {
         return {
           ...p,
@@ -431,7 +476,21 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
         };
       }
       return p;
-    }));
+    });
+    setPosts(updatedPosts);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(updatedPosts));
+    } catch (e) {}
+
+    if (currentUser && (currentUser.email || currentUser.username)) {
+      try {
+        fetch("https://grow.thegrowinstones.com/api/user/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user: currentUser, posts: updatedPosts })
+        }).catch(() => {});
+      } catch (e) {}
+    }
   };
 
   const defaultBanner = dark
