@@ -1852,6 +1852,7 @@ function GrowinStones() {
   const [growName, setGrowName] = useState("");
   const [owner, setOwner] = useState("");
   const [strain, setStrain] = useState(""); // Variedade / Genética da planta
+  const [isGrowPublic, setIsGrowPublic] = useState(true); // Se o projeto do grow é público no subdomínio
 
   // estrutura
   const [width, setWidth] = useState(240);
@@ -2267,6 +2268,7 @@ function GrowinStones() {
     if (data.notes !== undefined) setNotes(data.notes);
     if (data.instructions !== undefined) setInstructions(data.instructions);
     if (data.terms !== undefined) setTerms(data.terms);
+    if (data.isGrowPublic !== undefined) setIsGrowPublic(Boolean(data.isGrowPublic));
     if (data.dark !== undefined) setDark(Boolean(data.dark));
     if (data.allPresets !== undefined && Array.isArray(data.allPresets) && data.allPresets.length > 0) {
       setAllPresets(data.allPresets);
@@ -2423,6 +2425,7 @@ function GrowinStones() {
     notes,
     instructions,
     terms,
+    isGrowPublic,
     dark,
   });
 
@@ -2465,6 +2468,7 @@ function GrowinStones() {
     if (typeof data.notes === "string") setNotes(data.notes);
     if (typeof data.instructions === "string") setInstructions(data.instructions);
     if (typeof data.terms === "string") setTerms(data.terms);
+    if (typeof data.isGrowPublic === "boolean") setIsGrowPublic(data.isGrowPublic);
     if (typeof data.dark === "boolean") setDark(data.dark);
     return true;
   };
@@ -2501,7 +2505,7 @@ function GrowinStones() {
   }, [
     growName, owner, strain, width, depth, height, potCount, potIdx, potShape, potFlipped, customPotW, customPotL, customPotH, gaugeIdx,
     spacing, cols, conn, recirculate, equip, perPot, watts, equipUrls, equipShopping, vegaHours, floraHours, vegaDays, floraDays, cycleDays, yieldPerPlant, priceG,
-    tariff, costs, extraCost, monthlyCost, customItems, notes, instructions, terms, dark
+    tariff, costs, extraCost, monthlyCost, customItems, notes, instructions, terms, isGrowPublic, dark
   ]);
 
   // Exportar setup completo em arquivo JSON
@@ -3879,7 +3883,7 @@ function GrowinStones() {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${esc(growName || "GrowinStones")} — ${esc(userDisplayName)}</title>
+<title>${esc(userDisplayName)} (@${esc(userHandle)}) — GrowinStones</title>
 <link href="https://fonts.googleapis.com/css2?family=Berkshire+Swash&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; }
@@ -3915,44 +3919,6 @@ function GrowinStones() {
   .badge-live::before { content: ""; width: 7px; height: 7px; background: ${isDark ? '#10b981' : '#059669'}; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px ${isDark ? '#10b981' : '#059669'}; }
   
   .container { max-width: 1100px; margin: 20px auto; padding: 0 20px 60px; }
-  
-  /* TAB NAVIGATION */
-  .tab-nav {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 24px;
-    border-bottom: 1px solid ${isDark ? '#292524' : '#e2dccc'};
-    padding-bottom: 12px;
-  }
-  .tab-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 10px 22px;
-    border-radius: 14px;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    border: 1px solid ${isDark ? '#292524' : '#e2dccc'};
-    transition: all 0.2s ease;
-    background: ${isDark ? '#1c1917' : '#ffffff'};
-    color: ${isDark ? '#a8a29e' : '#6b6354'};
-  }
-  .tab-btn.active {
-    background: ${isDark ? '#292524' : '#f5f1e7'};
-    border-color: ${isDark ? '#f59e0b' : '#b45309'};
-    color: ${isDark ? '#f5f5f4' : '#1f1b16'};
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  }
-  .tab-badge {
-    padding: 2px 7px;
-    border-radius: 10px;
-    font-size: 10.5px;
-    font-weight: 800;
-    background: ${isDark ? 'rgba(245,158,11,0.2)' : '#fef3c7'};
-    color: ${isDark ? '#f59e0b' : '#b45309'};
-  }
 
   .hero-card { 
     background: ${isDark ? 'linear-gradient(135deg, #1c1917 0%, #292524 100%)' : 'linear-gradient(135deg, #ffffff 0%, #faf7f0 100%)'}; 
@@ -4016,77 +3982,67 @@ function GrowinStones() {
   <div class="header-in">
     <div style="display:flex; align-items:center; gap:12px;">
       ${logoSvg}
-      <span style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.14em; color:${isDark ? '#a8a29e' : '#78716c'}; border-left:1px solid ${isDark ? '#44403c' : '#d6d3d1'}; padding-left:10px;">Dashboard Interativo</span>
+      <span style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.14em; color:${isDark ? '#a8a29e' : '#78716c'}; border-left:1px solid ${isDark ? '#44403c' : '#d6d3d1'}; padding-left:10px;">Perfil do Cultivador</span>
     </div>
     <a href="https://${displaySlug}.thegrowinstones.com" target="_blank" class="badge-live">https://${displaySlug}.thegrowinstones.com</a>
   </div>
 </header>
 
 <div class="container">
-  <!-- TOP SUBDOMAIN TABS -->
-  <div class="tab-nav">
-    <button id="btn-tab-posts" class="tab-btn active" onclick="switchSubTab('posts')">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-      <span>POSTS & DIÁRIO</span>
-      <span class="tab-badge">${userPosts.length}</span>
-    </button>
-    <button id="btn-tab-grow" class="tab-btn" onclick="switchSubTab('grow')">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-9"/><path d="M12 13a6 6 0 0 1 6-6c0 6-6 6-6 6z"/><path d="M12 13a6 6 0 0 0-6-6c0 6 6 6 6 6z"/></svg>
-      <span>PROJETO DO GROW</span>
-    </button>
-  </div>
+  {/* ————————————————— CARD PRINCIPAL: PERFIL DO CULTIVADOR ————————————————— */}
+  <div class="sec-card" style="padding:0; overflow:hidden; margin-bottom:24px;">
+    {/* FOTO DE CAPA (BANNER) */}
+    <div style="height:200px; width:100%; position:relative; overflow:hidden; background:${isDark ? '#292524' : '#e2dccc'};">
+      ${userBannerUrl 
+        ? `<img src="${userBannerUrl}" alt="Capa do Perfil" style="width:100%; height:100%; object-fit:cover; display:block;" />` 
+        : `<div style="width:100%; height:100%; background:${isDark ? 'linear-gradient(135deg, #1c1917 0%, #292524 50%, #44403c 100%)' : 'linear-gradient(135deg, #e2dccc 0%, #d8cfbe 50%, #c4b9a3 100%)'};"></div>`
+      }
+    </div>
 
-  <!-- ————————————————— ABA 1: POSTS & PERFIL DO CULTIVADOR (PADRÃO) ————————————————— -->
-  <div id="tab-content-posts" style="display:block;">
-    <!-- PERFIL DO CULTIVADOR (TWITTER STYLE) -->
-    <div class="sec-card" style="padding:0; overflow:hidden; margin-bottom:24px;">
-      <div style="height:160px; width:100%; ${bannerBg}"></div>
-      <div style="padding:0 24px 24px; position:relative;">
-        <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-top:-50px; margin-bottom:16px;">
-          <div style="width:100px; height:100px; border-radius:50%; overflow:hidden; border:4px solid ${isDark ? '#1c1917' : '#ffffff'}; background:${isDark ? '#292524' : '#e2dccc'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:32px; color:${isDark ? '#f59e0b' : '#b45309'}; box-shadow:0 10px 25px rgba(0,0,0,0.15); shrink:0;">
-            ${userAvatarUrl ? `<img src="${userAvatarUrl}" style="width:100%; height:100%; object-fit:cover;" />` : userDisplayName.charAt(0).toUpperCase()}
-          </div>
-          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span class="badge-live" style="background:${isDark ? 'rgba(16,185,129,0.15)' : 'rgba(5,150,105,0.1)'}; color:${isDark ? '#34d399' : '#047857'}; border:1px solid ${isDark ? '#10b981' : '#059669'};">Cultivador Pro</span>
-            <button onclick="switchSubTab('grow')" style="background:${isDark ? '#292524' : '#f5f1e7'}; border:1px solid ${isDark ? '#f59e0b' : '#b45309'}; color:${isDark ? '#f59e0b' : '#b45309'}; border-radius:20px; padding:5px 13px; font:700 11.5px Inter; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s ease; box-shadow:0 2px 6px rgba(0,0,0,0.06);" title="Acessar Projeto do Grow e Planta Baixa">
+    <div style="padding:0 24px 24px; position:relative;">
+      {/* AVATAR & BADGES & ÍCONE DO PROJETO */}
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-top:-50px; margin-bottom:16px;">
+        <div style="width:100px; height:100px; border-radius:50%; overflow:hidden; border:4px solid ${isDark ? '#1c1917' : '#ffffff'}; background:${isDark ? '#292524' : '#e2dccc'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:32px; color:${isDark ? '#f59e0b' : '#b45309'}; box-shadow:0 10px 25px rgba(0,0,0,0.15); shrink:0;">
+          ${userAvatarUrl ? `<img src="${userAvatarUrl}" alt="Avatar" style="width:100%; height:100%; object-fit:cover; display:block;" />` : userDisplayName.charAt(0).toUpperCase()}
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span class="badge-live" style="background:${isDark ? 'rgba(16,185,129,0.15)' : 'rgba(5,150,105,0.1)'}; color:${isDark ? '#34d399' : '#047857'}; border:1px solid ${isDark ? '#10b981' : '#059669'};">Cultivador Pro</span>
+
+          ${isGrowPublic ? `
+            <button onclick="document.getElementById('grow-project-section')?.scrollIntoView({ behavior: 'smooth' })" style="background:${isDark ? '#292524' : '#f5f1e7'}; border:1px solid ${isDark ? '#f59e0b' : '#b45309'}; color:${isDark ? '#f59e0b' : '#b45309'}; border-radius:20px; padding:6px 14px; font:700 12px Inter; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s ease; box-shadow:0 2px 6px rgba(0,0,0,0.06);" title="Ver Projeto Técnico do Grow e Planta Baixa">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-9"/><path d="M12 13a6 6 0 0 1 6-6c0 6-6 6-6 6z"/><path d="M12 13a6 6 0 0 0-6-6c0 6 6 6 6 6z"/></svg>
               <span>Projeto do Grow</span>
             </button>
-          </div>
-        </div>
-
-        <h2 style="font-size:22px; font-weight:800; margin:0 0 2px; color:${isDark ? '#ffffff' : '#1f1b16'};">${esc(userDisplayName)}</h2>
-        <div style="font-size:12px; font-family:monospace; font-weight:600; color:${isDark ? '#f59e0b' : '#b45309'}; margin-bottom:12px;">@${esc(userHandle)}</div>
-        <p style="font-size:13.5px; line-height:1.6; margin:0 0 16px; color:${isDark ? '#f5f5f4' : '#1f1b16'}; max-width:700px;">${esc(userBio)}</p>
-
-        <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:12px; color:${isDark ? '#a8a29e' : '#6b6354'}; padding-top:12px; border-top:1px solid ${isDark ? '#292524' : '#e2dccc'};">
-          <div>Localização: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(userLocation)}</b></div>
-          <div>Foco: <b style="color:${isDark ? '#f59e0b' : '#b45309'};">${esc(userStrainFocus)}</b></div>
-          <div>Publicações: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${userPosts.length}</b></div>
-          <div>Automação: <b style="color:#10b981;">Online 24/7</b></div>
+          ` : `
+            <span style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:20px; font-size:11.5px; font-weight:700; background:${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}; color:${isDark ? '#a8a29e' : '#78716c'}; border:1px solid ${isDark ? '#44403c' : '#d6d3d1'};" title="O cultivador manteve os dados técnicos deste projeto privados">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              <span>Projeto Privado</span>
+            </span>
+          `}
         </div>
       </div>
-    </div>
 
-    <!-- LISTA DE POSTAGENS -->
-    <div style="margin-bottom:20px;">
-      <h2 class="sec-title">Linha do Tempo & Diário de Cultivo</h2>
-      ${postsFeedHtml}
+      <h1 style="font-size:22px; font-weight:800; margin:0 0 2px; color:${isDark ? '#ffffff' : '#1f1b16'};">${esc(userDisplayName)}</h1>
+      <div style="font-size:12px; font-family:monospace; font-weight:600; color:${isDark ? '#f59e0b' : '#b45309'}; margin-bottom:12px;">@${esc(userHandle)}</div>
+      <p style="font-size:13.5px; line-height:1.6; margin:0 0 16px; color:${isDark ? '#f5f5f4' : '#1f1b16'}; max-width:700px;">${esc(userBio)}</p>
+
+      <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:12px; color:${isDark ? '#a8a29e' : '#6b6354'}; padding-top:12px; border-top:1px solid ${isDark ? '#292524' : '#e2dccc'};">
+        <div>Localização: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(userLocation)}</b></div>
+        <div>Foco: <b style="color:${isDark ? '#f59e0b' : '#b45309'};">${esc(userStrainFocus)}</b></div>
+        <div>Publicações: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${userPosts.length}</b></div>
+        <div>Automação: <b style="color:#10b981;">Online 24/7</b></div>
+      </div>
     </div>
   </div>
 
-  <!-- ————————————————— ABA 2: GROW & COMPARATIVOS ————————————————— -->
-  <div id="tab-content-grow" style="display:none;">
-    <div style="margin-bottom:14px;">
-      <button onclick="switchSubTab('posts')" style="background:${isDark ? '#1c1917' : '#ffffff'}; border:1px solid ${isDark ? '#292524' : '#e2dccc'}; color:${isDark ? '#a8a29e' : '#6b6354'}; border-radius:12px; padding:7px 14px; font:700 12px Inter; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s ease;">
-        <span>← Voltar aos Posts Diários</span>
-      </button>
-    </div>
-
+  ${isGrowPublic ? `
+  {/* ————————————————— SEÇÃO: PROJETO DO GROW (CASO PÚBLICO) ————————————————— */}
+  <div id="grow-project-section" style="margin-top:28px; margin-bottom:28px;">
     <div class="hero-card">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
         <div>
-          <h1 style="font-size:28px; font-weight:800; margin:0 0 6px; color:${isDark ? '#ffffff' : '#1f1b16'};">${esc(growName || "GrowinStones")}</h1>
+          <h2 style="font-size:26px; font-weight:800; margin:0 0 6px; color:${isDark ? '#ffffff' : '#1f1b16'};">${esc(growName || "Projeto do Grow")}</h2>
           <div style="font-size:13px; color:${isDark ? '#a8a29e' : '#6b6354'};">
             ${owner ? `Responsável: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(owner)}</b> · ` : ""}Genética: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(strain || "Não informada")}</b> · Atualizado em ${today}
           </div>
@@ -4201,34 +4157,19 @@ function GrowinStones() {
       ${safeTerms ? `<div><b style="color:${isDark ? '#f59e0b' : '#b45309'}; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Termos & Condições</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeTerms)}</div></div>` : ""}
     </div>` : ""}
   </div>
+  ` : ""}
+
+  {/* ————————————————— SEÇÃO: LINHA DO TEMPO & DIÁRIO DE CULTIVO ————————————————— */}
+  <div id="posts-timeline-section" style="margin-top:24px; margin-bottom:20px;">
+    <h2 class="sec-title">Linha do Tempo & Diário de Cultivo</h2>
+    ${postsFeedHtml}
+  </div>
 
   <div class="footer">
-    Relatório e Dashboard Interativo gerado pelo <b>GrowinStones</b> em ${today}.<br/>
+    Perfil e Diário de Cultivo gerado pelo <b>GrowinStones</b> em ${today}.<br/>
     Hospedado exclusivamente em <b>https://${displaySlug}.thegrowinstones.com</b>
   </div>
 </div>
-
-<script>
-  function switchSubTab(tabName) {
-    var tabGrow = document.getElementById('tab-content-grow');
-    var tabPosts = document.getElementById('tab-content-posts');
-    var btnGrow = document.getElementById('btn-tab-grow');
-    var btnPosts = document.getElementById('btn-tab-posts');
-
-    if (tabName === 'grow') {
-      tabGrow.style.display = 'block';
-      tabPosts.style.display = 'none';
-      if (btnPosts) btnPosts.classList.remove('active');
-      if (btnGrow) btnGrow.classList.add('active');
-    } else {
-      tabGrow.style.display = 'none';
-      tabPosts.style.display = 'block';
-      if (btnGrow) btnGrow.classList.remove('active');
-      if (btnPosts) btnPosts.classList.add('active');
-    }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-</script>
 </body>
 </html>`;
   };
@@ -5190,6 +5131,28 @@ function GrowinStones() {
                     onChange={(e) => setStrain(e.target.value)}
                     className="w-full h-9 px-3 rounded-lg text-sm font-medium focus:outline-none" style={inputStyle} />
                 </div>
+
+                {/* Toggle: Projeto Público / Privado no Subdomínio */}
+                <div className="pt-2.5 mt-1 border-t flex items-center justify-between gap-3" style={{ borderColor: T.borderSoft }}>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold" style={{ color: T.text }}>
+                      Projeto Público no Subdomínio
+                    </div>
+                    <div className="text-[11px] mt-0.5" style={{ color: T.muted }}>
+                      {isGrowPublic ? "Visível no seu subdomínio exclusivo" : "Oculto (Apenas seu perfil e posts serão públicos)"}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsGrowPublic((p) => !p)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isGrowPublic ? "bg-emerald-600" : "bg-stone-600"}`}
+                    title={isGrowPublic ? "Projeto Público" : "Projeto Privado"}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isGrowPublic ? "translate-x-5" : "translate-x-0"}`}
+                    />
+                  </button>
+                </div>
               </div>
             </CollapsibleCard>
 
@@ -5930,6 +5893,28 @@ function GrowinStones() {
               <div className="text-[10.5px]" style={{ color: T.faint }}>
                 Apenas letras minúsculas, números e hífens. Ex: <code style={{ color: T.text }}>projeto-organico-01</code>
               </div>
+            </div>
+
+            {/* Toggle: Projeto Público / Privado no Subdomínio */}
+            <div className="p-3 rounded-xl flex items-center justify-between border gap-3" style={{ background: T.surface2, borderColor: T.borderSoft }}>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-bold" style={{ color: T.text }}>
+                  Tornar este projeto visível no subdomínio
+                </div>
+                <div className="text-[11px] mt-0.5" style={{ color: T.muted }}>
+                  {isGrowPublic ? "Público (planta baixa, equipamentos e custos visíveis)" : "Privado (somente seu perfil e posts ficarão visíveis)"}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGrowPublic((p) => !p)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isGrowPublic ? "bg-emerald-600" : "bg-stone-600"}`}
+                title={isGrowPublic ? "Projeto Público" : "Projeto Privado"}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isGrowPublic ? "translate-x-5" : "translate-x-0"}`}
+                />
+              </button>
             </div>
 
             {publishResult && (
