@@ -74,12 +74,19 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
     ];
   });
 
-  // Save posts
+  // Save posts locally and in cloud
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(posts));
+      if (currentUser && (currentUser.email || currentUser.username)) {
+        fetch("https://grow.thegrowinstones.com/api/user/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user: currentUser, posts })
+        }).catch(() => {});
+      }
     } catch (e) {}
-  }, [posts, storageKey]);
+  }, [posts, storageKey, currentUser]);
 
   // Handle Avatar Change
   const handleAvatarFile = (e) => {
@@ -124,8 +131,16 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
     };
     setCurrentUser(updated);
     localStorage.setItem("growcalc_user", JSON.stringify(updated));
+    
+    // Sync immediately to cloud
+    fetch("https://grow.thegrowinstones.com/api/user/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user: updated, posts })
+    }).catch(() => {});
+
     setIsEditingProfile(false);
-    showToast("Perfil atualizado com sucesso!");
+    showToast("Perfil atualizado e sincronizado na nuvem!");
   };
 
   // Handle Attach Images

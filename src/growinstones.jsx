@@ -1964,6 +1964,24 @@ function GrowinStones() {
       script.defer = true;
       document.head.appendChild(script);
     }
+
+    // Sincronização em segundo plano na inicialização
+    if (currentUser && (currentUser.email || currentUser.username)) {
+      const fetchCloudSync = async () => {
+        try {
+          const syncUrl = `https://grow.thegrowinstones.com/api/user/sync?email=${encodeURIComponent(currentUser.email || "")}&username=${encodeURIComponent(currentUser.username || "")}`;
+          const res = await fetch(syncUrl);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.exists && data.user) {
+              setCurrentUser((prev) => ({ ...prev, ...data.user }));
+              if (data.user.username) setSubdomainInput(data.user.username);
+            }
+          }
+        } catch (e) {}
+      };
+      fetchCloudSync();
+    }
   }, []);
 
   const triggerGoogleOAuth = () => {
@@ -2008,7 +2026,61 @@ function GrowinStones() {
             setAuthNameInput(googleUser.name || "Cultivador");
             setAuthUsernameInput(defaultSlug);
 
-            // Verificar se o usuário já tem conta/configuração salva
+            // 1. Consultar a nuvem por dados existentes vinculados a este e-mail da conta Google
+            let cloudData = null;
+            try {
+              const syncUrl = `https://grow.thegrowinstones.com/api/user/sync?email=${encodeURIComponent(googleUser.email)}&username=${encodeURIComponent(defaultSlug)}`;
+              const syncRes = await fetch(syncUrl);
+              if (syncRes.ok) {
+                const syncJson = await syncRes.json();
+                if (syncJson && syncJson.exists) {
+                  cloudData = syncJson;
+                }
+              }
+            } catch (e) {
+              console.warn("Aviso ao buscar sync na nuvem:", e);
+            }
+
+            // 2. Se já tem cadastro na nuvem, restaurar completamente a sessão
+            if (cloudData && cloudData.user) {
+              const restoredUser = {
+                name: cloudData.user.name || googleUser.name || "Cultivador",
+                email: googleUser.email,
+                username: cloudData.user.username || defaultSlug,
+                avatarUrl: cloudData.user.avatarUrl || googleUser.picture || `https://api.dicebear.com/7.x/bottts/svg?seed=${defaultSlug}`,
+                bannerUrl: cloudData.user.bannerUrl || "",
+                bio: cloudData.user.bio || "",
+                location: cloudData.user.location || "Brasil",
+                strainFocus: cloudData.user.strainFocus || "",
+                googleSub: googleUser.sub
+              };
+
+              // Restaurar presets da nuvem se houver
+              if (Array.isArray(cloudData.presets) && cloudData.presets.length > 0) {
+                setAllPresets(cloudData.presets);
+                localStorage.setItem("growinstones_all_presets_v2", JSON.stringify(cloudData.presets));
+              }
+
+              // Restaurar posts da nuvem se houver
+              if (Array.isArray(cloudData.posts)) {
+                localStorage.setItem(`growcalc_posts_${restoredUser.username}`, JSON.stringify(cloudData.posts));
+              }
+
+              // Restaurar setup de cultivo da nuvem se houver
+              if (cloudData.setup) {
+                try {
+                  applyPreset(cloudData.setup);
+                } catch(e) {}
+              }
+
+              localStorage.setItem("growcalc_user", JSON.stringify(restoredUser));
+              setCurrentUser(restoredUser);
+              setSubdomainInput(restoredUser.username);
+              showToast(`Sessão sincronizada! Bem-vindo de volta, ${restoredUser.name}!`);
+              return;
+            }
+
+            // 3. Verificar se o usuário já tem conta local
             const existingSetup = localStorage.getItem(`growcalc_user_setup_${defaultSlug}`);
             const savedUserJson = localStorage.getItem("growcalc_user");
             let isExisting = false;
@@ -2026,16 +2098,28 @@ function GrowinStones() {
                 name: googleUser.name || "Cultivador",
                 email: googleUser.email,
                 username: defaultSlug,
-                avatar: googleUser.picture || `https://api.dicebear.com/7.x/bottts/svg?seed=${defaultSlug}`,
+                avatarUrl: googleUser.picture || `https://api.dicebear.com/7.x/bottts/svg?seed=${defaultSlug}`,
+                bannerUrl: "",
+                bio: "",
+                location: "Brasil",
+                strainFocus: "",
                 googleSub: googleUser.sub
               };
               localStorage.setItem("growcalc_user", JSON.stringify(existingUser));
               setCurrentUser(existingUser);
               setSubdomainInput(defaultSlug);
-              showToast(` Bem-vindo de volta, ${existingUser.name}! Subdomínio @${defaultSlug} carregado.`);
+
+              // Salvar na nuvem para os próximos dispositivos
+              fetch("https://grow.thegrowinstones.com/api/user/sync", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user: existingUser, setup: getSetupData(), presets: allPresets })
+              }).catch(() => {});
+
+              showToast(`Bem-vindo de volta, ${existingUser.name}! Subdomínio @${defaultSlug} carregado.`);
             } else {
               setAuthModalOpen(true);
-              showToast(` Google Autenticado: ${googleUser.email}`);
+              showToast(`Google Autenticado: ${googleUser.email}`);
             }
           } catch (err) {
             console.error("Erro ao obter perfil do Google:", err);
@@ -4338,19 +4422,31 @@ function GrowinStones() {
                       name: cleanName,
                       email: pendingGoogleUser ? pendingGoogleUser.email : `${cleanSlug}@gmail.com`,
                       username: cleanSlug,
-                      avatar: pendingGoogleUser && pendingGoogleUser.picture ? pendingGoogleUser.picture : `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanSlug}`,
+                      avatarUrl: pendingGoogleUser && pendingGoogleUser.picture ? pendingGoogleUser.picture : `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanSlug}`,
+                      bannerUrl: "",
+                      bio: "",
+                      location: "Brasil",
+                      strainFocus: "",
                       googleSub: pendingGoogleUser ? pendingGoogleUser.sub : null
                     };
                     localStorage.setItem("growcalc_user", JSON.stringify(newUser));
                     setCurrentUser(newUser);
                     setSubdomainInput(cleanSlug);
                     setAuthModalOpen(false);
-                    showToast(` Bem-vindo, ${cleanName}! Subdomínio @${cleanSlug} ativado com Google.`);
+
+                    // Sync to Cloud immediately
+                    fetch("https://grow.thegrowinstones.com/api/user/sync", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ user: newUser, setup: getSetupData(), presets: allPresets })
+                    }).catch(() => {});
+
+                    showToast(`Bem-vindo, ${cleanName}! Subdomínio @${cleanSlug} ativado e sincronizado.`);
                   }}
                   className="w-full py-3 rounded-xl font-bold text-xs transition-all hover:opacity-90 shadow-lg flex items-center justify-center gap-2 mt-2"
                   style={{ background: "#0284c7", color: "#ffffff" }}
                 >
-                   Confirmar & Acessar Configurador
+                  Confirmar & Acessar Configurador
                 </button>
               </div>
             </div>
