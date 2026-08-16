@@ -5271,7 +5271,7 @@ function GrowinStones() {
                     <span className="text-xs" style={{ color: T.faint }}>Consumo total de iluminação</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <NumInput value={ledWatts} onCommit={setLedWatts} min={0} max={10000}
+                    <NumInput value={watts?.led || 0} onCommit={(n) => setW("led", n)} min={0} max={10000}
                       className={`w-20 h-8 ${inputCls}`} style={inputStyle} />
                     <span className="text-xs font-medium" style={{ color: T.muted }}>W</span>
                   </div>
@@ -5315,7 +5315,7 @@ function GrowinStones() {
 
             <CollapsibleCard
               title="4 · Equipamentos & custos"
-              subtitle={`${activeEquipCount} ativos · ${fmtBRL(capex)} CAPEX`}
+              subtitle={`${EQUIPMENT.filter((e) => equip[e.id] > 0).length} ativos · ${fmtBRL(capex)} CAPEX`}
               T={T} dark={dark}>
               <div className="space-y-3">
                 {EQUIPMENT.map((e) => {
@@ -5349,7 +5349,7 @@ function GrowinStones() {
                           <div className="flex items-center gap-3 flex-wrap">
                             <div className="flex items-center gap-1">
                               <NumInput value={watts[e.id]} min={0} max={5000}
-                                onCommit={(n) => setWatt(e.id, n)}
+                                onCommit={(n) => setW(e.id, n)}
                                 className={`w-16 h-7 ${inputCls}`} style={inputStyle} />
                               <span className="text-[11px] font-medium" style={{ color: T.muted }}>W</span>
                             </div>
