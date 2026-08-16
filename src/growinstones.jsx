@@ -1,18 +1,7 @@
-// ————————————————————————— ESP32 TELEMETRY & MQTT MONITOR —————————————————————————
+// ————————————————————————— ESP32 TELEMETRY & DYNAMIC MQTT MONITOR —————————————————————————
 function MQTTMonitorView({ currentUser, T, dark, showToast }) {
-  const [telemetry, setTelemetry] = useState({
-    temp: 24.5,
-    humidity: 62.0,
-    ph: 5.85,
-    ec: 1.65,
-    waterLevel: 85,
-    pumpWater: true,
-    pumpAir: true,
-    led: true,
-    exhaust: false,
-    timestamp: new Date().toLocaleTimeString()
-  });
-
+  const [telemetry, setTelemetry] = useState(null);
+  const [rawPayload, setRawPayload] = useState(null);
   const [logs, setLogs] = useState([]);
   const [isSimulating, setIsSimulating] = useState(false);
   const [codeModalOpen, setCodeModalOpen] = useState(false);
@@ -24,9 +13,11 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
         const result = await res.json();
         if (result.data) {
           setTelemetry({
-            ...result.data,
+            data: result.data,
+            topic: result.topic || `growinstones/${currentUser.username}/telemetry`,
             timestamp: new Date(result.timestamp || Date.now()).toLocaleTimeString()
           });
+          setRawPayload(result.data);
           setLogs((prev) => [
             { time: new Date().toLocaleTimeString(), topic: result.topic || `growinstones/${currentUser.username}/telemetry`, payload: JSON.stringify(result.data) },
             ...prev.slice(0, 15)
@@ -38,22 +29,26 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
 
   useEffect(() => {
     fetchTelemetry();
-    const interval = setInterval(fetchTelemetry, 4000);
+    const interval = setInterval(fetchTelemetry, 3000);
     return () => clearInterval(interval);
   }, [currentUser.username]);
 
   const simulateESP32Payload = async () => {
     setIsSimulating(true);
-    const mockData = {
-      temp: (23 + Math.random() * 3).toFixed(1),
-      humidity: (58 + Math.random() * 8).toFixed(1),
-      ph: (5.7 + Math.random() * 0.4).toFixed(2),
-      ec: (1.5 + Math.random() * 0.4).toFixed(2),
-      waterLevel: Math.floor(80 + Math.random() * 15),
-      pumpWater: true,
-      pumpAir: true,
-      led: true,
-      exhaust: Math.random() > 0.5
+    const mockCustomHardwareData = {
+      temperatura_ambiente: (23.5 + Math.random() * 3).toFixed(1),
+      umidade_ar: Math.floor(55 + Math.random() * 15),
+      ph_solucao: (5.8 + Math.random() * 0.4).toFixed(2),
+      ec_condutividade: (1.6 + Math.random() * 0.3).toFixed(2),
+      nivel_reservatorio_litros: Math.floor(85 + Math.random() * 20),
+      co2_ppm: Math.floor(800 + Math.random() * 250),
+      luminosidade_lux: Math.floor(12000 + Math.random() * 3000),
+      bomba_recirculante: true,
+      solenoide_oxigenacao: true,
+      painel_led_principal: true,
+      sistema_exaustao: Math.random() > 0.5,
+      status_esp32: "Online (Hardware Customizado)",
+      tensao_bateria_volts: 12.6
     };
 
     try {
@@ -63,91 +58,80 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
         body: JSON.stringify({
           username: currentUser.username,
           topic: `growinstones/${currentUser.username}/telemetry`,
-          data: mockData
+          data: mockCustomHardwareData
         })
       });
       if (res.ok) {
-        showToast("⚡ Mensagem ESP32 simulada enviada com sucesso!");
+        showToast("⚡ Pacote de hardware simulado enviado com sucesso!");
         fetchTelemetry();
       }
     } catch (e) {
-      showToast("Erro ao simular envio do ESP32.");
+      showToast("Erro ao simular envio.");
     } finally {
       setIsSimulating(false);
     }
   };
 
-  const esp32CodeSnippet = `// ——————————————————————————————————————————————————————————
-// OPÇÃO 1: CÓDIGO ESP32 USANDO MQTT NATIVO (PubSubClient - Porta 1883)
-// ——————————————————————————————————————————————————————————
-#include <WiFi.h>
-#include <PubSubClient.h>
-#include <ArduinoJson.h>
+  // Funcao para separar dinamicamente qualquer chave recebida do ESP32
+  const parseDynamicData = (data) => {
+    if (!data || typeof data !== "object") return { sensors: [], actuators: [], info: [] };
 
-const char* ssid         = "SUA_REDE_WIFI";
-const char* password     = "SENHA_DO_SEU_WIFI";
+    const sensors = [];
+    const actuators = [];
+    const info = [];
 
-const char* mqttServer   = "grow.thegrowinstones.com"; // ou IP 34.196.51.10
-const int   mqttPort     = 1883;                        // PORTA MQTT NATIVA
-const char* mqttTopic    = "growinstones/${currentUser.username}/telemetry";
+    // Colors list for dynamic metric cards
+    const cardColors = ["#38bdf8", "#34d399", "#f59e0b", "#a78bfa", "#f43f5e", "#fb923c", "#2dd4bf", "#818cf8"];
+    let colorIdx = 0;
 
-WiFiClient espClient;
-PubSubClient client(espClient);
+    Object.entries(data).forEach(([key, val]) => {
+      const label = key
+        .replace(/_/g, " ")
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .replace(/^./, (str) => str.toUpperCase());
 
-void setup() {
-  Serial.begin(115200);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) { delay(500); Serial.print("."); }
-  Serial.println("\\nWiFi Conectado!");
+      if (typeof val === "boolean") {
+        actuators.push({ key, label, val });
+      } else if (typeof val === "number" || (!isNaN(val) && typeof val === "string" && val.trim() !== "" && !isNaN(Number(val)))) {
+        const numVal = Number(val);
+        let unit = "";
+        const lower = key.toLowerCase();
+        if (lower.includes("temp") || lower.includes("temperatura")) unit = "°C";
+        else if (lower.includes("umid") || lower.includes("hum") || lower.includes("humidity")) unit = "%";
+        else if (lower.includes("ph")) unit = "pH";
+        else if (lower.includes("ec")) unit = "mS/cm";
+        else if (lower.includes("co2")) unit = "PPM";
+        else if (lower.includes("lux") || lower.includes("luz")) unit = "Lux";
+        else if (lower.includes("nivel") || lower.includes("level") || lower.includes("litro")) unit = lower.includes("litro") ? "L" : "%";
+        else if (lower.includes("vazao") || lower.includes("flow")) unit = "L/min";
+        else if (lower.includes("volt") || lower.includes("tensao")) unit = "V";
 
-  client.setServer(mqttServer, mqttPort);
-}
-
-void loop() {
-  if (!client.connected()) {
-    while (!client.connected()) {
-      Serial.print("Conectando ao Broker MQTT na porta 1883...");
-      if (client.connect("ESP32_GrowClient_${currentUser.username}")) {
-        Serial.println("Conectado!");
-      } else {
-        delay(2000);
+        sensors.push({ key, label, val: numVal, unit, color: cardColors[colorIdx % cardColors.length] });
+        colorIdx++;
+      } else if (val !== null && val !== undefined) {
+        info.push({ key, label, val: String(val) });
       }
-    }
-  }
-  client.loop();
+    });
 
-  StaticJsonDocument<256> doc;
-  doc["temp"]       = 24.5;
-  doc["humidity"]   = 62.0;
-  doc["ph"]         = 5.85;
-  doc["ec"]         = 1.65;
-  doc["waterLevel"] = 85;
-  doc["pumpWater"]  = true;
-  doc["pumpAir"]    = true;
-  doc["led"]        = true;
+    return { sensors, actuators, info };
+  };
 
-  char buffer[256];
-  serializeJson(doc, buffer);
-
-  client.publish(mqttTopic, buffer);
-  Serial.println("Mensagem enviada via MQTT Porta 1883!");
-
-  delay(5000);
-}`;
+  const currentPayload = telemetry ? telemetry.data : null;
+  const { sensors, actuators, info } = parseDynamicData(currentPayload);
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8 w-full">
+    <div className="max-w-6xl mx-auto px-6 py-8 w-full space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4 mb-8">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold" style={{ color: T.text }}>📡 Telemetria ESP32 / MQTT (Porta 1883)</h1>
+            <h1 className="text-2xl font-bold" style={{ color: T.text }}>📡 Inspeção Dinâmica de Telemetria ESP32</h1>
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> CONECTADO A PORTA 1883
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> RECEPTOR DINÂMICO ATIVO
             </span>
           </div>
           <p className="text-xs mt-1" style={{ color: T.textMuted }}>
-            Acompanhe a leitura dos sensores e estado dos relés enviados pelo microcontrolador ESP32 apontado para seu subdomínio.
+            Este painel escuta e renderiza automaticamente **qualquer chave ou formato de sensor** enviado pelo seu ESP32, sem necessidade de regras pre-setadas.
           </p>
         </div>
 
@@ -157,8 +141,8 @@ void loop() {
             className="px-4 py-2 rounded-xl text-xs font-bold transition-all shadow flex items-center gap-1.5"
             style={{ background: "#0284c7", color: "#ffffff" }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-            <span>Código ESP32</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
+            <span>Instruções de Envio MQTT/REST</span>
           </button>
 
           <button
@@ -167,110 +151,128 @@ void loop() {
             className="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
             style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
           >
-            <span>{isSimulating ? "Enviando..." : "⚡ Simular Mensagem ESP32"}</span>
+            <span>{isSimulating ? "Enviando..." : "⚡ Simular Payload Customizado"}</span>
           </button>
         </div>
       </div>
 
-      {/* Connection info bar */}
-      <div className="p-4 rounded-2xl mb-8 grid grid-cols-1 sm:grid-cols-3 gap-4" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+      {/* Connection Info Bar */}
+      <div className="p-4 rounded-2xl grid grid-cols-1 sm:grid-cols-3 gap-4" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30 shrink-0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
           </div>
           <div>
-            <div className="text-[11px] text-stone-400">Servidor MQTT (Host):</div>
-            <div className="text-xs font-bold text-sky-400 font-mono">grow.thegrowinstones.com</div>
+            <div className="text-[11px] text-stone-400">Broker MQTT Nativo (Porta 1883):</div>
+            <div className="text-xs font-bold text-sky-400 font-mono">grow.thegrowinstones.com:1883</div>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 shrink-0">
-            1883
+            #
           </div>
           <div>
-            <div className="text-[11px] text-stone-400">Porta MQTT TCP:</div>
-            <div className="text-xs font-bold text-emerald-400 font-mono">1883 (ou 8083 WS)</div>
+            <div className="text-[11px] text-stone-400">Tópico MQTT do Usuário:</div>
+            <div className="text-xs font-bold text-emerald-400 font-mono">growinstones/{currentUser.username}/telemetry</div>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 shrink-0">
-            #
+            ⏱️
           </div>
           <div>
-            <div className="text-[11px] text-stone-400">Tópico MQTT do Usuário:</div>
-            <div className="text-xs font-bold text-amber-400 font-mono">growinstones/{currentUser.username}/telemetry</div>
+            <div className="text-[11px] text-stone-400">Última Atualização Detectada:</div>
+            <div className="text-xs font-bold text-amber-400 font-mono">{telemetry ? telemetry.timestamp : "Aguardando..."}</div>
           </div>
         </div>
       </div>
 
-      {/* Sensor Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="p-5 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
-          <div className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: T.textMuted }}>Temperatura Ar</div>
-          <div className="text-3xl font-extrabold font-mono" style={{ color: "#38bdf8" }}>{telemetry.temp} °C</div>
-          <div className="text-[11px] mt-2" style={{ color: T.textMuted }}>Ideal: 21.0°C – 26.0°C</div>
-        </div>
-
-        <div className="p-5 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
-          <div className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: T.textMuted }}>Umidade Relativa</div>
-          <div className="text-3xl font-extrabold font-mono" style={{ color: "#34d399" }}>{telemetry.humidity} %</div>
-          <div className="text-[11px] mt-2" style={{ color: T.textMuted }}>Ideal: 55% – 70%</div>
-        </div>
-
-        <div className="p-5 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
-          <div className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: T.textMuted }}>pH da Solução</div>
-          <div className="text-3xl font-extrabold font-mono" style={{ color: "#f59e0b" }}>{telemetry.ph} pH</div>
-          <div className="text-[11px] mt-2" style={{ color: T.textMuted }}>Faixa ideal: 5.5 – 6.5</div>
-        </div>
-
-        <div className="p-5 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
-          <div className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: T.textMuted }}>Condutividade (EC)</div>
-          <div className="text-3xl font-extrabold font-mono" style={{ color: "#a78bfa" }}>{telemetry.ec} mS/cm</div>
-          <div className="text-[11px] mt-2" style={{ color: T.textMuted }}>Faixa ideal: 1.2 – 2.2</div>
-        </div>
+      {/* Seção 1: Sensores / Medições Numéricas Detectadas Dinamicamente */}
+      <div>
+        <h2 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.text }}>
+          <span>📊 Sensores & Métricas Detectados no ESP32 ({sensors.length})</span>
+        </h2>
+        {sensors.length === 0 ? (
+          <div className="p-8 rounded-2xl text-center" style={{ background: T.surface, border: `1px dashed ${T.border}` }}>
+            <p className="text-xs text-stone-400">Nenhum sensor numérico detectado ainda. Envie qualquer payload JSON contendo números a partir do seu ESP32!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {sensors.map((s) => (
+              <div key={s.key} className="p-5 rounded-2xl transition-all hover:scale-[1.02]" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+                <div className="text-xs font-bold uppercase tracking-wider mb-1 text-stone-400 truncate" title={s.key}>{s.label}</div>
+                <div className="text-3xl font-extrabold font-mono flex items-baseline gap-1" style={{ color: s.color }}>
+                  <span>{s.val}</span>
+                  {s.unit && <span className="text-xs font-normal text-stone-400">{s.unit}</span>}
+                </div>
+                <div className="text-[10px] font-mono text-stone-500 mt-2 truncate">Chave original: <code className="text-stone-300">{s.key}</code></div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Actuators & Relays Section */}
-      <div className="p-6 rounded-2xl mb-8" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
-        <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: T.text }}>Estado dos Atuadores (Relés ESP32)</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="p-3.5 rounded-xl border flex items-center justify-between" style={{ background: T.surface2, borderColor: T.border }}>
-            <span className="text-xs font-bold" style={{ color: T.text }}>Bomba d'Água</span>
-            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${telemetry.pumpWater ? "bg-emerald-500/20 text-emerald-400" : "bg-stone-500/20 text-stone-400"}`}>
-              {telemetry.pumpWater ? "LIGADO" : "DESLIGADO"}
-            </span>
+      {/* Seção 2: Atuadores / Relés (Boleanos) Detectados Dinamicamente */}
+      <div>
+        <h2 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.text }}>
+          <span>🔌 Atuadores & Relés Detectados ({actuators.length})</span>
+        </h2>
+        {actuators.length === 0 ? (
+          <div className="p-6 rounded-2xl text-center" style={{ background: T.surface, border: `1px dashed ${T.border}` }}>
+            <p className="text-xs text-stone-400">Nenhum relé/chave boleana (`true`/`false`) detectado no payload do ESP32.</p>
           </div>
-
-          <div className="p-3.5 rounded-xl border flex items-center justify-between" style={{ background: T.surface2, borderColor: T.border }}>
-            <span className="text-xs font-bold" style={{ color: T.text }}>Bomba de Ar</span>
-            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${telemetry.pumpAir ? "bg-emerald-500/20 text-emerald-400" : "bg-stone-500/20 text-stone-400"}`}>
-              {telemetry.pumpAir ? "LIGADO" : "DESLIGADO"}
-            </span>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {actuators.map((a) => (
+              <div key={a.key} className="p-4 rounded-2xl flex items-center justify-between" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+                <div>
+                  <div className="text-xs font-bold text-white truncate">{a.label}</div>
+                  <div className="text-[10px] font-mono text-stone-400">{a.key}</div>
+                </div>
+                <span className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono ${a.val ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-stone-500/20 text-stone-400 border border-stone-500/30"}`}>
+                  {a.val ? "LIGADO" : "DESLIGADO"}
+                </span>
+              </div>
+            ))}
           </div>
-
-          <div className="p-3.5 rounded-xl border flex items-center justify-between" style={{ background: T.surface2, borderColor: T.border }}>
-            <span className="text-xs font-bold" style={{ color: T.text }}>Painel LED</span>
-            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${telemetry.led ? "bg-emerald-500/20 text-emerald-400" : "bg-stone-500/20 text-stone-400"}`}>
-              {telemetry.led ? "LIGADO" : "DESLIGADO"}
-            </span>
-          </div>
-
-          <div className="p-3.5 rounded-xl border flex items-center justify-between" style={{ background: T.surface2, borderColor: T.border }}>
-            <span className="text-xs font-bold" style={{ color: T.text }}>Exaustor</span>
-            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${telemetry.exhaust ? "bg-emerald-500/20 text-emerald-400" : "bg-stone-500/20 text-stone-400"}`}>
-              {telemetry.exhaust ? "LIGADO" : "DESLIGADO"}
-            </span>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Incoming JSON Payload Logs Table */}
+      {/* Seção 3: Informações de Texto / Metadados do Dispositivo */}
+      {info.length > 0 && (
+        <div>
+          <h2 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.text }}>
+            <span>ℹ️ Metadados & Informações do Dispositivo ({info.length})</span>
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {info.map((item) => (
+              <div key={item.key} className="p-4 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+                <div className="text-xs font-bold text-stone-400 mb-1">{item.label}</div>
+                <div className="text-sm font-mono font-bold text-sky-400 truncate">{item.val}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Inspeção do JSON Bruto Recebido */}
+      <div className="p-6 rounded-2xl space-y-3" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-stone-300">📦 Inspeção do JSON Bruto Recebido do ESP32</h3>
+          <span className="text-[11px] font-mono text-emerald-400">JSON 100% Válido</span>
+        </div>
+        <pre className="p-4 rounded-xl font-mono text-xs text-emerald-400 overflow-x-auto max-h-60" style={{ background: "#0c0a09", border: "1px solid #292524" }}>
+          {currentPayload ? JSON.stringify(currentPayload, null, 2) : "// Nenhum payload recebido ainda."}
+        </pre>
+      </div>
+
+      {/* Histórico de Logs de Payloads Recebidos */}
       <div className="p-6 rounded-2xl" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
-        <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: T.text }}>Histórico de Payloads Recebidos (Feed)</h3>
+        <h3 className="text-xs font-bold uppercase tracking-wider mb-4 text-stone-300">📜 Histórico de Pacotes Recebidos (Feed)</h3>
         {logs.length === 0 ? (
-          <p className="text-xs" style={{ color: T.textMuted }}>Aguardando primeira mensagem do ESP32 ou clique em "Simular Mensagem ESP32".</p>
+          <p className="text-xs text-stone-400">Aguardando primeiras mensagens do ESP32...</p>
         ) : (
           <div className="space-y-2">
             {logs.map((log, i) => (
@@ -284,35 +286,30 @@ void loop() {
         )}
       </div>
 
-      {/* Code Modal */}
+      {/* Modal Instruções de Conexão */}
       {codeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
-          <div className="w-full max-w-2xl p-6 rounded-2xl text-left shadow-2xl relative space-y-4" style={{ background: "#1c1917", border: "1px solid #383532", color: "#f5f5f4" }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.88)", backdropFilter: "blur(8px)" }}>
+          <div className="w-full max-w-xl p-6 rounded-2xl text-left shadow-2xl relative space-y-4" style={{ background: "#1c1917", border: "1px solid #383532", color: "#f5f5f4" }}>
             <button onClick={() => setCodeModalOpen(false)} className="absolute top-4 right-4 text-stone-400 hover:text-white font-bold text-sm">✕</button>
 
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sky-400 bg-sky-500/10 border border-sky-500/30">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/></svg>
               </div>
               <div>
-                <h3 className="font-bold text-base text-white">Código C++ para ESP32 (Arduino IDE)</h3>
-                <p className="text-xs text-stone-400">Pré-configurado para enviar dados diretamente para o seu subdomínio</p>
+                <h3 className="font-bold text-base text-white">Como Apontar Seu Próprio ESP32</h3>
+                <p className="text-xs text-stone-400">Você não precisa alterar o firmware do seu ESP32. Basta apontar o Broker e Tópico existentes!</p>
               </div>
             </div>
 
-            <div className="relative">
-              <pre className="p-4 rounded-xl font-mono text-xs text-emerald-400 overflow-x-auto max-h-96" style={{ background: "#0c0a09", border: "1px solid #292524" }}>
-                {esp32CodeSnippet}
-              </pre>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(esp32CodeSnippet);
-                  showToast("✓ Código ESP32 copiado para a área de transferência!");
-                }}
-                className="absolute top-3 right-3 px-3 py-1.5 rounded-lg text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white shadow"
-              >
-                📋 Copiar Código
-              </button>
+            <div className="space-y-3 text-xs text-stone-300">
+              <div className="p-3.5 rounded-xl bg-stone-900 border border-stone-800 space-y-2 font-mono">
+                <div><b className="text-sky-400">Broker MQTT Server:</b> grow.thegrowinstones.com</div>
+                <div><b className="text-emerald-400">Porta MQTT TCP:</b> 1883</div>
+                <div><b className="text-amber-400">Tópico MQTT:</b> growinstones/{currentUser.username}/telemetry</div>
+                <div><b className="text-stone-300">Formato do Payload:</b> Qualquer JSON válido (objeto com chaves e valores)</div>
+              </div>
+              <p>O servidor escuta continuamente o tópico <code className="text-emerald-400 font-mono">growinstones/{currentUser.username}/telemetry</code> na porta **1883** e desenha automaticamente os cartões na tela conforme as chaves enviadas pelo seu ESP32.</p>
             </div>
           </div>
         </div>
@@ -323,1389 +320,7 @@ void loop() {
 
 
 
-import { useState, useMemo, useEffect, useRef } from "react";
-import Logo, { getLogoSvgString } from "./Logo";
-
-// ————— Dados de referência —————
-const POT_SIZES = [
-  { label: "3,5 L", liters: 3.5, diameter: 18, shape: "circle" },
-  { label: "7 L", liters: 7, diameter: 22, shape: "circle" },
-  { label: "11 L", liters: 11, diameter: 26, shape: "circle" },
-  { label: "15 L", liters: 15, diameter: 30, shape: "circle" },
-  { label: "20 L", liters: 20, diameter: 33, shape: "circle" },
-  { label: "30 L", liters: 30, diameter: 38, shape: "circle" },
-  { label: "40 L (60×40)", liters: 40, widthCm: 60, depthCm: 40, shape: "rect" },
-  { label: "50 L", liters: 50, diameter: 45, shape: "circle" },
-  { label: "80 L", liters: 80, diameter: 52, shape: "circle" },
-];
-
-const PIPE_GAUGES = [
-  { label: "10 mm", mm: 10, flow: "microduto · capilar / gotejamento ind." },
-  { label: "16 mm", mm: 16, flow: "baixo fluxo · gotejamento" },
-  { label: "20 mm", mm: 20, flow: "fluxo médio · até 8 vasos" },
-  { label: "25 mm", mm: 25, flow: "fluxo alto · até 16 vasos" },
-  { label: "32 mm", mm: 32, flow: "linha principal · 16+ vasos" },
-  { label: "50 mm", mm: 50, flow: "alta vazão / drenagem · 32+ vasos" },
-  { label: "75 mm", mm: 75, flow: "coletor / drenagem máster" },
-];
-
-const CONNECTIONS = [
-  { id: "espinha", name: "Espinha de peixe (linha central + ramais)", short: "Espinha", desc: "Linha principal central distribuindo para ramais laterais em cada vaso. Ótimo equilíbrio e distribuição de vazão." },
-  { id: "serpentina", name: "Serpentina (série)", short: "Série", desc: "Uma linha única passa vaso a vaso em zigue-zague. Econômica em tubulação, ideal para poucos vasos." },
-  { id: "paralelo", name: "Paralelo (manifold de alimentação)", short: "Paralelo", desc: "Manifold coletor distribuidor na frente alimentando linhas independentes por coluna com 1 saída de retorno ao tanque." },
-  { id: "anel", name: "Anel recirculante (RDWC)", short: "Anel", desc: "Circuito fechado ligando todos os vasos em loop com 1 retorno contínuo ao reservatório — padrão em DWC recirculante." },
-  { id: "gotejo_coletor", name: "Gotejo + Calha Central (drenagem)", short: "Calha", desc: "Irrigação por capilares e calha central de recolhimento que conduz a drenagem em 1 saída de volta ao reservatório." },
-  { id: "malha_grid", name: "Malha em Grid (pressurizada)", short: "Grid", desc: "Anel perimetral fechado equalizando a pressão de irrigação em todos os vasos sem perda de carga." },
-];
-
-const EQUIPMENT = [
-  { id: "led", name: "Board de LED", defW: 240, hours: 18, max: 8, defCost: 600 },
-  { id: "exaustor", name: "Exaustor", defW: 45, hours: 24, max: 4, defCost: 250 },
-  { id: "filtro", name: "Filtro de carvão", defW: 0, hours: 0, max: 4, defCost: 180 },
-  { id: "ventilador", name: "Ventilador de circulação", defW: 25, hours: 24, max: 6, defCost: 90 },
-  { id: "bombaAgua", name: "Bomba de água", defW: 35, hours: 24, max: 4, defCost: 120 },
-  { id: "bombaAr", name: "Bomba de ar", defW: 8, hours: 24, max: 4, defCost: 60 },
-  { id: "tanque", name: "Tanque / reservatório extra", defW: 0, hours: 0, max: 3, defCost: 100 },
-  { id: "umidificador", name: "Umidificador", defW: 30, hours: 12, max: 2, defCost: 250 },
-  { id: "desumidificador", name: "Desumidificador", defW: 200, hours: 8, max: 2, defCost: 900 },
-  { id: "aquecedor", name: "Aquecedor", defW: 500, hours: 6, max: 2, defCost: 150 },
-  { id: "phec", name: "Medidor pH / EC", defW: 2, hours: 24, max: 2, defCost: 200 },
-  { id: "timer", name: "Timer digital", defW: 1, hours: 24, max: 8, defCost: 30 },
-];
-
-const BASE_COSTS = { pot: 15, pipeM: 4, fitting: 3, reservoir: 120 };
-
-const INITIAL_PRESETS = [
-  {
-    id: "preset-micro",
-    name: "Micro · 2 vasos DWC",
-    apply: { width: 80, depth: 80, height: 180, potCount: 2, potIdx: 4, gaugeIdx: 2, spacing: 20, cols: 0, conn: "anel" },
-    equip: { led: 1, exaustor: 1, filtro: 1, ventilador: 1, bombaAgua: 0, bombaAr: 1, tanque: 1, umidificador: 0, desumidificador: 0, aquecedor: 0, phec: 1, timer: 1 },
-    data: {
-      growName: "Micro · 2 vasos DWC",
-      width: 80, depth: 80, height: 180, potCount: 2, potIdx: 4, gaugeIdx: 2, spacing: 20, cols: 0, conn: "anel",
-      equip: { led: 1, exaustor: 1, filtro: 1, ventilador: 1, bombaAgua: 0, bombaAr: 1, tanque: 1, umidificador: 0, desumidificador: 0, aquecedor: 0, phec: 1, timer: 1 },
-      vegaHours: 18, floraHours: 12, vegaDays: 30, floraDays: 60, yieldPerPlant: 80, priceG: 50, tariff: 0.95,
-    }
-  },
-  {
-    id: "preset-padrao",
-    name: "Padrão · 8 vasos gotejo",
-    apply: { width: 240, depth: 120, height: 200, potCount: 8, potIdx: 2, gaugeIdx: 2, spacing: 15, cols: 4, conn: "espinha" },
-    equip: { led: 2, exaustor: 1, filtro: 1, ventilador: 2, bombaAgua: 1, bombaAr: 1, tanque: 1, umidificador: 0, desumidificador: 0, aquecedor: 0, phec: 1, timer: 2 },
-    data: {
-      growName: "Padrão · 8 vasos gotejo",
-      width: 240, depth: 120, height: 200, potCount: 8, potIdx: 2, gaugeIdx: 2, spacing: 15, cols: 4, conn: "espinha",
-      equip: { led: 2, exaustor: 1, filtro: 1, ventilador: 2, bombaAgua: 1, bombaAr: 1, tanque: 1, umidificador: 0, desumidificador: 0, aquecedor: 0, phec: 1, timer: 2 },
-      vegaHours: 18, floraHours: 12, vegaDays: 30, floraDays: 60, yieldPerPlant: 80, priceG: 50, tariff: 0.95,
-    }
-  },
-  {
-    id: "preset-ampla",
-    name: "Ampla · 16 vasos",
-    apply: { width: 300, depth: 150, height: 220, potCount: 16, potIdx: 1, gaugeIdx: 3, spacing: 12, cols: 0, conn: "paralelo" },
-    equip: { led: 4, exaustor: 2, filtro: 2, ventilador: 3, bombaAgua: 2, bombaAr: 2, tanque: 2, umidificador: 1, desumidificador: 0, aquecedor: 0, phec: 1, timer: 4 },
-    data: {
-      growName: "Ampla · 16 vasos",
-      width: 300, depth: 150, height: 220, potCount: 16, potIdx: 1, gaugeIdx: 3, spacing: 12, cols: 0, conn: "paralelo",
-      equip: { led: 4, exaustor: 2, filtro: 2, ventilador: 3, bombaAgua: 2, bombaAr: 2, tanque: 2, umidificador: 1, desumidificador: 0, aquecedor: 0, phec: 1, timer: 4 },
-      vegaHours: 18, floraHours: 12, vegaDays: 30, floraDays: 60, yieldPerPlant: 80, priceG: 50, tariff: 0.95,
-    }
-  },
-];
-const PRESETS = INITIAL_PRESETS;
-
-const fmtBRL = (v) => {
-  if (!isFinite(v)) return "R$ 0";
-  const abs = Math.abs(v);
-  if (abs > 0 && abs < 1) {
-    return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-  return Math.round(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 });
-};
-const fmtG = (v) => {
-  if (!isFinite(v)) return "0 g";
-  if (v >= 1000) {
-    const kg = v / 1000;
-    return `${kg.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg`;
-  }
-  return `${Math.round(v)} g`;
-};
-
-
-
-// Inputs com rascunho local: permitem digitar livremente e só normalizam ao sair do campo
-function NumInput({ value, onCommit, min = 0, max = 999999, className, style }) {
-  const [draft, setDraft] = useState(null); // null = não está editando
-  const clamp = (n) => Math.min(max, Math.max(min, n));
-  return (
-    <input
-      type="number"
-      inputMode="numeric"
-      value={draft !== null ? draft : value}
-      min={min}
-      max={max}
-      className={className}
-      style={style}
-      onFocus={(e) => setDraft(String(value))}
-      onChange={(e) => {
-        const v = e.target.value;
-        setDraft(v);
-        const n = Number(v);
-        if (v !== "" && isFinite(n)) onCommit(clamp(n));
-      }}
-      onBlur={() => {
-        const n = Number(draft);
-        if (draft !== null && draft !== "" && isFinite(n)) onCommit(clamp(n));
-        setDraft(null);
-      }}
-    />
-  );
-}
-
-function MoneyInput({ value, onCommit, className, style }) {
-  const [draft, setDraft] = useState(null);
-  return (
-    <input
-      type="number"
-      inputMode="decimal"
-      step="0.01"
-      min={0}
-      value={draft !== null ? draft : value}
-      className={className}
-      style={style}
-      onFocus={() => setDraft(String(value))}
-      onChange={(e) => {
-        const v = e.target.value;
-        setDraft(v);
-        const n = Number(v);
-        if (v !== "" && isFinite(n) && n >= 0) onCommit(n);
-      }}
-      onBlur={() => {
-        const n = Number(draft);
-        if (draft !== null && draft !== "" && isFinite(n) && n >= 0) onCommit(n);
-        setDraft(null);
-      }}
-    />
-  );
-}
-
-function IsometricPotSVG({ potW, potD, potH, potLiters, isRect, isSquare, dark, T }) {
-  const svgW = 320;
-  const svgH = 180;
-
-  const isBox = isRect || isSquare;
-
-  // Calculo de escala proporcional dinamica para caber 100% no canvas
-  const scaleX = 200 / ((potW + potD) * 0.866);
-  const scaleY = 110 / (potH * 0.85 + (potW + potD) * 0.5);
-  const scale = Math.min(1.4, Math.max(0.4, scaleX, scaleY));
-
-  const cos30 = 0.866;
-  const sin30 = 0.5;
-
-  const kX = cos30 * scale;
-  const kY = sin30 * scale;
-  const kZ = 0.85 * scale;
-
-  const dxX = potW * kX;
-  const dyX = potW * kY;
-  const dxY = potD * kX;
-  const dyY = potD * kY;
-  const dz = potH * kZ;
-
-  // Centralização geométrica exata dentro do viewBox 320x180
-  const cx = 160 + (dxY - dxX) / 2;
-  const cy = 90 + (dz - (dyX + dyY)) / 2 + 5;
-
-  const strokeColor = dark ? "#e4e4e7" : "#475569";
-  const rimColor = dark ? "#52525b" : "#cbd5e1";
-  const sideLeftFill = dark ? "#27272a" : "#e2e8f0";
-  const sideRightFill = dark ? "#3f3f46" : "#ffffff";
-  const topFill = dark ? "#1c1917" : "#fef3c7";
-  const soilInner = dark ? "#292524" : "#d97706";
-  const cotaColor = dark ? "#fbbf24" : "#b45309";
-  const cotaLine = dark ? "#f59e0b" : "#d97706";
-
-  if (isBox) {
-    const p0 = [cx, cy];
-    const p1 = [cx + dxX, cy + dyX];
-    const p2 = [cx + dxX - dxY, cy + dyX + dyY];
-    const p3 = [cx - dxY, cy + dyY];
-
-    const t0 = [cx, cy - dz];
-    const t1 = [cx + dxX, cy + dyX - dz];
-    const t2 = [cx + dxX - dxY, cy + dyX + dyY - dz];
-    const t3 = [cx - dxY, cy + dyY - dz];
-
-    const insetRatio = 0.12;
-    const i0 = [t0[0] + (t2[0] - t0[0]) * insetRatio, t0[1] + (t2[1] - t0[1]) * insetRatio];
-    const i1 = [t1[0] + (t3[0] - t1[0]) * insetRatio, t1[1] + (t3[1] - t1[1]) * insetRatio];
-    const i2 = [t2[0] + (t0[0] - t2[0]) * insetRatio, t2[1] + (t0[1] - t2[1]) * insetRatio];
-    const i3 = [t3[0] + (t1[0] - t3[0]) * insetRatio, t3[1] + (t1[1] - t3[1]) * insetRatio];
-
-    return (
-      <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full h-auto max-w-[320px] mx-auto block">
-        {/* Sombra da base no chão */}
-        <polygon points={`${p0[0]},${p0[1]} ${p1[0]},${p1[1]} ${p2[0]},${p2[1]} ${p3[0]},${p3[1]}`} fill="rgba(0,0,0,0.12)" />
-
-        {/* Linhas ocultas da estrutura traseira (Tracejadas 3D) */}
-        <line x1={p2[0]} y1={p2[1]} x2={p1[0]} y2={p1[1]} stroke={strokeColor} strokeWidth={1} strokeDasharray="3 3" opacity={0.45} />
-        <line x1={p2[0]} y1={p2[1]} x2={p3[0]} y2={p3[1]} stroke={strokeColor} strokeWidth={1} strokeDasharray="3 3" opacity={0.45} />
-        <line x1={p2[0]} y1={p2[1]} x2={t2[0]} y2={t2[1]} stroke={strokeColor} strokeWidth={1} strokeDasharray="3 3" opacity={0.45} />
-
-        {/* Face Esquerda (Frente-Esquerda) */}
-        <polygon points={`${p0[0]},${p0[1]} ${p3[0]},${p3[1]} ${t3[0]},${t3[1]} ${t0[0]},${t0[1]}`}
-          fill={sideLeftFill} stroke={strokeColor} strokeWidth={1.5} strokeLinejoin="round" />
-
-        {/* Face Direita (Frente-Direita) */}
-        <polygon points={`${p0[0]},${p0[1]} ${p1[0]},${p1[1]} ${t1[0]},${t1[1]} ${t0[0]},${t0[1]}`}
-          fill={sideRightFill} stroke={strokeColor} strokeWidth={1.5} strokeLinejoin="round" />
-
-        {/* Face do Topo (Borda do Vaso) */}
-        <polygon points={`${t0[0]},${t0[1]} ${t1[0]},${t1[1]} ${t2[0]},${t2[1]} ${t3[0]},${t3[1]}`}
-          fill={rimColor} stroke={strokeColor} strokeWidth={1.5} strokeLinejoin="round" />
-
-        {/* Vincos dos Cantos da Borda Interna */}
-        <line x1={t0[0]} y1={t0[1]} x2={i0[0]} y2={i0[1]} stroke={strokeColor} strokeWidth={1} />
-        <line x1={t1[0]} y1={t1[1]} x2={i1[0]} y2={i1[1]} stroke={strokeColor} strokeWidth={1} />
-        <line x1={t2[0]} y1={t2[1]} x2={i2[0]} y2={i2[1]} stroke={strokeColor} strokeWidth={1} />
-        <line x1={t3[0]} y1={t3[1]} x2={i3[0]} y2={i3[1]} stroke={strokeColor} strokeWidth={1} />
-
-        {/* Substrato no topo */}
-        <polygon points={`${i0[0]},${i0[1]} ${i1[0]},${i1[1]} ${i2[0]},${i2[1]} ${i3[0]},${i3[1]}`}
-          fill={topFill} stroke={soilInner} strokeWidth={1.2} />
-
-        {/* Linhas estruturais externas principais reforçadas */}
-        <line x1={p0[0]} y1={p0[1]} x2={t0[0]} y2={t0[1]} stroke={strokeColor} strokeWidth={1.8} />
-        <line x1={p1[0]} y1={p1[1]} x2={t1[0]} y2={t1[1]} stroke={strokeColor} strokeWidth={1.8} />
-        <line x1={p3[0]} y1={p3[1]} x2={t3[0]} y2={t3[1]} stroke={strokeColor} strokeWidth={1.8} />
-        <line x1={p0[0]} y1={p0[1]} x2={p1[0]} y2={p1[1]} stroke={strokeColor} strokeWidth={1.8} />
-        <line x1={p0[0]} y1={p0[1]} x2={p3[0]} y2={p3[1]} stroke={strokeColor} strokeWidth={1.8} />
-        <line x1={t0[0]} y1={t0[1]} x2={t1[0]} y2={t1[1]} stroke={strokeColor} strokeWidth={1.8} />
-        <line x1={t0[0]} y1={t0[1]} x2={t3[0]} y2={t3[1]} stroke={strokeColor} strokeWidth={1.8} />
-        <line x1={t1[0]} y1={t1[1]} x2={t2[0]} y2={t2[1]} stroke={strokeColor} strokeWidth={1.8} />
-        <line x1={t3[0]} y1={t3[1]} x2={t2[0]} y2={t2[1]} stroke={strokeColor} strokeWidth={1.8} />
-
-        {/* Cota Largura (Frente-Direita) */}
-        <g>
-          <line x1={p0[0]} y1={p0[1] + 6} x2={p1[0]} y2={p1[1] + 6} stroke={cotaLine} strokeWidth={1.2} strokeDasharray="3 2" />
-          <rect x={(p0[0] + p1[0]) / 2 - 18} y={(p0[1] + p1[1]) / 2 + 1} width={36} height={13} rx={3} fill={T.surface} opacity={0.92} />
-          <text x={(p0[0] + p1[0]) / 2} y={(p0[1] + p1[1]) / 2 + 10} textAnchor="middle" fontSize="9" fontWeight="700" fill={cotaColor}>
-            {potW} cm
-          </text>
-        </g>
-        {/* Cota Comprimento / Profundidade (Frente-Esquerda) */}
-        <g>
-          <line x1={p0[0]} y1={p0[1] + 6} x2={p3[0]} y2={p3[1] + 6} stroke={cotaLine} strokeWidth={1.2} strokeDasharray="3 2" />
-          <rect x={(p0[0] + p3[0]) / 2 - 18} y={(p0[1] + p3[1]) / 2 + 1} width={36} height={13} rx={3} fill={T.surface} opacity={0.92} />
-          <text x={(p0[0] + p3[0]) / 2} y={(p0[1] + p3[1]) / 2 + 10} textAnchor="middle" fontSize="9" fontWeight="700" fill={cotaColor}>
-            {potD} cm
-          </text>
-        </g>
-        {/* Cota Altura (Vertical Frontal) */}
-        <g>
-          <line x1={p0[0] - 8} y1={p0[1]} x2={t0[0] - 8} y2={t0[1]} stroke={cotaLine} strokeWidth={1.2} strokeDasharray="3 2" />
-          <rect x={p0[0] - 38} y={(p0[1] + t0[1]) / 2 - 6} width={36} height={13} rx={3} fill={T.surface} opacity={0.92} />
-          <text x={p0[0] - 20} y={(p0[1] + t0[1]) / 2 + 3} textAnchor="middle" fontSize="9" fontWeight="700" fill={cotaColor}>
-            {potH} cm
-          </text>
-        </g>
-
-        {/* Badge Litragem */}
-        <g transform="translate(232, 12)">
-          <rect width="76" height="24" rx="12" fill={T.accentBg} stroke={T.accentBorder} strokeWidth="1.2" />
-          <text x="38" y="16" textAnchor="middle" fontSize="10.5" fontWeight="800" fill={T.text}>
-            {potLiters} L
-          </text>
-        </g>
-      </svg>
-    );
-  }
-
-  const cylRadius = (potW / 2) * scale;
-  const rx = cylRadius * 1.15;
-  const ry = cylRadius * 0.55;
-  const roundCy = 90 + (dz / 2) - 4;
-  const topCy = roundCy - dz;
-
-  return (
-    <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full h-auto max-w-[320px] mx-auto block">
-      {/* Sombra no chão */}
-      <ellipse cx={160} cy={roundCy} rx={rx * 1.05} ry={ry * 1.05} fill="rgba(0,0,0,0.12)" />
-
-      {/* Arco traseiro oculto da base (Tracejado 3D) */}
-      <path
-        d={`M ${160 - rx} ${roundCy} A ${rx} ${ry} 0 0 1 ${160 + rx} ${roundCy}`}
-        fill="none" stroke={strokeColor} strokeWidth={1} strokeDasharray="3 3" opacity={0.45}
-      />
-
-      {/* Corpo do Cilindro */}
-      <path
-        d={`M ${160 - rx} ${topCy} L ${160 - rx} ${roundCy} A ${rx} ${ry} 0 0 0 ${160 + rx} ${roundCy} L ${160 + rx} ${topCy} Z`}
-        fill={sideRightFill} stroke={strokeColor} strokeWidth={1.8} strokeLinejoin="round"
-      />
-
-      {/* Borda superior externa */}
-      <ellipse cx={160} cy={topCy} rx={rx} ry={ry} fill={rimColor} stroke={strokeColor} strokeWidth={1.8} />
-
-      {/* Substrato interno */}
-      <ellipse cx={160} cy={topCy} rx={rx * 0.85} ry={ry * 0.85} fill={topFill} stroke={soilInner} strokeWidth={1.2} />
-
-      {/* Linhas verticais de contorno reforçadas */}
-      <line x1={160 - rx} y1={topCy} x2={160 - rx} y2={roundCy} stroke={strokeColor} strokeWidth={1.8} />
-      <line x1={160 + rx} y1={topCy} x2={160 + rx} y2={roundCy} stroke={strokeColor} strokeWidth={1.8} />
-
-      <g>
-        <line x1={160 - rx} y1={topCy - ry - 6} x2={160 + rx} y2={topCy - ry - 6} stroke={cotaLine} strokeWidth={1.2} strokeDasharray="3 2" />
-        <rect x={160 - 24} y={topCy - ry - 14} width={48} height={13} rx={3} fill={T.surface} opacity={0.92} />
-        <text x={160} y={topCy - ry - 4} textAnchor="middle" fontSize="9" fontWeight="700" fill={cotaColor}>
-          ⌀ {potW} cm
-        </text>
-      </g>
-      <g>
-        <line x1={160 - rx - 8} y1={roundCy} x2={160 - rx - 8} y2={topCy} stroke={cotaLine} strokeWidth={1.2} strokeDasharray="3 2" />
-        <rect x={160 - rx - 40} y={(roundCy + topCy) / 2 - 6} width={36} height={13} rx={3} fill={T.surface} opacity={0.92} />
-        <text x={160 - rx - 22} y={(roundCy + topCy) / 2 + 3} textAnchor="middle" fontSize="9" fontWeight="700" fill={cotaColor}>
-          {potH} cm
-        </text>
-      </g>
-
-      <g transform="translate(232, 12)">
-        <rect width="76" height="24" rx="12" fill={T.accentBg} stroke={T.accentBorder} strokeWidth="1.2" />
-        <text x="38" y="16" textAnchor="middle" fontSize="10.5" fontWeight="800" fill={T.text}>
-          {potLiters} L
-        </text>
-      </g>
-    </svg>
-  );
-}
-
-function CollapsibleCard({ title, subtitle, defaultOpen = true, children, action, className = "", T, dark }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <section className={`rounded-2xl transition-all duration-200 ${open ? "p-5" : "px-5 py-3.5"} ${className}`}
-      style={{
-        background: T.surface,
-        border: `1px solid ${T.borderSoft}`,
-        boxShadow: dark ? "none" : "0 1px 2px rgba(31,27,22,0.04)"
-      }}>
-      <div
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center justify-between cursor-pointer select-none group">
-        <div className="flex items-center gap-2.5 min-w-0 pr-2">
-          <h2 className="text-[11px] font-semibold uppercase tracking-wider transition-colors group-hover:text-amber-500"
-            style={{ color: T.faint, letterSpacing: "0.14em" }}>
-            {title}
-          </h2>
-          {!open && subtitle && (
-            <span className="text-xs font-medium truncate px-2.5 py-0.5 rounded-md"
-              style={{ background: T.surface2, color: T.text, border: `1px solid ${T.border}` }}>
-              {subtitle}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
-          {action}
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            title={open ? "Recolher card" : "Expandir card"}
-            aria-label={open ? "Recolher card" : "Expandir card"}
-            className="w-6 h-6 rounded-md flex items-center justify-center transition-transform hover:opacity-80"
-            style={{ background: T.surface2, color: T.muted, border: `1px solid ${T.border}` }}>
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.2s" }}>
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      {open && <div className="mt-4">{children}</div>}
-    </section>
-  );
-}
-
-
-const calculatePresetMetrics = (preset) => {
-  const data = preset.data || {};
-  const apply = preset.apply || {};
-  const equipData = preset.equip || data.equip || {};
-
-  const w = data.width || apply.width || 240;
-  const d = data.depth || apply.depth || 120;
-  const h = data.height || apply.height || 200;
-  const potCount = data.potCount || apply.potCount || 8;
-  const potIdx = data.potIdx !== undefined ? data.potIdx : (apply.potIdx !== undefined ? apply.potIdx : 2);
-
-  const isCustomPot = potIdx >= POT_SIZES.length;
-  let potObj;
-  if (isCustomPot) {
-    const cW = data.customPotW !== undefined ? data.customPotW : (apply.customPotW !== undefined ? apply.customPotW : 30);
-    const cL = data.customPotL !== undefined ? data.customPotL : (apply.customPotL !== undefined ? apply.customPotL : 30);
-    const cH = data.customPotH !== undefined ? data.customPotH : (apply.customPotH !== undefined ? apply.customPotH : 30);
-    const customLiters = Math.round(((cW * cL * cH) / 1000) * 10) / 10;
-    potObj = {
-      label: `${customLiters} L (Custom)`,
-      liters: customLiters,
-      widthCm: cW,
-      depthCm: cL,
-      heightCm: cH,
-      isCustom: true,
-    };
-  } else {
-    potObj = POT_SIZES[potIdx] || POT_SIZES[2];
-  }
-
-  const areaM2 = (w * d) / 10000;
-  const volM3 = (areaM2 * h) / 100;
-
-  const yPerPlant = data.yieldPerPlant !== undefined ? data.yieldPerPlant : 80;
-  const pG = data.priceG !== undefined ? data.priceG : 50;
-  const trf = data.tariff !== undefined ? data.tariff : 0.95;
-
-  const vDays = data.vegaDays !== undefined ? data.vegaDays : 30;
-  const fDays = data.floraDays !== undefined ? data.floraDays : 60;
-  const cDays = Math.max(1, vDays + fDays);
-  const hYear = 365 / cDays;
-
-  const yieldHarvestG = potCount * yPerPlant;
-  const yieldYearG = yieldHarvestG * hYear;
-  const yieldM2 = areaM2 > 0 ? yieldHarvestG / areaM2 : 0;
-
-  const wattsMap = data.watts || Object.fromEntries(EQUIPMENT.map((e) => [e.id, e.defW]));
-  let totalW = 0;
-  EQUIPMENT.forEach((eq) => {
-    const qty = equipData[eq.id] || 0;
-    const wVal = wattsMap[eq.id] || eq.defW;
-    totalW += qty * wVal;
-  });
-
-  const gPerW = totalW > 0 ? yieldYearG / totalW : 0;
-
-  const costsMap = data.costs || { ...BASE_COSTS, ...Object.fromEntries(EQUIPMENT.map((e) => [e.id, e.defCost])) };
-  let capex = 0;
-  capex += potCount * (costsMap.pot || 15);
-  capex += (w / 100) * 2 * (costsMap.pipeM || 4);
-  capex += potCount * 2 * (costsMap.fitting || 3);
-  capex += costsMap.reservoir || 120;
-  EQUIPMENT.forEach((eq) => {
-    const qty = equipData[eq.id] || 0;
-    const unitCost = costsMap[eq.id] || eq.defCost;
-    capex += qty * unitCost;
-  });
-  capex += data.extraCost || 0;
-
-  const capexPerPlant = potCount > 0 ? capex / potCount : 0;
-
-  const vHours = data.vegaHours || 18;
-  const fHours = data.floraHours || 12;
-  const avgHoursDay = cDays > 0 ? (vDays * vHours + fDays * fHours) / cDays : 18;
-  const kwhMonth = (totalW * avgHoursDay * 30) / 1000;
-  const energyCostMonth = kwhMonth * trf;
-  const monthlyInsumos = data.monthlyCost || 0;
-  const opexMonth = energyCostMonth + monthlyInsumos;
-  const opexCycle = opexMonth * (cDays / 30);
-  const opexYear = opexMonth * 12;
-
-  const revHarvest = yieldHarvestG * pG;
-  const revYear = yieldYearG * pG;
-  const netProfitYear = revYear - opexYear;
-  const profitHarvest = revHarvest - opexCycle;
-  const paybackMonths = profitHarvest > 0 ? capex / (profitHarvest / (cDays / 30)) : null;
-
-  // Cost-to-Return & Cost per Gram Ratios
-  const ratioHarvest = opexCycle > 0 && pG > 0 ? revHarvest / opexCycle : 0;
-  const ratioYear = opexYear > 0 && pG > 0 ? revYear / opexYear : 0;
-  const capexRoiYear = capex > 0 && pG > 0 ? (netProfitYear / capex) * 100 : 0;
-  const costPerGramOpex = yieldYearG > 0 ? opexYear / yieldYearG : 0;
-  const costPerGramTotal = yieldYearG > 0 ? (capex + opexYear) / yieldYearG : 0;
-
-  return {
-    id: preset.id || preset.name,
-    name: preset.name,
-    width: w, depth: d, height: h,
-    areaM2, volM3,
-    potCount, potLabel: potObj.label,
-    yPerPlant,
-    cDays, hYear,
-    yieldHarvestG, yieldYearG, yieldM2,
-    totalW, gPerW,
-    kwhMonth, opexMonth, opexCycle, opexYear,
-    capex, capexPerPlant,
-    priceG: pG,
-    revHarvest, revYear,
-    netProfitYear, profitHarvest, paybackMonths,
-    ratioHarvest, ratioYear, capexRoiYear,
-    costPerGramOpex, costPerGramTotal,
-  };
-};
-
-function ComparisonView({ allPresets, loadPreset, removePreset, restoreDefaultPresets, addCurrentAsPreset, T, dark }) {
-  const [compMode, setCompMode] = useState("all"); // "all" | "custom" | "individual"
-  const [selectedIds, setSelectedIds] = useState(() => allPresets.map((p) => p.id || p.name));
-  const [singleId, setSingleId] = useState(() => (allPresets.length > 0 ? (allPresets[0].id || allPresets[0].name) : ""));
-
-  useEffect(() => {
-    if (compMode === "all") {
-      setSelectedIds(allPresets.map((p) => p.id || p.name));
-    }
-  }, [allPresets, compMode]);
-
-  if (!allPresets || allPresets.length === 0) {
-    return (
-      <div className="rounded-2xl p-12 text-center my-8" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
-        <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: T.surface, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="20" x2="18" y2="10"/>
-            <line x1="12" y1="20" x2="12" y2="4"/>
-            <line x1="6" y1="20" x2="6" y2="14"/>
-          </svg>
-        </div>
-        <h3 className="text-xl font-bold mb-2" style={{ color: T.text }}>Nenhum chip de setup para comparar</h3>
-        <p className="text-sm max-w-md mx-auto mb-6" style={{ color: T.muted }}>
-          Adicione o setup atual como um novo chip ou restaure os presets padrão para visualizar gráficos e tabelas comparativas.
-        </p>
-        <div className="flex items-center justify-center gap-3 flex-wrap">
-          <button onClick={addCurrentAsPreset} className="px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
-            style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <span>Salvar setup atual como chip</span>
-          </button>
-          <button onClick={restoreDefaultPresets} className="px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
-            style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-            <span>Restaurar presets padrão</span>
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const toggleSelectId = (id) => {
-    if (selectedIds.includes(id)) {
-      if (selectedIds.length === 1) return;
-      setSelectedIds(selectedIds.filter((x) => x !== id));
-    } else {
-      setSelectedIds([...selectedIds, id]);
-    }
-  };
-
-  const allMetrics = allPresets.map((p) => calculatePresetMetrics(p));
-
-  const activeMetricsList = compMode === "individual"
-    ? allMetrics.filter((m) => m.id === (singleId || (allPresets[0].id || allPresets[0].name)))
-    : compMode === "custom"
-    ? allMetrics.filter((m) => selectedIds.includes(m.id))
-    : allMetrics;
-
-  const metricsList = activeMetricsList.length > 0 ? activeMetricsList : allMetrics;
-
-  const topYield = [...metricsList].sort((a, b) => b.yieldYearG - a.yieldYearG)[0];
-  const lowestCapex = [...metricsList].sort((a, b) => a.capex - b.capex)[0];
-  const lowestCostPerG = [...metricsList].sort((a, b) => a.costPerGramOpex - b.costPerGramOpex)[0];
-  const topEfficiency = [...metricsList].sort((a, b) => b.gPerW - a.gPerW)[0];
-  const validPaybackList = metricsList.filter((m) => m.paybackMonths && m.paybackMonths > 0);
-  const lowestPayback = validPaybackList.length > 0 ? [...validPaybackList].sort((a, b) => a.paybackMonths - b.paybackMonths)[0] : null;
-
-  const maxYieldG = Math.max(...metricsList.map((m) => m.yieldYearG), 1);
-  const maxCapex = Math.max(...metricsList.map((m) => m.capex), 1);
-  const maxOpex = Math.max(...metricsList.map((m) => m.opexMonth), 1);
-  const maxRatioHarvest = Math.max(...metricsList.map((m) => m.ratioHarvest), 1);
-  const maxRatioYear = Math.max(...metricsList.map((m) => m.ratioYear), 1);
-  const maxCostPerG = Math.max(...metricsList.map((m) => m.costPerGramOpex), 1);
-
-  const singlePresetMetrics = allMetrics.find((m) => m.id === singleId) || allMetrics[0];
-  const otherMetrics = allMetrics.filter((m) => m.id !== singlePresetMetrics.id);
-  const otherPresetsAverage = otherMetrics.length > 0
-    ? {
-        yieldYearG: otherMetrics.reduce((acc, m) => acc + m.yieldYearG, 0) / otherMetrics.length,
-        capex: otherMetrics.reduce((acc, m) => acc + m.capex, 0) / otherMetrics.length,
-        opexMonth: otherMetrics.reduce((acc, m) => acc + m.opexMonth, 0) / otherMetrics.length,
-        costPerGramOpex: otherMetrics.reduce((acc, m) => acc + m.costPerGramOpex, 0) / otherMetrics.length,
-      }
-    : null;
-
-  // Soft Pastel Palette (Theme-aware for maximum legibility and elegance)
-  const pastelMintText = dark ? "#a3e635" : "#15803d";
-  const pastelMintBar = dark ? "#a3e635" : "#86efac";
-  const pastelMintBg = dark ? "rgba(163, 230, 53, 0.1)" : "rgba(21, 128, 61, 0.08)";
-
-  const pastelPeachText = dark ? "#fde047" : "#b45309";
-  const pastelPeachBar = dark ? "#fef08a" : "#fde047";
-
-  const pastelSkyText = dark ? "#7dd3fc" : "#0284c7";
-  const pastelSkyBar = dark ? "#bae6fd" : "#7dd3fc";
-
-  const pastelLavenderText = dark ? "#c7d2fe" : "#4338ca";
-  const pastelLavenderBar = dark ? "#c7d2fe" : "#a5b4fc";
-
-  return (
-    <div className="space-y-6 my-4">
-      {/* Top Header Toolbar & Mode Switcher */}
-      <div className="p-5 rounded-2xl space-y-4" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2" style={{ color: T.text }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-              <span>Painel Comparativo de Setups</span>
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full"
-                style={{ background: T.surface, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-                {metricsList.length} de {allPresets.length} setup(s) em análise
-              </span>
-            </h2>
-            <p className="text-xs mt-1" style={{ color: T.muted }}>
-              Visualização gráfica e tabular das métricas resultantes de cada chip de cultivo.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button onClick={addCurrentAsPreset} className="px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
-              style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              <span>Salvar setup atual</span>
-            </button>
-            <button onClick={restoreDefaultPresets} className="px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
-              style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-              <span>Restaurar padrões</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Mode Selector Buttons */}
-        <div className="flex items-center gap-2 pt-2 border-t flex-wrap" style={{ borderColor: T.borderSoft }}>
-          <span className="text-xs font-bold mr-1" style={{ color: T.muted }}>Modo de análise:</span>
-          <button onClick={() => { setCompMode("all"); setSelectedIds(allPresets.map(p => p.id || p.name)); }}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
-            style={compMode === "all"
-              ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
-              : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-            <span>Em Conjunto (Todos os {allPresets.length})</span>
-          </button>
-
-          <button onClick={() => setCompMode("custom")}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
-            style={compMode === "custom"
-              ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
-              : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-            <span>Customizado (Seleção)</span>
-          </button>
-
-          <button onClick={() => { setCompMode("individual"); if (!singleId && allPresets.length > 0) setSingleId(allPresets[0].id || allPresets[0].name); }}
-            className="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
-            style={compMode === "individual"
-              ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
-              : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            <span>Individual (Diagnóstico)</span>
-          </button>
-        </div>
-
-        {/* Custom Mode: Checkbox Selectors */}
-        {compMode === "custom" && (
-          <div className="p-3 rounded-xl border flex items-center gap-2 flex-wrap" style={{ background: T.surface, borderColor: T.accentBorder }}>
-            <span className="text-xs font-bold mr-1" style={{ color: T.muted }}>Marque para incluir no comparativo:</span>
-            {allPresets.map((p) => {
-              const id = p.id || p.name;
-              const isChecked = selectedIds.includes(id);
-              return (
-                <button key={id} onClick={() => toggleSelectId(id)}
-                  className="px-3 py-1 rounded-full text-xs font-semibold border transition-all flex items-center gap-1.5"
-                  style={isChecked
-                    ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text, fontWeight: 700 }
-                    : { background: T.surface2, border: `1px solid ${T.border}`, color: T.faint }}>
-                  <span>{isChecked ? "✓" : "○"}</span>
-                  <span>{p.name}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Individual Mode: Chip Selector */}
-        {compMode === "individual" && (
-          <div className="p-3.5 rounded-xl border space-y-3" style={{ background: T.surface, borderColor: T.accentBorder }}>
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <span className="text-xs font-bold" style={{ color: T.muted }}>Selecione o setup para diagnóstico individual:</span>
-              <div className="flex items-center gap-2 flex-wrap">
-                {allPresets.map((p) => {
-                  const id = p.id || p.name;
-                  const isSelected = singleId === id;
-                  return (
-                    <button key={id} onClick={() => setSingleId(id)}
-                      className="px-3 py-1 rounded-lg text-xs font-bold border transition-all"
-                      style={isSelected
-                        ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
-                        : { background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
-                      {p.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Individual Diagnostic Card */}
-            {singlePresetMetrics && (
-              <div className="p-4 rounded-xl border space-y-3" style={{ background: T.surface2, borderColor: T.borderSoft }}>
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div>
-                    <span className="text-[10px] font-extrabold uppercase tracking-wider block" style={{ color: pastelPeachText }}>Análise Individual</span>
-                    <h3 className="text-base font-extrabold" style={{ color: T.text }}>{singlePresetMetrics.name}</h3>
-                  </div>
-                  <button onClick={() => loadPreset(allPresets.find((p) => (p.id || p.name) === singlePresetMetrics.id))}
-                    className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
-                    style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                    <span>Carregar no Configurador</span>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3 rounded-lg border" style={{ background: T.surface, borderColor: T.borderSoft }}>
-                    <div className="text-[10px] font-bold uppercase" style={{ color: T.muted }}>Produção Anual</div>
-                    <div className="text-lg font-extrabold mt-0.5" style={{ color: pastelMintText }}>{fmtG(singlePresetMetrics.yieldYearG)}</div>
-                    <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>{singlePresetMetrics.hYear.toFixed(1)} safras/ano</div>
-                  </div>
-                  <div className="p-3 rounded-lg border" style={{ background: T.surface, borderColor: T.borderSoft }}>
-                    <div className="text-[10px] font-bold uppercase" style={{ color: T.muted }}>Custo OPEX por Grama</div>
-                    <div className="text-lg font-extrabold mt-0.5" style={{ color: pastelMintText }}>{fmtBRL(singlePresetMetrics.costPerGramOpex)}/g</div>
-                    <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>Custo produtivo direto</div>
-                  </div>
-                  <div className="p-3 rounded-lg border" style={{ background: T.surface, borderColor: T.borderSoft }}>
-                    <div className="text-[10px] font-bold uppercase" style={{ color: T.muted }}>Investimento CAPEX</div>
-                    <div className="text-lg font-extrabold mt-0.5" style={{ color: pastelPeachText }}>{fmtBRL(singlePresetMetrics.capex)}</div>
-                    <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>{fmtBRL(singlePresetMetrics.capexPerPlant)}/vaso</div>
-                  </div>
-                  <div className="p-3 rounded-lg border" style={{ background: T.surface, borderColor: T.borderSoft }}>
-                    <div className="text-[10px] font-bold uppercase" style={{ color: T.muted }}>OPEX Mensal</div>
-                    <div className="text-lg font-extrabold mt-0.5" style={{ color: pastelSkyText }}>{fmtBRL(singlePresetMetrics.opexMonth)}</div>
-                    <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>{singlePresetMetrics.kwhMonth.toFixed(0)} kWh/mês</div>
-                  </div>
-                </div>
-
-                {/* Comparison vs Average */}
-                {otherPresetsAverage && (
-                  <div className="pt-2 border-t" style={{ borderColor: T.borderSoft }}>
-                    <div className="text-[11px] font-bold mb-2" style={{ color: T.muted }}>
-                      Comparação do <span style={{ color: T.text }}>{singlePresetMetrics.name}</span> em relação à média dos outros {otherMetrics.length} setup(s):
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                      <div className="flex items-center justify-between p-2 rounded border" style={{ background: T.surface, borderColor: T.borderSoft }}>
-                        <span style={{ color: T.muted }}>Produção Anual:</span>
-                        <span className="font-extrabold" style={{ color: singlePresetMetrics.yieldYearG >= otherPresetsAverage.yieldYearG ? pastelMintText : pastelPeachText }}>
-                          {singlePresetMetrics.yieldYearG >= otherPresetsAverage.yieldYearG ? "+" : ""}
-                          {(((singlePresetMetrics.yieldYearG - otherPresetsAverage.yieldYearG) / (otherPresetsAverage.yieldYearG || 1)) * 100).toFixed(0)}%
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between p-2 rounded border" style={{ background: T.surface, borderColor: T.borderSoft }}>
-                        <span style={{ color: T.muted }}>Custo/g (OPEX):</span>
-                        <span className="font-extrabold" style={{ color: singlePresetMetrics.costPerGramOpex <= otherPresetsAverage.costPerGramOpex ? pastelMintText : pastelPeachText }}>
-                          {singlePresetMetrics.costPerGramOpex <= otherPresetsAverage.costPerGramOpex ? "-" : "+"}
-                          {Math.abs(((singlePresetMetrics.costPerGramOpex - otherPresetsAverage.costPerGramOpex) / (otherPresetsAverage.costPerGramOpex || 1)) * 100).toFixed(0)}%
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between p-2 rounded border" style={{ background: T.surface, borderColor: T.borderSoft }}>
-                        <span style={{ color: T.muted }}>CAPEX (Investimento):</span>
-                        <span className="font-extrabold" style={{ color: singlePresetMetrics.capex <= otherPresetsAverage.capex ? pastelMintText : pastelPeachText }}>
-                          {singlePresetMetrics.capex <= otherPresetsAverage.capex ? "-" : "+"}
-                          {Math.abs(((singlePresetMetrics.capex - otherPresetsAverage.capex) / (otherPresetsAverage.capex || 1)) * 100).toFixed(0)}%
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Hero Champions Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {topYield && (
-          <div className="p-4 rounded-2xl relative overflow-hidden" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
-            <div className="text-[10px] font-extrabold uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ color: T.muted }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>
-              <span>Maior Produção Anual</span>
-            </div>
-            <div className="text-2xl font-extrabold tracking-tight" style={{ color: T.text }}>{fmtG(topYield.yieldYearG)}</div>
-            <div className="text-xs font-bold mt-1 truncate" style={{ color: pastelMintText }}>{topYield.name}</div>
-            <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>{topYield.hYear.toFixed(1)} safras/ano ({fmtG(topYield.yieldHarvestG)}/safra)</div>
-          </div>
-        )}
-
-        {lowestCostPerG && (
-          <div className="p-4 rounded-2xl relative overflow-hidden" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
-            <div className="text-[10px] font-extrabold uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ color: T.muted }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-              <span>Menor Custo por Grama</span>
-            </div>
-            <div className="text-2xl font-extrabold tracking-tight" style={{ color: T.text }}>{fmtBRL(lowestCostPerG.costPerGramOpex)} / g</div>
-            <div className="text-xs font-bold mt-1 truncate" style={{ color: pastelMintText }}>{lowestCostPerG.name}</div>
-            <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>Custo produtivo direto (OPEX/g)</div>
-          </div>
-        )}
-
-        {topEfficiency && (
-          <div className="p-4 rounded-2xl relative overflow-hidden" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
-            <div className="text-[10px] font-extrabold uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ color: T.muted }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              <span>Eficiência por Watt</span>
-            </div>
-            <div className="text-2xl font-extrabold tracking-tight" style={{ color: T.text }}>{topEfficiency.gPerW.toFixed(2)} g/W</div>
-            <div className="text-xs font-bold mt-1 truncate" style={{ color: pastelMintText }}>{topEfficiency.name}</div>
-            <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>Potência total: {topEfficiency.totalW}W</div>
-          </div>
-        )}
-
-        {lowestPayback ? (
-          <div className="p-4 rounded-2xl relative overflow-hidden" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
-            <div className="text-[10px] font-extrabold uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ color: T.muted }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.71 1.26-1.5 1.74-2.3L4.5 16.5z"/><path d="M12 15l-3-3 7.5-7.5c1.4-1.4 3.7-1.4 5.1 0s1.4 3.7 0 5.1L12 15z"/></svg>
-              <span>Retorno Mais Rápido</span>
-            </div>
-            <div className="text-2xl font-extrabold tracking-tight" style={{ color: T.text }}>{lowestPayback.paybackMonths.toFixed(1)} meses</div>
-            <div className="text-xs font-bold mt-1 truncate" style={{ color: pastelSkyText }}>{lowestPayback.name}</div>
-            <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>Payback em ~{(lowestPayback.paybackMonths / (lowestPayback.cDays / 30)).toFixed(1)} safras</div>
-          </div>
-        ) : (
-          <div className="p-4 rounded-2xl relative overflow-hidden" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
-            <div className="text-[10px] font-extrabold uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ color: T.muted }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-              <span>Receita Anual Máxima</span>
-            </div>
-            <div className="text-2xl font-extrabold tracking-tight" style={{ color: T.text }}>{fmtBRL(topYield.revYear)}</div>
-            <div className="text-xs font-bold mt-1 truncate" style={{ color: pastelPeachText }}>{topYield.name}</div>
-            <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>Estimativa baseada em R$/g</div>
-          </div>
-        )}
-      </div>
-
-      {/* Graphical Comparisons Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Chart 1: Produção Anual (kg/ano) */}
-        <div className="p-5 rounded-2xl" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
-          <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center justify-between" style={{ color: T.muted }}>
-            <span className="flex items-center gap-1.5">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-              <span>Produção Anual Comparada</span>
-            </span>
-            <span className="text-[10px] font-semibold" style={{ color: pastelMintText }}>kg / ano</span>
-          </h3>
-          <div className="space-y-3">
-            {metricsList.map((m) => {
-              const pct = Math.max(8, Math.min(100, (m.yieldYearG / maxYieldG) * 100));
-              const isTop = m.id === topYield.id;
-              return (
-                <div key={m.id} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs font-semibold">
-                    <span className="truncate max-w-[200px]" style={{ color: T.text }}>{m.name}</span>
-                    <span className="font-bold" style={{ color: isTop ? pastelMintText : T.text }}>{fmtG(m.yieldYearG)}</span>
-                  </div>
-                  <div className="w-full h-3 rounded-full overflow-hidden" style={{ background: T.surface, border: `1px solid ${T.borderSoft}` }}>
-                    <div className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${pct}%`,
-                        background: isTop ? pastelMintBar : pastelPeachBar
-                      }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Chart 2: Investimento (CAPEX) vs OPEX Mensal */}
-        <div className="p-5 rounded-2xl" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
-          <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center justify-between" style={{ color: T.muted }}>
-            <span className="flex items-center gap-1.5">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-              <span>Investimento (CAPEX) & OPEX Mensal</span>
-            </span>
-            <span className="text-[10px] font-semibold" style={{ color: T.faint }}>R$</span>
-          </h3>
-          <div className="space-y-3">
-            {metricsList.map((m) => {
-              const capexPct = Math.max(6, Math.min(100, (m.capex / maxCapex) * 100));
-              const opexPct = Math.max(6, Math.min(100, (m.opexMonth / maxOpex) * 100));
-              return (
-                <div key={m.id} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs font-semibold">
-                    <span className="truncate max-w-[180px]" style={{ color: T.text }}>{m.name}</span>
-                    <div className="flex items-center gap-3 text-[11px]">
-                      <span style={{ color: pastelPeachText }}>CAPEX: {fmtBRL(m.capex)}</span>
-                      <span style={{ color: pastelSkyText }}>OPEX: {fmtBRL(m.opexMonth)}/mês</span>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="w-full h-2.5 rounded-full overflow-hidden" style={{ background: T.surface, border: `1px solid ${T.borderSoft}` }}>
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${capexPct}%`, background: pastelPeachBar }} />
-                    </div>
-                    <div className="w-full h-2.5 rounded-full overflow-hidden" style={{ background: T.surface, border: `1px solid ${T.borderSoft}` }}>
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${opexPct}%`, background: pastelSkyBar }} />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Chart 3: Comparativo Por Safra (Peso, Receita, Produtividade, Custo/g & Custo/Retorno) */}
-        <div className="p-5 rounded-2xl lg:col-span-2" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
-          <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center justify-between" style={{ color: T.muted }}>
-            <span className="flex items-center gap-1.5">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-              <span>Métricas & Custo por Grama Por Safra</span>
-            </span>
-            <span className="text-[10px] font-semibold" style={{ color: T.faint }}>Desempenho por ciclo de cultivo</span>
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {metricsList.map((m) => {
-              const maxHarvestG = Math.max(...metricsList.map(x => x.yieldHarvestG), 1);
-              const maxRevHarvest = Math.max(...metricsList.map(x => x.revHarvest), 1);
-              const maxM2 = Math.max(...metricsList.map(x => x.yieldM2), 1);
-
-              const pctWeight = Math.max(8, Math.min(100, (m.yieldHarvestG / maxHarvestG) * 100));
-              const pctRev = Math.max(8, Math.min(100, (m.revHarvest / maxRevHarvest) * 100));
-              const pctM2 = Math.max(8, Math.min(100, (m.yieldM2 / maxM2) * 100));
-              const pctRatioH = Math.max(8, Math.min(100, (m.ratioHarvest / maxRatioHarvest) * 100));
-              const pctCostG = Math.max(8, Math.min(100, (m.costPerGramOpex / maxCostPerG) * 100));
-
-              return (
-                <div key={m.id} className="p-4 rounded-xl space-y-3" style={{ background: T.surface, border: `1px solid ${T.borderSoft}` }}>
-                  <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: T.borderSoft }}>
-                    <span className="font-extrabold text-sm truncate" style={{ color: T.text }}>{m.name}</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
-                      {m.cDays} dias / ciclo
-                    </span>
-                  </div>
-
-                  {/* Peso por safra */}
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-[11px] font-medium" style={{ color: T.muted }}>Peso por safra</span>
-                      <span className="font-extrabold text-xs" style={{ color: pastelMintText }}>{fmtG(m.yieldHarvestG)}</span>
-                    </div>
-                    <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: T.surface2 }}>
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctWeight}%`, background: pastelMintBar }} />
-                    </div>
-                  </div>
-
-                  {/* Custo por Grama (OPEX) */}
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-[11px] font-medium" style={{ color: T.muted }}>Custo / grama (OPEX)</span>
-                      <span className="font-extrabold text-xs" style={{ color: pastelMintText }}>{fmtBRL(m.costPerGramOpex)}/g</span>
-                    </div>
-                    <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: T.surface2 }}>
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctCostG}%`, background: pastelMintBar }} />
-                    </div>
-                  </div>
-
-                  {/* Receita por safra */}
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-[11px] font-medium" style={{ color: T.muted }}>Receita por safra</span>
-                      <span className="font-extrabold text-xs" style={{ color: pastelPeachText }}>{m.priceG > 0 ? fmtBRL(m.revHarvest) : "—"}</span>
-                    </div>
-                    <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: T.surface2 }}>
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctRev}%`, background: pastelPeachBar }} />
-                    </div>
-                  </div>
-
-                  {/* Produtividade por m² */}
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-[11px] font-medium" style={{ color: T.muted }}>Produtividade / m²</span>
-                      <span className="font-extrabold text-xs" style={{ color: pastelLavenderText }}>{m.yieldM2.toFixed(0)} g/m²</span>
-                    </div>
-                    <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: T.surface2 }}>
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctM2}%`, background: pastelLavenderBar }} />
-                    </div>
-                  </div>
-
-                  {/* Relação Custo / Retorno por safra */}
-                  <div className="space-y-1 pt-1 border-t" style={{ borderColor: T.borderSoft }}>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-[11px] font-bold" style={{ color: T.text }}>Custo/Retorno Safra</span>
-                      <span className="font-extrabold text-xs" style={{ color: pastelSkyText }}>
-                        {m.ratioHarvest > 0 ? `${m.ratioHarvest.toFixed(1)}× retorno` : "—"}
-                      </span>
-                    </div>
-                    <div className="text-[9.5px] truncate" style={{ color: T.faint }}>
-                      {m.priceG > 0 ? `OPEX ${fmtBRL(m.opexCycle)} → Receita ${fmtBRL(m.revHarvest)}` : "defina R$/g"}
-                    </div>
-                    <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: T.surface2 }}>
-                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctRatioH}%`, background: pastelSkyBar }} />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Chart 4: Relação Custo / Retorno Anual (OPEX & CAPEX vs Receita Anual) */}
-        <div className="p-5 rounded-2xl lg:col-span-2" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
-          <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center justify-between" style={{ color: T.muted }}>
-            <span className="flex items-center gap-1.5">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-              <span>Relação Custo / Retorno Anual (OPEX & CAPEX vs Receita Anual)</span>
-            </span>
-            <span className="text-[10px] font-semibold" style={{ color: T.faint }}>Retorno financeiro por ano</span>
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {metricsList.map((m) => {
-              const pctRatioY = Math.max(8, Math.min(100, (m.ratioYear / maxRatioYear) * 100));
-
-              return (
-                <div key={m.id} className="p-4 rounded-xl space-y-3" style={{ background: T.surface, border: `1px solid ${T.borderSoft}` }}>
-                  <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: T.borderSoft }}>
-                    <span className="font-extrabold text-sm truncate" style={{ color: T.text }}>{m.name}</span>
-                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full"
-                      style={{ background: pastelMintBg, border: `1px solid ${T.border}`, color: pastelMintText }}>
-                      {m.ratioYear > 0 ? `${m.ratioYear.toFixed(1)}× retorno s/ OPEX` : "—"}
-                    </span>
-                  </div>
-
-                  <div className="space-y-1.5 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400" style={{ color: T.muted }}>Custo OPEX por grama:</span>
-                      <span className="font-extrabold" style={{ color: pastelMintText }}>{fmtBRL(m.costPerGramOpex)} / g</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400" style={{ color: T.muted }}>Custo Total 1º ano / grama:</span>
-                      <span className="font-bold" style={{ color: T.text }}>{fmtBRL(m.costPerGramTotal)} / g</span>
-                    </div>
-                    <div className="flex items-center justify-between pt-1 border-t" style={{ borderColor: T.borderSoft }}>
-                      <span className="text-slate-400" style={{ color: T.muted }}>OPEX Anual Total:</span>
-                      <span className="font-bold" style={{ color: pastelSkyText }}>{fmtBRL(m.opexYear)}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400" style={{ color: T.muted }}>Receita Anual Estimada:</span>
-                      <span className="font-bold" style={{ color: pastelPeachText }}>{m.priceG > 0 ? fmtBRL(m.revYear) : "—"}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400" style={{ color: T.muted }}>Lucro Líquido Anual:</span>
-                      <span className="font-extrabold" style={{ color: pastelMintText }}>{m.priceG > 0 ? fmtBRL(m.netProfitYear) : "—"}</span>
-                    </div>
-                    <div className="flex items-center justify-between pt-1 border-t" style={{ borderColor: T.borderSoft }}>
-                      <span className="text-slate-400 font-medium" style={{ color: T.muted }}>ROI s/ CAPEX Anual:</span>
-                      <span className="font-extrabold" style={{ color: pastelMintText }}>
-                        {m.capexRoiYear > 0 ? `+${m.capexRoiYear.toFixed(0)}% / ano` : "—"}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: T.surface2 }}>
-                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctRatioY}%`, background: pastelMintBar }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Comparison Matrix Table */}
-      <div className="p-5 rounded-2xl overflow-hidden" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
-        <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.muted }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
-          <span>Tabela Comparativa Detalhada ({metricsList.length} setup(s))</span>
-        </h3>
-
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-xs text-left min-w-[650px]">
-            <thead>
-              <tr style={{ borderBottom: `2px solid ${T.border}` }}>
-                <th className="py-3 px-4 font-bold uppercase tracking-wider w-56" style={{ color: T.muted }}>Métrica / Leitura</th>
-                {metricsList.map((m) => (
-                  <th key={m.id} className="py-3 px-4 text-center font-bold" style={{ borderLeft: `1px solid ${T.borderSoft}` }}>
-                    <div className="font-extrabold text-sm mb-1" style={{ color: T.text }}>{m.name}</div>
-                    <div className="flex items-center justify-center gap-1.5">
-                      <button onClick={() => loadPreset(allPresets.find((p) => (p.id || p.name) === m.id))}
-                        className="px-2 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1"
-                        style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                        <span>Carregar</span>
-                      </button>
-                      <button onClick={() => removePreset(allPresets.find((p) => (p.id || p.name) === m.id)?.id, m.name)}
-                        className="px-2 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1"
-                        style={{ background: dark ? "rgba(239, 68, 68, 0.15)" : "rgba(220, 38, 38, 0.08)", border: `1px solid ${dark ? "rgba(239, 68, 68, 0.3)" : "rgba(220, 38, 38, 0.2)"}`, color: dark ? "#f87171" : "#dc2626" }}>
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                        <span>Remover</span>
-                      </button>
-                    </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y" style={{ borderColor: T.borderSoft }}>
-              {/* Group 1: Estrutura */}
-              <tr style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
-                <td colSpan={metricsList.length + 1} className="py-2.5 px-4 font-extrabold text-[11px] uppercase tracking-wider" style={{ color: T.text }}>
-                  Estrutura & Área de Cultivo
-                </td>
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Dimensões (L × P × A)</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-medium" style={{ color: T.text, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {m.width} × {m.depth} × {m.height} cm
-                  </td>
-                ))}
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Área Útil de Cultivo</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center font-bold text-xs" style={{ color: T.text, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {m.areaM2.toFixed(2)} m²
-                  </td>
-                ))}
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Volume Total da Estufa</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-medium" style={{ color: T.text, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {m.volM3.toFixed(2)} m³
-                  </td>
-                ))}
-              </tr>
-
-              {/* Group 2: Vasos */}
-              <tr style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
-                <td colSpan={metricsList.length + 1} className="py-2.5 px-4 font-extrabold text-[11px] uppercase tracking-wider" style={{ color: T.text }}>
-                  Vasos & Densidade
-                </td>
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Quantidade de Vasos</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center font-bold text-xs" style={{ color: T.text, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {m.potCount} vaso(s)
-                  </td>
-                ))}
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Tipo de Vaso</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-medium" style={{ color: T.muted, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {m.potLabel}
-                  </td>
-                ))}
-              </tr>
-
-              {/* Group 3: Produção */}
-              <tr style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
-                <td colSpan={metricsList.length + 1} className="py-2.5 px-4 font-extrabold text-[11px] uppercase tracking-wider" style={{ color: T.text }}>
-                  Produção & Rendimento Por Safra e Por Ano
-                </td>
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Safras por Ano</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-medium" style={{ color: T.text, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {m.hYear.toFixed(1)} safras/ano ({m.cDays}d/ciclo)
-                  </td>
-                ))}
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Produção por Safra (Peso)</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center font-bold text-xs" style={{ color: pastelMintText, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {fmtG(m.yieldHarvestG)}
-                  </td>
-                ))}
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Produção por Ano</td>
-                {metricsList.map((m) => {
-                  const isTop = m.id === topYield.id;
-                  return (
-                    <td key={m.id} className="py-2.5 px-4 text-center font-extrabold text-xs"
-                      style={{
-                        color: isTop ? pastelMintText : T.text,
-                        background: isTop ? pastelMintBg : "transparent",
-                        borderLeft: `1px solid ${T.borderSoft}`
-                      }}>
-                      {fmtG(m.yieldYearG)} {isTop && "★"}
-                    </td>
-                  );
-                })}
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Produtividade por m²</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-semibold" style={{ color: pastelLavenderText, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {m.yieldM2.toFixed(0)} g/m²
-                  </td>
-                ))}
-              </tr>
-
-              {/* Group 4: Financeiro */}
-              <tr style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
-                <td colSpan={metricsList.length + 1} className="py-2.5 px-4 font-extrabold text-[11px] uppercase tracking-wider" style={{ color: T.text }}>
-                  Financeiro, Custos & Custo por Grama
-                </td>
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Custo Operacional por Grama (OPEX/g)</td>
-                {metricsList.map((m) => {
-                  const isLowG = m.id === lowestCostPerG.id;
-                  return (
-                    <td key={m.id} className="py-2.5 px-4 text-center font-extrabold text-xs"
-                      style={{
-                        color: isLowG ? pastelMintText : T.text,
-                        background: isLowG ? pastelMintBg : "transparent",
-                        borderLeft: `1px solid ${T.borderSoft}`
-                      }}>
-                      {fmtBRL(m.costPerGramOpex)} / g {isLowG && "★"}
-                    </td>
-                  );
-                })}
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Custo Total no 1º Ano (CAPEX+OPEX / g)</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-semibold" style={{ color: T.text, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {fmtBRL(m.costPerGramTotal)} / g
-                  </td>
-                ))}
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Investimento Total (CAPEX)</td>
-                {metricsList.map((m) => {
-                  const isLow = m.id === lowestCapex.id;
-                  return (
-                    <td key={m.id} className="py-2.5 px-4 text-center font-bold text-xs"
-                      style={{
-                        color: isLow ? pastelMintText : pastelPeachText,
-                        background: isLow ? pastelMintBg : "transparent",
-                        borderLeft: `1px solid ${T.borderSoft}`
-                      }}>
-                      {fmtBRL(m.capex)} {isLow && "★"}
-                    </td>
-                  );
-                })}
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Custo Operacional por Safra (OPEX Safra)</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-medium" style={{ color: T.muted, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {fmtBRL(m.opexCycle)}
-                  </td>
-                ))}
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>OPEX Mensal (Energia + Insumos)</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-semibold" style={{ color: pastelSkyText, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {fmtBRL(m.opexMonth)} / mês
-                  </td>
-                ))}
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Consumo Elétrico Mensal</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-medium" style={{ color: T.muted, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {m.kwhMonth.toFixed(0)} kWh/mês
-                  </td>
-                ))}
-              </tr>
-
-              {/* Group 5: Retorno & Relações Custo/Retorno */}
-              <tr style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
-                <td colSpan={metricsList.length + 1} className="py-2.5 px-4 font-extrabold text-[11px] uppercase tracking-wider" style={{ color: T.text }}>
-                  Relações Custo/Retorno, Receita & Lucro
-                </td>
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Receita por Safra</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center font-bold text-xs" style={{ color: pastelPeachText, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {m.priceG > 0 ? fmtBRL(m.revHarvest) : "—"}
-                  </td>
-                ))}
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Relação Custo/Retorno por Safra</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center font-extrabold text-xs" style={{ color: pastelSkyText, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {m.ratioHarvest > 0 ? `${m.ratioHarvest.toFixed(1)}× retorno` : "—"}
-                  </td>
-                ))}
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Receita Anual Estimada</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center font-extrabold text-xs" style={{ color: pastelPeachText, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {m.priceG > 0 ? fmtBRL(m.revYear) : "—"}
-                  </td>
-                ))}
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Relação Custo/Retorno Anual (Receita/OPEX)</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center font-extrabold text-xs" style={{ color: pastelMintText, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {m.ratioYear > 0 ? `${m.ratioYear.toFixed(1)}× retorno` : "—"}
-                  </td>
-                ))}
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Lucro Líquido Anual (Receita - OPEX)</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center font-bold text-xs" style={{ color: pastelMintText, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {m.priceG > 0 ? fmtBRL(m.netProfitYear) : "—"}
-                  </td>
-                ))}
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>ROI do CAPEX Inicial (% / ano)</td>
-                {metricsList.map((m) => (
-                  <td key={m.id} className="py-2.5 px-4 text-center font-extrabold text-xs" style={{ color: pastelMintText, borderLeft: `1px solid ${T.borderSoft}` }}>
-                    {m.capexRoiYear > 0 ? `+${m.capexRoiYear.toFixed(0)}% / ano` : "—"}
-                  </td>
-                ))}
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Payback Estimado</td>
-                {metricsList.map((m) => {
-                  const isBestPayback = lowestPayback && m.id === lowestPayback.id;
-                  return (
-                    <td key={m.id} className="py-2.5 px-4 text-center font-bold text-xs"
-                      style={{
-                        color: isBestPayback ? pastelMintText : T.text,
-                        background: isBestPayback ? pastelMintBg : "transparent",
-                        borderLeft: `1px solid ${T.borderSoft}`
-                      }}>
-                      {m.paybackMonths ? `${m.paybackMonths.toFixed(1)} m (${(m.paybackMonths / (m.cDays / 30)).toFixed(1)} safras)` : "—"} {isBestPayback && "★"}
-                    </td>
-                  );
-                })}
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default function GrowinStones() {
+function GrowinStones() {
   const [dark, setDark] = useState(false);
   const [showReport, setShowReport] = useState(false);
 
@@ -5144,3 +3759,5 @@ export default function GrowinStones() {
     </div>
   );
 }
+
+export default GrowinStones;
