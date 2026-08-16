@@ -2672,6 +2672,12 @@ export default function GrowinStones() {
       console.error("Erro ao gerar relatório HTML:", e);
     }
 
+    if (!html || typeof html !== "string" || html.trim().length < 100) {
+      setPublishResult({ success: false, error: "Erro ao gerar a versão estática do relatório HTML." });
+      setIsPublishing(false);
+      return;
+    }
+
     const apiUrl = window.location.origin.includes("localhost") 
       ? "/api/publish" 
       : "https://grow.thegrowinstones.com/api/publish";
