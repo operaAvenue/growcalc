@@ -1480,6 +1480,9 @@ export default function GrowinStones() {
     return localStorage.getItem("growcalc_google_client_id") || "717208226500-1k3u639v7p665p1b90u29k0989069v.apps.googleusercontent.com";
   });
   const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
+  const [googleClientIdModalOpen, setGoogleClientIdModalOpen] = useState(false);
+  const [customClientIdInput, setCustomClientIdInput] = useState(googleClientId);
+
 
   useEffect(() => {
     if (!document.getElementById("google-gsi-script")) {
@@ -1502,9 +1505,17 @@ export default function GrowinStones() {
       const tokenClient = window.google.accounts.oauth2.initTokenClient({
         client_id: googleClientId,
         scope: "email profile",
+        error_callback: (err) => {
+          console.error("Erro no Google Client ID:", err);
+          setGoogleClientIdModalOpen(true);
+        },
         callback: async (response) => {
           if (response.error) {
             console.error("Erro no Google OAuth:", response);
+            if (response.error === "invalid_client" || response.error === "unauthorized_client") {
+              setGoogleClientIdModalOpen(true);
+              return;
+            }
             showToast(`⚠️ Falha no Google Auth: ${response.error_description || response.error}`);
             return;
           }
@@ -1537,10 +1548,7 @@ export default function GrowinStones() {
       tokenClient.requestAccessToken({ prompt: "select_account" });
     } catch (err) {
       console.error("Erro ao inicializar token client:", err);
-      // Fallback modal if client_id error
-      setAuthNameInput("Cultivador");
-      setAuthUsernameInput("meu-grow");
-      setAuthModalOpen(true);
+      setGoogleClientIdModalOpen(true);
     }
   };
 
@@ -3154,6 +3162,84 @@ export default function GrowinStones() {
         <footer className="py-6 text-center text-xs border-t border-stone-800" style={{ color: "#78716c" }}>
           GrowinStones © 2026 — Plataforma de Projetos Hidropônicos.
         </footer>
+
+        {/* Modal Configurar Client ID do Google OAuth ou Entrar Direto */}
+        {googleClientIdModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.88)", backdropFilter: "blur(8px)" }}>
+            <div className="w-full max-w-lg p-6 rounded-2xl text-left shadow-2xl relative space-y-4" style={{ background: "#1c1917", border: "1px solid #383532", color: "#f5f5f4" }}>
+              <button onClick={() => setGoogleClientIdModalOpen(false)} className="absolute top-4 right-4 text-stone-400 hover:text-white font-bold text-sm">✕</button>
+
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-amber-400 text-lg bg-amber-500/10 border border-amber-500/30 shrink-0">
+                  🔑
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-white">Configuração do Google OAuth 2.0</h3>
+                  <p className="text-xs text-stone-400">O Google exige um Client ID válido para o domínio grow.thegrowinstones.com</p>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 space-y-2">
+                <p className="font-bold">⚠️ Erro 401: invalid_client</p>
+                <p>O Client ID atual não está registrado para a origem <code className="text-white bg-black/40 px-1 py-0.5 rounded">https://grow.thegrowinstones.com</code> no Google Cloud Console.</p>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-stone-300">Cole seu Google OAuth Client ID:</label>
+                  <input
+                    type="text"
+                    value={customClientIdInput}
+                    onChange={(e) => setCustomClientIdInput(e.target.value)}
+                    placeholder="xxxxxxxxx-xxxxxxx.apps.googleusercontent.com"
+                    className="w-full px-3.5 py-2.5 rounded-xl text-xs outline-none font-mono"
+                    style={{ background: "#292524", border: "1px solid #44403c", color: "#38bdf8" }}
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 pt-2">
+                  <button
+                    onClick={() => {
+                      if (customClientIdInput.trim()) {
+                        localStorage.setItem("growcalc_google_client_id", customClientIdInput.trim());
+                        setGoogleClientId(customClientIdInput.trim());
+                        setGoogleClientIdModalOpen(false);
+                        showToast("✓ Novo Google Client ID salvo! Tentando novamente...");
+                        setTimeout(() => triggerGoogleOAuth(), 500);
+                      } else {
+                        showToast("⚠️ Digite um Client ID válido.");
+                      }
+                    }}
+                    className="flex-1 py-2.5 rounded-xl font-bold text-xs bg-sky-600 hover:bg-sky-500 text-white shadow"
+                  >
+                    💾 Salvar Client ID & Conectar
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setGoogleClientIdModalOpen(false);
+                      setAuthNameInput("Cultivador");
+                      setAuthUsernameInput("meu-grow");
+                      setAuthModalOpen(true);
+                    }}
+                    className="flex-1 py-2.5 rounded-xl font-bold text-xs bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700"
+                  >
+                    🚀 Entrar no Modo Direto
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-[11px] text-stone-400 pt-3 border-t border-stone-800 space-y-1">
+                <p className="font-bold text-stone-300">💡 Como obter seu Client ID no Google Cloud (Grátis):</p>
+                <ol className="list-decimal pl-4 space-y-0.5">
+                  <li>Acesse o <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-sky-400 underline">Google Cloud Console</a>.</li>
+                  <li>Crie um **ID do cliente OAuth** do tipo **Aplicação Web**.</li>
+                  <li>Adicione <code className="text-white">https://grow.thegrowinstones.com</code> nas **Origens JavaScript Autorizadas**.</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Modal Cadastro Google & Subdomínio */}
         {authModalOpen && (
