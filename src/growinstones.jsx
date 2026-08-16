@@ -2029,7 +2029,7 @@ function GrowinStones() {
             // 1. Consultar a nuvem por dados existentes vinculados a este e-mail da conta Google
             let cloudData = null;
             try {
-              const syncUrl = `https://grow.thegrowinstones.com/api/user/sync?email=${encodeURIComponent(googleUser.email)}&username=${encodeURIComponent(defaultSlug)}`;
+              const syncUrl = `https://grow.thegrowinstones.com/api/user/sync?email=${encodeURIComponent(googleUser.email)}&name=${encodeURIComponent(googleUser.name || "")}&googleSub=${encodeURIComponent(googleUser.sub || "")}&username=${encodeURIComponent(defaultSlug)}`;
               const syncRes = await fetch(syncUrl);
               if (syncRes.ok) {
                 const syncJson = await syncRes.json();
@@ -2076,51 +2076,37 @@ function GrowinStones() {
               localStorage.setItem("growcalc_user", JSON.stringify(restoredUser));
               setCurrentUser(restoredUser);
               setSubdomainInput(restoredUser.username);
-              showToast(`Sessão sincronizada! Bem-vindo de volta, ${restoredUser.name}!`);
+              setAuthModalOpen(false);
+              showToast(`Sessão sincronizada! Bem-vindo de volta, ${restoredUser.name} (@${restoredUser.username}).`);
               return;
             }
 
-            // 3. Verificar se o usuário já tem conta local
-            const existingSetup = localStorage.getItem(`growcalc_user_setup_${defaultSlug}`);
-            const savedUserJson = localStorage.getItem("growcalc_user");
-            let isExisting = false;
-            if (savedUserJson) {
-              try {
-                const parsedUser = JSON.parse(savedUserJson);
-                if (parsedUser.username === defaultSlug || parsedUser.email === googleUser.email) {
-                  isExisting = true;
-                }
-              } catch(e) {}
-            }
+            // 3. Caso seja o primeiro acesso deste usuário, autenticar e registrar na nuvem automaticamente
+            const autoUser = {
+              name: googleUser.name || "Cultivador",
+              email: googleUser.email,
+              username: defaultSlug,
+              avatarUrl: googleUser.picture || `https://api.dicebear.com/7.x/bottts/svg?seed=${defaultSlug}`,
+              bannerUrl: "",
+              bio: "Cultivador apaixonado por hidroponia e automação.",
+              location: "Brasil",
+              strainFocus: "",
+              googleSub: googleUser.sub
+            };
 
-            if (existingSetup || isExisting) {
-              const existingUser = {
-                name: googleUser.name || "Cultivador",
-                email: googleUser.email,
-                username: defaultSlug,
-                avatarUrl: googleUser.picture || `https://api.dicebear.com/7.x/bottts/svg?seed=${defaultSlug}`,
-                bannerUrl: "",
-                bio: "",
-                location: "Brasil",
-                strainFocus: "",
-                googleSub: googleUser.sub
-              };
-              localStorage.setItem("growcalc_user", JSON.stringify(existingUser));
-              setCurrentUser(existingUser);
-              setSubdomainInput(defaultSlug);
+            localStorage.setItem("growcalc_user", JSON.stringify(autoUser));
+            setCurrentUser(autoUser);
+            setSubdomainInput(defaultSlug);
+            setAuthModalOpen(false);
 
-              // Salvar na nuvem para os próximos dispositivos
-              fetch("https://grow.thegrowinstones.com/api/user/sync", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ user: existingUser, setup: getSetupData(), presets: allPresets })
-              }).catch(() => {});
+            // Salvar imediatamente na nuvem para persistência em todos os dispositivos
+            fetch("https://grow.thegrowinstones.com/api/user/sync", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ user: autoUser, setup: getSetupData(), presets: allPresets })
+            }).catch(() => {});
 
-              showToast(`Bem-vindo de volta, ${existingUser.name}! Subdomínio @${defaultSlug} carregado.`);
-            } else {
-              setAuthModalOpen(true);
-              showToast(`Google Autenticado: ${googleUser.email}`);
-            }
+            showToast(`Bem-vindo, ${autoUser.name}! Subdomínio @${defaultSlug} ativado e sincronizado.`);
           } catch (err) {
             console.error("Erro ao obter perfil do Google:", err);
             showToast(`Erro ao obter perfil do Google: ${err.message}`);
