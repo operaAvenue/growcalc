@@ -2142,11 +2142,40 @@ function GrowinStones() {
     return INITIAL_PRESETS;
   });
 
+  const syncAllToCloud = (overrideSetup = null, overridePresets = null) => {
+    if (!currentUser || (!currentUser.username && !currentUser.email)) return;
+    const setupData = overrideSetup || {
+      growName, owner, strain,
+      width, depth, height,
+      potCount, potIdx, potShape, potFlipped, customPotW, customPotL, customPotH,
+      gaugeIdx, spacing, cols, conn, recirculate,
+      equip, perPot, watts, equipUrls, equipShopping, customItems,
+      vegaHours, floraHours, vegaDays, floraDays, yieldPerPlant, priceG, tariff,
+      costs, extraCost, monthlyCost,
+      notes, instructions, terms,
+      dark
+    };
+    const presetsData = overridePresets || allPresets || [];
+
+    fetch("https://grow.thegrowinstones.com/api/user/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user: currentUser,
+        setup: setupData,
+        presets: presetsData
+      })
+    }).catch(() => {});
+  };
+
   const saveAllPresetsToStorage = (list) => {
     setAllPresets(list);
     try {
       localStorage.setItem("growinstones_all_presets_v2", JSON.stringify(list));
     } catch (e) {}
+    if (currentUser && (currentUser.email || currentUser.username)) {
+      syncAllToCloud(null, list);
+    }
   };
 
   const removePreset = (id, name) => {
@@ -2194,55 +2223,85 @@ function GrowinStones() {
   const [toastMsg, setToastMsg] = useState("");
 
   // ————— SISTEMA DE PERSISTÊNCIA E ISOLAMENTO DE USUÁRIOS —————
+  const loadUserSetupFromData = (data) => {
+    if (!data || typeof data !== "object") return;
+    if (data.growName !== undefined) setGrowName(data.growName);
+    if (data.owner !== undefined) setOwner(data.owner);
+    if (data.strain !== undefined) setStrain(data.strain);
+    if (data.width !== undefined) setWidth(data.width);
+    if (data.depth !== undefined) setDepth(data.depth);
+    if (data.height !== undefined) setHeight(data.height);
+    if (data.potCount !== undefined) setPotCount(data.potCount);
+    if (data.potIdx !== undefined) setPotIdx(data.potIdx);
+    if (data.potShape !== undefined) setPotShape(data.potShape);
+    if (data.potFlipped !== undefined) setPotFlipped(data.potFlipped);
+    if (data.customPotW !== undefined) setCustomPotW(data.customPotW);
+    if (data.customPotL !== undefined) setCustomPotL(data.customPotL);
+    if (data.customPotH !== undefined) setCustomPotH(data.customPotH);
+    if (data.gaugeIdx !== undefined) setGaugeIdx(data.gaugeIdx);
+    if (data.spacing !== undefined) setSpacing(data.spacing);
+    if (data.cols !== undefined) setCols(data.cols);
+    if (data.conn !== undefined) setConn(data.conn);
+    if (data.recirculate !== undefined) setRecirculate(data.recirculate);
+    if (data.equip !== undefined) setEquip(data.equip);
+    if (data.perPot !== undefined) setPerPot(data.perPot);
+    if (data.watts !== undefined) setWatts(data.watts);
+    if (data.equipUrls !== undefined) setEquipUrls(data.equipUrls);
+    if (data.equipShopping !== undefined) setEquipShopping(data.equipShopping);
+    if (data.customItems !== undefined) setCustomItems(data.customItems);
+    if (data.vegaHours !== undefined) setVegaHours(data.vegaHours);
+    if (data.floraHours !== undefined) setFloraHours(data.floraHours);
+    if (data.vegaDays !== undefined) setVegaDays(data.vegaDays);
+    if (data.floraDays !== undefined) setFloraDays(data.floraDays);
+    if (data.yieldPerPlant !== undefined) setYieldPerPlant(data.yieldPerPlant);
+    if (data.priceG !== undefined) setPriceG(data.priceG);
+    if (data.tariff !== undefined) setTariff(data.tariff);
+    if (data.costs !== undefined) setCosts(data.costs);
+    if (data.extraCost !== undefined) setExtraCost(data.extraCost);
+    if (data.monthlyCost !== undefined) setMonthlyCost(data.monthlyCost);
+    if (data.notes !== undefined) setNotes(data.notes);
+    if (data.instructions !== undefined) setInstructions(data.instructions);
+    if (data.terms !== undefined) setTerms(data.terms);
+    if (data.dark !== undefined) setDark(Boolean(data.dark));
+    if (data.allPresets !== undefined && Array.isArray(data.allPresets) && data.allPresets.length > 0) {
+      setAllPresets(data.allPresets);
+    }
+  };
+
   const loadUserSetup = (user) => {
     if (!user || !user.username) return;
     const key = `growcalc_user_setup_${user.username}`;
     try {
       const saved = localStorage.getItem(key);
       if (saved) {
-        const data = JSON.parse(saved);
-        if (data.growName !== undefined) setGrowName(data.growName);
-        if (data.owner !== undefined) setOwner(data.owner);
-        if (data.strain !== undefined) setStrain(data.strain);
-        if (data.width !== undefined) setWidth(data.width);
-        if (data.depth !== undefined) setDepth(data.depth);
-        if (data.height !== undefined) setHeight(data.height);
-        if (data.potCount !== undefined) setPotCount(data.potCount);
-        if (data.potIdx !== undefined) setPotIdx(data.potIdx);
-        if (data.potShape !== undefined) setPotShape(data.potShape);
-        if (data.potFlipped !== undefined) setPotFlipped(data.potFlipped);
-        if (data.customPotW !== undefined) setCustomPotW(data.customPotW);
-        if (data.customPotL !== undefined) setCustomPotL(data.customPotL);
-        if (data.customPotH !== undefined) setCustomPotH(data.customPotH);
-        if (data.gaugeIdx !== undefined) setGaugeIdx(data.gaugeIdx);
-        if (data.spacing !== undefined) setSpacing(data.spacing);
-        if (data.cols !== undefined) setCols(data.cols);
-        if (data.conn !== undefined) setConn(data.conn);
-        if (data.recirculate !== undefined) setRecirculate(data.recirculate);
-        if (data.equip !== undefined) setEquip(data.equip);
-        if (data.perPot !== undefined) setPerPot(data.perPot);
-        if (data.watts !== undefined) setWatts(data.watts);
-        if (data.equipUrls !== undefined) setEquipUrls(data.equipUrls);
-        if (data.equipShopping !== undefined) setEquipShopping(data.equipShopping);
-        if (data.customItems !== undefined) setCustomItems(data.customItems);
-        if (data.vegaHours !== undefined) setVegaHours(data.vegaHours);
-        if (data.floraHours !== undefined) setFloraHours(data.floraHours);
-        if (data.vegaDays !== undefined) setVegaDays(data.vegaDays);
-        if (data.floraDays !== undefined) setFloraDays(data.floraDays);
-        if (data.yieldPerPlant !== undefined) setYieldPerPlant(data.yieldPerPlant);
-        if (data.priceG !== undefined) setPriceG(data.priceG);
-        if (data.tariff !== undefined) setTariff(data.tariff);
-        if (data.costs !== undefined) setCosts(data.costs);
-        if (data.extraCost !== undefined) setExtraCost(data.extraCost);
-        if (data.monthlyCost !== undefined) setMonthlyCost(data.monthlyCost);
-        if (data.notes !== undefined) setNotes(data.notes);
-        if (data.instructions !== undefined) setInstructions(data.instructions);
-        if (data.terms !== undefined) setTerms(data.terms);
-        if (data.allPresets !== undefined && Array.isArray(data.allPresets)) setAllPresets(data.allPresets);
+        loadUserSetupFromData(JSON.parse(saved));
       }
-    } catch (e) {
-      console.error("Erro ao carregar configurações do usuário:", e);
-    }
+    } catch (e) {}
+  };
+
+  // Carregar dados salvos do usuário e sincronizar com a nuvem
+  const fetchCloudUserSync = async () => {
+    if (!currentUser || (!currentUser.email && !currentUser.username)) return;
+    try {
+      const syncUrl = `https://grow.thegrowinstones.com/api/user/sync?email=${encodeURIComponent(currentUser.email || "")}&username=${encodeURIComponent(currentUser.username || "")}&name=${encodeURIComponent(currentUser.name || "")}`;
+      const res = await fetch(syncUrl);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.exists) {
+          if (data.user) {
+            setCurrentUser((prev) => ({ ...prev, ...data.user }));
+            if (data.user.username) setSubdomainInput(data.user.username);
+          }
+          if (Array.isArray(data.presets) && data.presets.length > 0) {
+            setAllPresets(data.presets);
+            try { localStorage.setItem("growinstones_all_presets_v2", JSON.stringify(data.presets)); } catch(e) {}
+          }
+          if (data.setup) {
+            loadUserSetupFromData(data.setup);
+          }
+        }
+      }
+    } catch (e) {}
   };
 
   // Carregar dados salvos do usuário ao iniciar/mudar usuário
@@ -2250,10 +2309,26 @@ function GrowinStones() {
     if (currentUser && currentUser?.username) {
       loadUserSetup(currentUser);
       setSubdomainInput(currentUser?.username);
+      fetchCloudUserSync();
     }
   }, [currentUser?.username]);
 
-  // Salvar automaticamente todas as alterações do usuário
+  // Sincronizar automaticamente quando a janela ganha foco ou muda de aba
+  useEffect(() => {
+    const handleFocus = () => {
+      if (currentUser && (currentUser.email || currentUser.username)) {
+        fetchCloudUserSync();
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
+  }, [currentUser]);
+
+  // Salvar automaticamente todas as alterações do usuário no localStorage e na nuvem
   useEffect(() => {
     if (!currentUser || !currentUser?.username) return;
     const userSetup = {
@@ -2266,19 +2341,24 @@ function GrowinStones() {
       costs, extraCost, monthlyCost,
       notes, instructions, terms,
       allPresets,
+      dark
     };
     try {
       localStorage.setItem(`growcalc_user_setup_${currentUser?.username}`, JSON.stringify(userSetup));
-    } catch (e) {
-      console.error("Erro ao auto-salvar configurações do usuário:", e);
-    }
+    } catch (e) {}
+
+    // Sincronizar na nuvem após debounce de 1 segundo
+    const timer = setTimeout(() => {
+      syncAllToCloud(userSetup, allPresets);
+    }, 1200);
+    return () => clearTimeout(timer);
   }, [
     currentUser, growName, owner, strain, width, depth, height,
     potCount, potIdx, potShape, potFlipped, customPotW, customPotL, customPotH,
     gaugeIdx, spacing, cols, conn, recirculate,
     equip, perPot, watts, equipUrls, equipShopping, customItems,
     vegaHours, floraHours, vegaDays, floraDays, yieldPerPlant, priceG, tariff,
-    costs, extraCost, monthlyCost, notes, instructions, terms, allPresets
+    costs, extraCost, monthlyCost, notes, instructions, terms, allPresets, dark
   ]);
 
   const showToast = (msg) => {
