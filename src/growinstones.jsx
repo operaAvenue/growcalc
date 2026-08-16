@@ -3069,13 +3069,16 @@ function GrowinStones() {
   // ————— Download do relatório como HTML autocontido (abre pronto p/ salvar em PDF) —————
   const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const generateReportHtmlString = (isStandalonePage = false) => {
+    const isDark = Boolean(dark);
     const kv = (a, b, st = false) => `<div class="kv${st ? " st" : ""}"><span>${a}</span><b>${b}</b></div>`;
     const rowsHtml = materialRows
       .map((r) => `<div class="mr"><span class="ml">${esc(r.label)}</span><span class="mq">${r.qty}</span><span class="mu">${fmtBRL(r.unitCost)}</span><span class="ms">${fmtBRL(r.subtotal)}</span></div>`)
       .join("");
+    
     const alertsHtml = alerts
       .map((a) => `<div class="al ${a.level}">• ${esc(a.text)}</div>`)
       .join("");
+    
     const revHtml = priceG > 0
       ? kv("Valor de mercado", `${fmtBRL(priceG)} / g`) +
         kv("Receita por safra", fmtBRL(revenueHarvest)) +
@@ -3093,7 +3096,7 @@ function GrowinStones() {
         const x1 = px(s.a[0]), y1 = py(s.a[1]), x2 = px(s.b[0]), y2 = py(s.b[1]);
         const isRet = s.kind === "return";
         const isBr = s.kind === "branch";
-        const stroke = isRet ? "#6b7280" : "#2563eb";
+        const stroke = isRet ? (isDark ? "#9ca3af" : "#6b7280") : "#2563eb";
         const dash = isRet ? 'stroke-dasharray="6 4"' : "";
         const sw = isBr ? Math.max(1.5, pipeWReport * 0.65) : pipeWReport;
         const op = isBr ? 'opacity="0.75"' : "";
@@ -3107,26 +3110,30 @@ function GrowinStones() {
         const anchor = c.dir === "horizontal" ? 'text-anchor="middle"' : 'text-anchor="start"';
         const rx = c.tx - (c.dir === "horizontal" ? 18 : 2);
         return `<g>
-          <line x1="${c.x1}" y1="${c.y1}" x2="${c.x2}" y2="${c.y2}" stroke="#d97706" stroke-width="1.2" stroke-dasharray="3 2"/>
-          <line x1="${c.tick1[0]}" y1="${c.tick1[1]}" x2="${c.tick1[2]}" y2="${c.tick1[3]}" stroke="#d97706" stroke-width="1.2"/>
-          <line x1="${c.tick2[0]}" y1="${c.tick2[1]}" x2="${c.tick2[2]}" y2="${c.tick2[3]}" stroke="#d97706" stroke-width="1.2"/>
-          <rect x="${rx}" y="${c.ty - 9}" width="36" height="12" rx="3" fill="#ffffff" opacity="0.85"/>
-          <text x="${c.tx}" y="${c.ty}" ${anchor} font-size="8.5" font-weight="700" fill="#b45309">${c.label}</text>
+          <line x1="${c.x1}" y1="${c.y1}" x2="${c.x2}" y2="${c.y2}" stroke="${isDark ? '#f59e0b' : '#d97706'}" stroke-width="1.2" stroke-dasharray="3 2"/>
+          <line x1="${c.tick1[0]}" y1="${c.tick1[1]}" x2="${c.tick1[2]}" y2="${c.tick1[3]}" stroke="${isDark ? '#f59e0b' : '#d97706'}" stroke-width="1.2"/>
+          <line x1="${c.tick2[0]}" y1="${c.tick2[1]}" x2="${c.tick2[2]}" y2="${c.tick2[3]}" stroke="${isDark ? '#f59e0b' : '#d97706'}" stroke-width="1.2"/>
+          <rect x="${rx}" y="${c.ty - 9}" width="36" height="12" rx="3" fill="${isDark ? '#1c1917' : '#ffffff'}" opacity="0.9"/>
+          <text x="${c.tx}" y="${c.ty}" ${anchor} font-size="8.5" font-weight="700" fill="${isDark ? '#f59e0b' : '#b45309'}">${c.label}</text>
         </g>`;
       })
       .join("");
+
+    const potFill = isDark ? "#292524" : "#dde3d0";
+    const potStroke = isDark ? "#78716c" : "#7e8c6d";
+    const potText = isDark ? "#f5f5f4" : "#3f4a33";
 
     const potsSvgReport = layout.grid
       .map((p, i) => {
         let potShapeSvg = "";
         if (isRect) {
-          potShapeSvg = `<rect x="${px(p.x - potW / 2)}" y="${py(p.y - potD / 2)}" width="${potW * topScale}" height="${potD * topScale}" rx="5" fill="#dde3d0" stroke="#7e8c6d" stroke-width="1.5" />`;
+          potShapeSvg = `<rect x="${px(p.x - potW / 2)}" y="${py(p.y - potD / 2)}" width="${potW * topScale}" height="${potD * topScale}" rx="5" fill="${potFill}" stroke="${potStroke}" stroke-width="1.5" />`;
         } else if (isSquare) {
-          potShapeSvg = `<rect x="${px(p.x - potW / 2)}" y="${py(p.y - potD / 2)}" width="${potW * topScale}" height="${potD * topScale}" rx="4" fill="#dde3d0" stroke="#7e8c6d" stroke-width="1.5" />`;
+          potShapeSvg = `<rect x="${px(p.x - potW / 2)}" y="${py(p.y - potD / 2)}" width="${potW * topScale}" height="${potD * topScale}" rx="4" fill="${potFill}" stroke="${potStroke}" stroke-width="1.5" />`;
         } else {
-          potShapeSvg = `<circle cx="${px(p.x)}" cy="${py(p.y)}" r="${(potW / 2) * topScale}" fill="#dde3d0" stroke="#7e8c6d" stroke-width="1.5" />`;
+          potShapeSvg = `<circle cx="${px(p.x)}" cy="${py(p.y)}" r="${(potW / 2) * topScale}" fill="${potFill}" stroke="${potStroke}" stroke-width="1.5" />`;
         }
-        return `<g>${potShapeSvg}<text x="${px(p.x)}" y="${py(p.y) + 3.5}" text-anchor="middle" font-size="10" font-weight="600" fill="#3f4a33">${i + 1}</text></g>`;
+        return `<g>${potShapeSvg}<text x="${px(p.x)}" y="${py(p.y) + 3.5}" text-anchor="middle" font-size="10" font-weight="600" fill="${potText}">${i + 1}</text></g>`;
       })
       .join("");
 
@@ -3137,31 +3144,31 @@ function GrowinStones() {
     const totalSvgH = showRes ? svgH : topH + OY * 2;
     const resSvgReport = showRes
       ? `<g>
-          <text x="${OX}" y="${resY - 6}" font-size="9" fill="#6b6354" letter-spacing="0.1em">ZONA TÉCNICA</text>
+          <text x="${OX}" y="${resY - 6}" font-size="9" fill="${isDark ? '#a8a29e' : '#6b6354'}" letter-spacing="0.1em">ZONA TÉCNICA</text>
           ${resItems
             .map(
               (it) => `
             <g>
-              <rect x="${it.x}" y="${resY + (34 - it.h) / 2}" width="${it.w}" height="${it.h}" rx="6" fill="#cbd5e1" stroke="#64748b" stroke-width="1.4"/>
-              <text x="${it.x + it.w / 2}" y="${resY + 19}" text-anchor="middle" font-size="8.5" font-weight="600" fill="#0f172a">${esc(it.label)}</text>
+              <rect x="${it.x}" y="${resY + (34 - it.h) / 2}" width="${it.w}" height="${it.h}" rx="6" fill="${isDark ? '#334155' : '#cbd5e1'}" stroke="${isDark ? '#64748b' : '#94a3b8'}" stroke-width="1.4"/>
+              <text x="${it.x + it.w / 2}" y="${resY + 19}" text-anchor="middle" font-size="8.5" font-weight="600" fill="${isDark ? '#f8fafc' : '#0f172a'}">${esc(it.label)}</text>
             </g>`
             )
             .join("")}
         </g>`
       : "";
 
-    const diagramSvgHtml = `<div style="background:#f5f1e7; border-radius:12px; padding:14px 10px; text-align:center; margin:10px 0;">
+    const diagramSvgHtml = `<div style="background:${isDark ? '#141210' : '#f5f1e7'}; border-radius:12px; padding:14px 10px; text-align:center; margin:10px 0; border:1px solid ${isDark ? '#292524' : '#e2dccc'};">
       <svg width="${svgW}" height="${totalSvgH}" viewBox="0 0 ${svgW} ${totalSvgH}" style="width:100%; max-width:${svgW}px; height:auto; display:block; margin:0 auto;">
-        <rect x="${OX}" y="${OY}" width="${topW}" height="${topH}" rx="10" fill="#ffffff" stroke="#1f1b16" stroke-width="1.5"/>
-        <text x="${OX + topW / 2}" y="${OY - 8}" text-anchor="middle" font-size="11" fill="#6b6354">${width} cm</text>
-        <text x="${OX - 10}" y="${OY + topH / 2}" text-anchor="middle" font-size="11" fill="#6b6354" transform="rotate(-90, ${OX - 10}, ${OY + topH / 2})">${depth} cm</text>
+        <rect x="${OX}" y="${OY}" width="${topW}" height="${topH}" rx="10" fill="${isDark ? '#1c1917' : '#ffffff'}" stroke="${isDark ? '#57534e' : '#1f1b16'}" stroke-width="1.5"/>
+        <text x="${OX + topW / 2}" y="${OY - 8}" text-anchor="middle" font-size="11" fill="${isDark ? '#a8a29e' : '#6b6354'}">${width} cm</text>
+        <text x="${OX - 10}" y="${OY + topH / 2}" text-anchor="middle" font-size="11" fill="${isDark ? '#a8a29e' : '#6b6354'}" transform="rotate(-90, ${OX - 10}, ${OY + topH / 2})">${depth} cm</text>
         ${segsSvg}
         ${dropLineSvgReport}
         ${potsSvgReport}
         ${cotasSvg}
         ${resSvgReport}
       </svg>
-      <div style="font-size:10.5px; color:#6b6354; margin-top:8px;">Planta baixa (${width} × ${depth} cm) · ${plants} vaso(s) de ${esc(pot.label)} (${esc(potDesc)})<br/>Afastamento paredes: E/D ${layout.wallLeft}/${layout.wallRight} cm, Sup/Inf ${layout.wallTop}/${layout.wallBottom} cm · Entre vasos: ${spacing} cm</div>
+      <div style="font-size:10.5px; color:${isDark ? '#a8a29e' : '#6b6354'}; margin-top:8px;">Planta baixa (${width} × ${depth} cm) · ${plants} vaso(s) de ${esc(pot.label)} (${esc(potDesc)})<br/>Afastamento paredes: E/D ${layout.wallLeft}/${layout.wallRight} cm, Sup/Inf ${layout.wallTop}/${layout.wallBottom} cm · Entre vasos: ${spacing} cm</div>
     </div>`;
 
     const presetMetrics = (Array.isArray(allPresets) && allPresets.length > 0)
@@ -3170,19 +3177,19 @@ function GrowinStones() {
 
     const comparisonReportHtml = presetMetrics.length > 0
       ? `<h2>8 · Comparativo entre Setups de Cultivo (Chips)</h2>
-         <div style="background:#f5f1e7; border-radius:12px; padding:12px 14px; margin-bottom:16px;">
+         <div style="background:${isDark ? '#292524' : '#f5f1e7'}; border-radius:12px; padding:12px 14px; margin-bottom:16px; border:1px solid ${isDark ? '#44403c' : '#e2dccc'};">
            <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;">
              ${presetMetrics.map((m) => `
-               <span style="display:inline-flex; align-items:center; gap:4px; padding:3px 10px; background:#ffffff; border:1px solid #d8cfbe; border-radius:16px; font-size:10px; font-weight:700; color:#1f1b16;">
+               <span style="display:inline-flex; align-items:center; gap:4px; padding:3px 10px; background:${isDark ? '#1c1917' : '#ffffff'}; border:1px solid ${isDark ? '#44403c' : '#d8cfbe'}; border-radius:16px; font-size:10px; font-weight:700; color:${isDark ? '#f5f5f4' : '#1f1b16'};">
                  <span>${esc(m.name)}</span>
-                 <small style="color:#78716c; font-weight:500;">(${m.width}×${m.depth}cm · ${m.potCount}v)</small>
+                 <small style="color:${isDark ? '#a8a29e' : '#78716c'}; font-weight:500;">(${m.width}×${m.depth}cm · ${m.potCount}v)</small>
                </span>
              `).join("")}
            </div>
            <div style="overflow-x:auto;">
              <table style="width:100%; border-collapse:collapse; font-size:11px; text-align:left;">
                <thead>
-                 <tr style="border-bottom:1.5px solid #d8cfbe; color:#78716c; font-size:9.5px; text-transform:uppercase; letter-spacing:0.05em;">
+                 <tr style="border-bottom:1.5px solid ${isDark ? '#44403c' : '#d8cfbe'}; color:${isDark ? '#a8a29e' : '#78716c'}; font-size:9.5px; text-transform:uppercase; letter-spacing:0.05em;">
                    <th style="padding:6px 6px;">Setup</th>
                    <th style="padding:6px 6px; text-align:right;">Invest. (CAPEX)</th>
                    <th style="padding:6px 6px; text-align:right;">OPEX / Mês</th>
@@ -3193,16 +3200,16 @@ function GrowinStones() {
                </thead>
                <tbody>
                  ${presetMetrics.map((m) => `
-                   <tr style="border-bottom:1px dotted #e2dccc;">
-                     <td style="padding:6px 6px; font-weight:700; color:#1f1b16;">
+                   <tr style="border-bottom:1px dotted ${isDark ? '#44403c' : '#e2dccc'};">
+                     <td style="padding:6px 6px; font-weight:700; color:${isDark ? '#f5f5f4' : '#1f1b16'};">
                        ${esc(m.name)}
-                       <div style="font-size:9px; font-weight:400; color:#78716c;">${m.width}×${m.depth}×${m.height} cm · ${m.potCount}× ${esc(m.potLabel)}</div>
+                       <div style="font-size:9px; font-weight:400; color:${isDark ? '#a8a29e' : '#78716c'};">${m.width}×${m.depth}×${m.height} cm · ${m.potCount}× ${esc(m.potLabel)}</div>
                      </td>
-                     <td style="padding:6px 6px; text-align:right; font-weight:600; color:#1f1b16;">${fmtBRL(m.capex)}</td>
-                     <td style="padding:6px 6px; text-align:right; color:#78716c;">${fmtBRL(m.opexMonth)}</td>
-                     <td style="padding:6px 6px; text-align:right; font-weight:600; color:#1f1b16;">${fmtG(m.yieldYearG)}</td>
-                     <td style="padding:6px 6px; text-align:right; font-weight:600; color:#b45309;">${fmtBRL(m.costPerGramOpex)}</td>
-                     <td style="padding:6px 6px; text-align:right; font-weight:700; color:#1f1b16;">${m.paybackMonths ? `${m.paybackMonths.toFixed(1)} m` : "—"}</td>
+                     <td style="padding:6px 6px; text-align:right; font-weight:600; color:${isDark ? '#38bdf8' : '#1f1b16'};">${fmtBRL(m.capex)}</td>
+                     <td style="padding:6px 6px; text-align:right; color:${isDark ? '#f43f5e' : '#78716c'};">${fmtBRL(m.opexMonth)}</td>
+                     <td style="padding:6px 6px; text-align:right; font-weight:600; color:${isDark ? '#34d399' : '#1f1b16'};">${fmtG(m.yieldYearG)}</td>
+                     <td style="padding:6px 6px; text-align:right; font-weight:600; color:${isDark ? '#a3e635' : '#b45309'};">${fmtBRL(m.costPerGramOpex)}</td>
+                     <td style="padding:6px 6px; text-align:right; font-weight:700; color:${isDark ? '#a78bfa' : '#1f1b16'};">${m.paybackMonths ? `${m.paybackMonths.toFixed(1)} m` : "—"}</td>
                    </tr>
                  `).join("")}
                </tbody>
@@ -3217,10 +3224,10 @@ function GrowinStones() {
 
     const extraNotesHtml = (safeNotes || safeInst || safeTerms)
       ? `<h2>9 · Observações, instruções e termos</h2>
-         <div style="background:#f5f1e7; border-radius:12px; padding:12px 14px; margin-bottom:16px; font-size:11px; color:#1f1b16;">
-           ${safeNotes ? `<div style="margin-bottom:10px;"><b style="display:block; text-transform:uppercase; font-size:9.5px; color:#6b6354; margin-bottom:3px; letter-spacing:0.05em;">Observações</b><div style="white-space:pre-wrap; line-height:1.4;">${esc(safeNotes)}</div></div>` : ""}
-           ${safeInst ? `<div style="margin-bottom:10px;"><b style="display:block; text-transform:uppercase; font-size:9.5px; color:#6b6354; margin-bottom:3px; letter-spacing:0.05em;">Instruções de operação</b><div style="white-space:pre-wrap; line-height:1.4;">${esc(safeInst)}</div></div>` : ""}
-           ${safeTerms ? `<div><b style="display:block; text-transform:uppercase; font-size:9.5px; color:#6b6354; margin-bottom:3px; letter-spacing:0.05em;">Termos & Condições</b><div style="white-space:pre-wrap; line-height:1.4;">${esc(safeTerms)}</div></div>` : ""}
+         <div style="background:${isDark ? '#292524' : '#f5f1e7'}; border-radius:12px; padding:12px 14px; margin-bottom:16px; font-size:11px; color:${isDark ? '#f5f5f4' : '#1f1b16'}; border:1px solid ${isDark ? '#44403c' : '#e2dccc'};">
+           ${safeNotes ? `<div style="margin-bottom:10px;"><b style="display:block; text-transform:uppercase; font-size:9.5px; color:${isDark ? '#f59e0b' : '#6b6354'}; margin-bottom:3px; letter-spacing:0.05em;">Observações</b><div style="white-space:pre-wrap; line-height:1.4;">${esc(safeNotes)}</div></div>` : ""}
+           ${safeInst ? `<div style="margin-bottom:10px;"><b style="display:block; text-transform:uppercase; font-size:9.5px; color:${isDark ? '#f59e0b' : '#6b6354'}; margin-bottom:3px; letter-spacing:0.05em;">Instruções de operação</b><div style="white-space:pre-wrap; line-height:1.4;">${esc(safeInst)}</div></div>` : ""}
+           ${safeTerms ? `<div><b style="display:block; text-transform:uppercase; font-size:9.5px; color:${isDark ? '#f59e0b' : '#6b6354'}; margin-bottom:3px; letter-spacing:0.05em;">Termos & Condições</b><div style="white-space:pre-wrap; line-height:1.4;">${esc(safeTerms)}</div></div>` : ""}
          </div>`
       : "";
 
@@ -3231,15 +3238,15 @@ function GrowinStones() {
              const itemUrl = typeof item?.url === "string" ? item.url.trim() : "";
              const qrImg = itemUrl
                ? `<img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(itemUrl)}&size=200x200" alt="QR Code" style="width:108px; height:108px; max-width:100%; border-radius:8px; border:1px solid #e2e8f0; background:#ffffff; padding:4px;" />`
-               : `<div style="width:108px; height:108px; max-width:100%; border-radius:8px; background:#f1f5f9; border:1px solid #e2e8f0; display:flex; align-items:center; justify-content:center; font-size:10px; color:#94a3b8; text-align:center;">Sem link</div>`;
+               : `<div style="width:108px; height:108px; max-width:100%; border-radius:8px; background:${isDark ? '#1c1917' : '#f1f5f9'}; border:1px solid ${isDark ? '#44403c' : '#e2e8f0'}; display:flex; align-items:center; justify-content:center; font-size:10px; color:#94a3b8; text-align:center;">Sem link</div>`;
              return `
-               <div style="display:flex; align-items:center; justify-content:space-between; gap:14px; background:#f5f1e7; border-radius:12px; padding:12px 14px;">
+               <div style="display:flex; align-items:center; justify-content:space-between; gap:14px; background:${isDark ? '#292524' : '#f5f1e7'}; border-radius:12px; padding:12px 14px; border:1px solid ${isDark ? '#44403c' : '#e2dccc'};">
                  <div style="width:50%; min-width:0;">
-                   <b style="font-size:12px; color:#1f1b16; display:block; margin-bottom:4px; line-height:1.3;">${esc(item.name)}</b>
-                   <div style="font-size:10.5px; color:#6b6354; line-height:1.5;">
-                     <div>Qtd: <b style="color:#1f1b16;">${item.qty} un</b></div>
+                   <b style="font-size:12px; color:${isDark ? '#f5f5f4' : '#1f1b16'}; display:block; margin-bottom:4px; line-height:1.3;">${esc(item.name)}</b>
+                   <div style="font-size:10.5px; color:${isDark ? '#a8a29e' : '#6b6354'}; line-height:1.5;">
+                     <div>Qtd: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${item.qty} un</b></div>
                      <div>Unit.: <b>${fmtBRL(item.unitCost)}</b></div>
-                     <div style="margin-top:2px;">Subtotal: <b style="font-size:11.5px; color:#1f1b16;">${fmtBRL(item.subtotal)}</b></div>
+                     <div style="margin-top:2px;">Subtotal: <b style="font-size:11.5px; color:${isDark ? '#38bdf8' : '#1f1b16'};">${fmtBRL(item.subtotal)}</b></div>
                    </div>
                  </div>
                  <div style="width:50%; display:flex; justify-content:center; align-items:center;">
@@ -3251,6 +3258,8 @@ function GrowinStones() {
          </div>`
       : "";
 
+    const logoSvg = getLogoSvgString(34, isDark ? "#f59e0b" : "#1f1b16");
+
     const html = `<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="utf-8">
 <title>Relatório — ${esc(growName || "GrowinStones")}</title>
@@ -3258,33 +3267,88 @@ function GrowinStones() {
 <style>
   @page { size: 108mm 192mm; margin: 9mm; }
   * { box-sizing: border-box; }
-  body { font-family: Inter, system-ui, sans-serif; color: #1f1b16; margin: 0; background: #f5f1e7; }
-  .toolbar { position: sticky; top: 0; background: #f5f1e7; border-bottom: 1px solid #e2dccc; padding: 10px; text-align: center; }
-  .toolbar button { padding: 9px 20px; border-radius: 10px; border: none; background: #1f1b16; color: #f7f3ea; font: 700 13px Inter; cursor: pointer; }
-  .toolbar span { display: block; font-size: 11px; color: #6b6354; margin-top: 6px; }
-  .page { max-width: 430px; margin: 18px auto; padding: 26px 24px; background: #fff; }
-  .hd { border-bottom: 2px solid #1f1b16; padding-bottom: 14px; margin-bottom: 18px; }
+  body { 
+    font-family: Inter, system-ui, sans-serif; 
+    color: ${isDark ? '#f5f5f4' : '#1f1b16'}; 
+    margin: 0; 
+    background: ${isDark ? '#0c0a09' : '#f5f1e7'}; 
+    -webkit-print-color-adjust: exact; 
+    print-color-adjust: exact; 
+  }
+  .toolbar { 
+    position: sticky; 
+    top: 0; 
+    background: ${isDark ? '#1c1917' : '#f5f1e7'}; 
+    border-bottom: 1px solid ${isDark ? '#292524' : '#e2dccc'}; 
+    padding: 10px; 
+    text-align: center; 
+  }
+  .toolbar button { 
+    padding: 9px 20px; 
+    border-radius: 10px; 
+    border: none; 
+    background: ${isDark ? '#0284c7' : '#1f1b16'}; 
+    color: #ffffff; 
+    font: 700 13px Inter; 
+    cursor: pointer; 
+  }
+  .toolbar span { display: block; font-size: 11px; color: ${isDark ? '#a8a29e' : '#6b6354'}; margin-top: 6px; }
+  .page { 
+    max-width: 430px; 
+    margin: 18px auto; 
+    padding: 26px 24px; 
+    background: ${isDark ? '#1c1917' : '#ffffff'}; 
+    border: 1px solid ${isDark ? '#292524' : '#e2dccc'}; 
+    border-radius: ${isDark ? '16px' : '0'}; 
+  }
+  .hd { border-bottom: 2px solid ${isDark ? '#292524' : '#1f1b16'}; padding-bottom: 14px; margin-bottom: 18px; }
   .hd .row { display: flex; align-items: center; gap: 10px; }
   .brand { font-family: 'Berkshire Swash', cursive; letter-spacing: -1px; font-size: 23px; line-height: 1; }
-  .tag { font-size: 9px; text-transform: uppercase; letter-spacing: .18em; color: #a39a87; margin-top: 3px; }
-  .meta { margin-top: 10px; font-size: 11.5px; color: #6b6354; }
-  .meta b { font-size: 15px; color: #1f1b16; display: block; }
+  .tag { font-size: 9px; text-transform: uppercase; letter-spacing: .18em; color: ${isDark ? '#a8a29e' : '#a39a87'}; margin-top: 3px; }
+  .meta { margin-top: 10px; font-size: 11.5px; color: ${isDark ? '#a8a29e' : '#6b6354'}; }
+  .meta b { font-size: 15px; color: ${isDark ? '#f5f5f4' : '#1f1b16'}; display: block; }
   .hl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 22px; }
-  .hl div { background: #f5f1e7; border-radius: 12px; padding: 12px 14px; }
-  .hl b { font-size: 17px; font-weight: 800; display: block; }
-  .hl small { font-size: 10.5px; color: #6b6354; }
-  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .16em; color: #a39a87; border-bottom: 1px solid #e2dccc; padding-bottom: 6px; margin: 26px 0 12px; font-weight: 600; }
-  .kv { display: flex; justify-content: space-between; gap: 16px; padding: 5px 0; border-bottom: 1px dotted #e2dccc; font-size: 12.5px; }
-  .kv span { color: #6b6354; } .kv b { font-weight: 600; text-align: right; } .kv.st b { font-weight: 800; }
-  .mh, .mr { display: flex; gap: 4px; align-items: baseline; font-size: 11px; padding: 4px 0; border-bottom: 1px dotted #e2dccc; }
-  .mh { text-transform: uppercase; letter-spacing: .08em; color: #a39a87; font-size: 10px; }
-  .ml { flex: 1; color: #6b6354; } .mq { width: 40px; text-align: right; } .mu { width: 64px; text-align: right; } .ms { width: 74px; text-align: right; font-weight: 600; }
-  .tot { display: flex; justify-content: space-between; margin-top: 10px; font-size: 15px; font-weight: 800; }
-  .sub { font-size: 11.5px; color: #6b6354; margin-top: 2px; }
-  .al { font-size: 12.5px; padding: 3px 0; color: #6b6354; } .al.hi { color: #8c3b3b; } .al.mid { color: #8a6a2a; }
-  .note { font-size: 12.5px; color: #6b6354; }
-  .ft { font-size: 10.5px; color: #a39a87; border-top: 1px solid #e2dccc; padding-top: 10px; margin-top: 20px; }
-  @media print { .toolbar { display: none; } body { background: #fff; } .page { margin: 0; max-width: none; padding: 0; } }
+  .hl div { 
+    background: ${isDark ? '#292524' : '#f5f1e7'}; 
+    border: 1px solid ${isDark ? '#44403c' : 'transparent'}; 
+    border-radius: 12px; 
+    padding: 12px 14px; 
+  }
+  .hl b { font-size: 17px; font-weight: 800; display: block; color: ${isDark ? '#38bdf8' : '#1f1b16'}; }
+  .hl small { font-size: 10.5px; color: ${isDark ? '#a8a29e' : '#6b6354'}; }
+  h2 { 
+    font-size: 12px; 
+    text-transform: uppercase; 
+    letter-spacing: .16em; 
+    color: ${isDark ? '#f59e0b' : '#a39a87'}; 
+    border-bottom: 1px solid ${isDark ? '#292524' : '#e2dccc'}; 
+    padding-bottom: 6px; 
+    margin: 26px 0 12px; 
+    font-weight: 600; 
+  }
+  .kv { display: flex; justify-content: space-between; gap: 16px; padding: 5px 0; border-bottom: 1px dotted ${isDark ? '#292524' : '#e2dccc'}; font-size: 12.5px; }
+  .kv span { color: ${isDark ? '#a8a29e' : '#6b6354'}; } 
+  .kv b { font-weight: 600; text-align: right; color: ${isDark ? '#f5f5f4' : '#1f1b16'}; } 
+  .kv.st b { font-weight: 800; color: ${isDark ? '#f59e0b' : '#1f1b16'}; }
+  .mh, .mr { display: flex; gap: 4px; align-items: baseline; font-size: 11px; padding: 4px 0; border-bottom: 1px dotted ${isDark ? '#292524' : '#e2dccc'}; }
+  .mh { text-transform: uppercase; letter-spacing: .08em; color: ${isDark ? '#a8a29e' : '#a39a87'}; font-size: 10px; }
+  .ml { flex: 1; color: ${isDark ? '#e7e5e4' : '#6b6354'}; } 
+  .mq { width: 40px; text-align: right; color: ${isDark ? '#a8a29e' : '#6b6354'}; } 
+  .mu { width: 64px; text-align: right; color: ${isDark ? '#a8a29e' : '#6b6354'}; } 
+  .ms { width: 74px; text-align: right; font-weight: 600; color: ${isDark ? '#f5f5f4' : '#1f1b16'}; }
+  .tot { display: flex; justify-content: space-between; margin-top: 10px; font-size: 15px; font-weight: 800; color: ${isDark ? '#38bdf8' : '#1f1b16'}; }
+  .sub { font-size: 11.5px; color: ${isDark ? '#a8a29e' : '#6b6354'}; margin-top: 2px; }
+  .al { font-size: 12.5px; padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; } 
+  .al.hi { background: ${isDark ? 'rgba(239,68,68,0.15)' : '#fef2f2'}; color: ${isDark ? '#f87171' : '#8c3b3b'}; border: 1px solid ${isDark ? 'rgba(239,68,68,0.3)' : '#fecaca'}; } 
+  .al.mid { background: ${isDark ? 'rgba(245,158,11,0.15)' : '#fffbeb'}; color: ${isDark ? '#fbbf24' : '#8a6a2a'}; border: 1px solid ${isDark ? 'rgba(245,158,11,0.3)' : '#fde68a'}; } 
+  .al.low { background: ${isDark ? 'rgba(16,185,129,0.15)' : '#f0fdf4'}; color: ${isDark ? '#34d399' : '#2d6a4f'}; border: 1px solid ${isDark ? 'rgba(16,185,129,0.3)' : '#bbf7d0'}; }
+  .note { font-size: 12.5px; color: ${isDark ? '#a8a29e' : '#6b6354'}; }
+  .ft { font-size: 10.5px; color: ${isDark ? '#78716c' : '#a39a87'}; border-top: 1px solid ${isDark ? '#292524' : '#e2dccc'}; padding-top: 10px; margin-top: 20px; }
+  @media print { 
+    .toolbar { display: none; } 
+    body { background: ${isDark ? '#0c0a09' : '#ffffff'}; } 
+    .page { margin: 0; max-width: none; padding: 0; border: none; } 
+  }
 </style></head><body>
 <div class="toolbar">
   <button onclick="window.print()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-2px;margin-right:6px"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>Salvar como PDF (9:16)</button>
@@ -3293,8 +3357,8 @@ function GrowinStones() {
 <div class="page">
   <div class="hd">
     <div class="row" style="display:flex; align-items:center; gap:12px;">
-      ${getLogoSvgString(34, "#1f1b16")}
-      <div class="tag" style="font-size:9.5px; text-transform:uppercase; letter-spacing:0.18em; color:#78716c; border-left:1px solid #d6d3d1; padding-left:10px;">Relatório de projeto hidropônico</div>
+      ${logoSvg}
+      <div class="tag" style="font-size:9.5px; text-transform:uppercase; letter-spacing:0.18em; color:${isDark ? '#a8a29e' : '#78716c'}; border-left:1px solid ${isDark ? '#44403c' : '#d6d3d1'}; padding-left:10px;">Relatório de projeto hidropônico</div>
     </div>
     <div class="meta"><b>${esc(growName || "Projeto sem nome")}</b>${owner ? `Responsável: ${esc(owner)} · ` : ""}${today}</div>
   </div>
@@ -3362,6 +3426,7 @@ function GrowinStones() {
   };
 
   const generateWebDashboardHtmlString = (slug = "") => {
+    const isDark = Boolean(dark);
     const safeNotes = typeof notes === "string" ? notes.trim() : "";
     const safeInst = typeof instructions === "string" ? instructions.trim() : "";
     const safeTerms = typeof terms === "string" ? terms.trim() : "";
@@ -3373,13 +3438,13 @@ function GrowinStones() {
 
     const webComparisonHtml = presetMetrics.length > 0
       ? `<div class="sec-card">
-          <h2 class="sec-title"> Comparativo de Setups & Presets Selecionados</h2>
+          <h2 class="sec-title">Comparativo de Setups & Presets Selecionados</h2>
           <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px;">
             ${presetMetrics.map((m) => `
-              <span style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; background:#292524; border:1px solid #44403c; border-radius:20px; font-size:12px; font-weight:700; color:#f5f5f4;">
-                <span style="width:6px; height:6px; border-radius:50%; background:#f59e0b;"></span>
+              <span style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; background:${isDark ? '#292524' : '#f5f1e7'}; border:1px solid ${isDark ? '#44403c' : '#d8cfbe'}; border-radius:20px; font-size:12px; font-weight:700; color:${isDark ? '#f5f5f4' : '#1f1b16'};">
+                <span style="width:6px; height:6px; border-radius:50%; background:${isDark ? '#f59e0b' : '#b45309'};"></span>
                 <span>${esc(m.name)}</span>
-                <span style="font-size:11px; color:#a8a29e; font-weight:400;">(${m.width}×${m.depth}cm · ${m.potCount} vasos)</span>
+                <span style="font-size:11px; color:${isDark ? '#a8a29e' : '#78716c'}; font-weight:400;">(${m.width}×${m.depth}cm · ${m.potCount} vasos)</span>
               </span>
             `).join("")}
           </div>
@@ -3400,15 +3465,15 @@ function GrowinStones() {
                 ${presetMetrics.map((m) => `
                   <tr>
                     <td>
-                      <b style="color:#ffffff; font-size:13.5px;">${esc(m.name)}</b>
-                      <div style="font-size:11px; color:#a8a29e;">${m.width}×${m.depth}×${m.height} cm · ${m.potCount}× ${esc(m.potLabel)}</div>
+                      <b style="color:${isDark ? '#ffffff' : '#1f1b16'}; font-size:13.5px;">${esc(m.name)}</b>
+                      <div style="font-size:11px; color:${isDark ? '#a8a29e' : '#78716c'};">${m.width}×${m.depth}×${m.height} cm · ${m.potCount}× ${esc(m.potLabel)}</div>
                     </td>
-                    <td style="text-align:right; font-weight:700; color:#38bdf8;">${fmtBRL(m.capex)}</td>
+                    <td style="text-align:right; font-weight:700; color:${isDark ? '#38bdf8' : '#0284c7'};">${fmtBRL(m.capex)}</td>
                     <td style="text-align:right; color:#f43f5e;">${fmtBRL(m.opexMonth)}</td>
-                    <td style="text-align:right; font-weight:700; color:#34d399;">${fmtG(m.yieldYearG)}</td>
-                    <td style="text-align:right; font-weight:700; color:#f59e0b;">${m.priceG > 0 ? fmtBRL(m.revYear) : "—"}</td>
-                    <td style="text-align:right; font-weight:700; color:#a3e635;">${fmtBRL(m.costPerGramOpex)}</td>
-                    <td style="text-align:right; font-weight:700; color:#a78bfa;">${m.paybackMonths ? `${m.paybackMonths.toFixed(1)} m` : "—"}</td>
+                    <td style="text-align:right; font-weight:700; color:${isDark ? '#34d399' : '#059669'};">${fmtG(m.yieldYearG)}</td>
+                    <td style="text-align:right; font-weight:700; color:${isDark ? '#f59e0b' : '#b45309'};">${m.priceG > 0 ? fmtBRL(m.revYear) : "—"}</td>
+                    <td style="text-align:right; font-weight:700; color:${isDark ? '#a3e635' : '#15803d'};">${fmtBRL(m.costPerGramOpex)}</td>
+                    <td style="text-align:right; font-weight:700; color:${isDark ? '#a78bfa' : '#7c3aed'};">${m.paybackMonths ? `${m.paybackMonths.toFixed(1)} m` : "—"}</td>
                   </tr>
                 `).join("")}
               </tbody>
@@ -3418,16 +3483,22 @@ function GrowinStones() {
       : "";
 
     const rowsHtml = materialRows
-      .map((r) => `<tr style="border-bottom:1px solid #e2e8f0;">
-        <td style="padding:10px 14px; font-weight:600; color:#1e293b;">${esc(r.label)}</td>
-        <td style="padding:10px 14px; text-align:right; color:#475569;">${r.qty} un</td>
-        <td style="padding:10px 14px; text-align:right; color:#475569;">${fmtBRL(r.unitCost)}</td>
-        <td style="padding:10px 14px; text-align:right; font-weight:700; color:#0f172a;">${fmtBRL(r.subtotal)}</td>
+      .map((r) => `<tr>
+        <td style="padding:10px 14px; font-weight:600; color:${isDark ? '#e7e5e4' : '#1f1b16'};">${esc(r.label)}</td>
+        <td style="padding:10px 14px; text-align:right; color:${isDark ? '#a8a29e' : '#6b6354'};">${r.qty} un</td>
+        <td style="padding:10px 14px; text-align:right; color:${isDark ? '#a8a29e' : '#6b6354'};">${fmtBRL(r.unitCost)}</td>
+        <td style="padding:10px 14px; text-align:right; font-weight:700; color:${isDark ? '#f5f5f4' : '#1f1b16'};">${fmtBRL(r.subtotal)}</td>
       </tr>`)
       .join("");
 
     const alertsHtml = alerts
-      .map((a) => `<div style="padding:10px 14px; border-radius:10px; font-size:13px; font-weight:600; margin-bottom:8px; ${a.level === 'hi' ? 'background:#fef2f2; color:#991b1b; border:1px solid #fecaca;' : a.level === 'mid' ? 'background:#fffbeb; color:#92400e; border:1px solid #fde68a;' : 'background:#f0fdf4; color:#166534; border:1px solid #bbf7d0;'}">• ${esc(a.text)}</div>`)
+      .map((a) => `<div style="padding:10px 14px; border-radius:10px; font-size:13px; font-weight:600; margin-bottom:8px; ${
+        a.level === 'hi'
+          ? (isDark ? 'background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3);' : 'background:#fef2f2; color:#991b1b; border:1px solid #fecaca;')
+          : a.level === 'mid'
+          ? (isDark ? 'background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.3);' : 'background:#fffbeb; color:#92400e; border:1px solid #fde68a;')
+          : (isDark ? 'background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.3);' : 'background:#f0fdf4; color:#166534; border:1px solid #bbf7d0;')
+      }">• ${esc(a.text)}</div>`)
       .join("");
 
     const pipeWReport = Math.max(2, gauge.mm * topScale * 0.1 + 1.2);
@@ -3436,7 +3507,7 @@ function GrowinStones() {
         const x1 = px(s.a[0]), y1 = py(s.a[1]), x2 = px(s.b[0]), y2 = py(s.b[1]);
         const isRet = s.kind === "return";
         const isBr = s.kind === "branch";
-        const stroke = isRet ? "#6b7280" : "#2563eb";
+        const stroke = isRet ? (isDark ? "#9ca3af" : "#6b7280") : "#2563eb";
         const dash = isRet ? 'stroke-dasharray="6 4"' : "";
         const sw = isBr ? Math.max(1.5, pipeWReport * 0.65) : pipeWReport;
         const op = isBr ? 'opacity="0.75"' : "";
@@ -3450,26 +3521,30 @@ function GrowinStones() {
         const anchor = c.dir === "horizontal" ? 'text-anchor="middle"' : 'text-anchor="start"';
         const rx = c.tx - (c.dir === "horizontal" ? 18 : 2);
         return `<g>
-          <line x1="${c.x1}" y1="${c.y1}" x2="${c.x2}" y2="${c.y2}" stroke="#d97706" stroke-width="1.2" stroke-dasharray="3 2"/>
-          <line x1="${c.tick1[0]}" y1="${c.tick1[1]}" x2="${c.tick1[2]}" y2="${c.tick1[3]}" stroke="#d97706" stroke-width="1.2"/>
-          <line x1="${c.tick2[0]}" y1="${c.tick2[1]}" x2="${c.tick2[2]}" y2="${c.tick2[3]}" stroke="#d97706" stroke-width="1.2"/>
-          <rect x="${rx}" y="${c.ty - 9}" width="36" height="12" rx="3" fill="#ffffff" opacity="0.85"/>
-          <text x="${c.tx}" y="${c.ty}" ${anchor} font-size="8.5" font-weight="700" fill="#b45309">${c.label}</text>
+          <line x1="${c.x1}" y1="${c.y1}" x2="${c.x2}" y2="${c.y2}" stroke="${isDark ? '#f59e0b' : '#d97706'}" stroke-width="1.2" stroke-dasharray="3 2"/>
+          <line x1="${c.tick1[0]}" y1="${c.tick1[1]}" x2="${c.tick1[2]}" y2="${c.tick1[3]}" stroke="${isDark ? '#f59e0b' : '#d97706'}" stroke-width="1.2"/>
+          <line x1="${c.tick2[0]}" y1="${c.tick2[1]}" x2="${c.tick2[2]}" y2="${c.tick2[3]}" stroke="${isDark ? '#f59e0b' : '#d97706'}" stroke-width="1.2"/>
+          <rect x="${rx}" y="${c.ty - 9}" width="36" height="12" rx="3" fill="${isDark ? '#1c1917' : '#ffffff'}" opacity="0.9"/>
+          <text x="${c.tx}" y="${c.ty}" ${anchor} font-size="8.5" font-weight="700" fill="${isDark ? '#f59e0b' : '#b45309'}">${c.label}</text>
         </g>`;
       })
       .join("");
+
+    const potFill = isDark ? "#292524" : "#dde3d0";
+    const potStroke = isDark ? "#78716c" : "#7e8c6d";
+    const potText = isDark ? "#f5f5f4" : "#3f4a33";
 
     const potsSvgReport = layout.grid
       .map((p, i) => {
         let potShapeSvg = "";
         if (isRect) {
-          potShapeSvg = `<rect x="${px(p.x - potW / 2)}" y="${py(p.y - potD / 2)}" width="${potW * topScale}" height="${potD * topScale}" rx="5" fill="#dde3d0" stroke="#7e8c6d" stroke-width="1.5" />`;
+          potShapeSvg = `<rect x="${px(p.x - potW / 2)}" y="${py(p.y - potD / 2)}" width="${potW * topScale}" height="${potD * topScale}" rx="5" fill="${potFill}" stroke="${potStroke}" stroke-width="1.5" />`;
         } else if (isSquare) {
-          potShapeSvg = `<rect x="${px(p.x - potW / 2)}" y="${py(p.y - potD / 2)}" width="${potW * topScale}" height="${potD * topScale}" rx="4" fill="#dde3d0" stroke="#7e8c6d" stroke-width="1.5" />`;
+          potShapeSvg = `<rect x="${px(p.x - potW / 2)}" y="${py(p.y - potD / 2)}" width="${potW * topScale}" height="${potD * topScale}" rx="4" fill="${potFill}" stroke="${potStroke}" stroke-width="1.5" />`;
         } else {
-          potShapeSvg = `<circle cx="${px(p.x)}" cy="${py(p.y)}" r="${(potW / 2) * topScale}" fill="#dde3d0" stroke="#7e8c6d" stroke-width="1.5" />`;
+          potShapeSvg = `<circle cx="${px(p.x)}" cy="${py(p.y)}" r="${(potW / 2) * topScale}" fill="${potFill}" stroke="${potStroke}" stroke-width="1.5" />`;
         }
-        return `<g>${potShapeSvg}<text x="${px(p.x)}" y="${py(p.y) + 3.5}" text-anchor="middle" font-size="10" font-weight="600" fill="#3f4a33">${i + 1}</text></g>`;
+        return `<g>${potShapeSvg}<text x="${px(p.x)}" y="${py(p.y) + 3.5}" text-anchor="middle" font-size="10" font-weight="600" fill="${potText}">${i + 1}</text></g>`;
       })
       .join("");
 
@@ -3480,13 +3555,13 @@ function GrowinStones() {
     const totalSvgH = showRes ? svgH : topH + OY * 2;
     const resSvgReport = showRes
       ? `<g>
-          <text x="${OX}" y="${resY - 6}" font-size="9" fill="#6b6354" letter-spacing="0.1em">ZONA TÉCNICA</text>
+          <text x="${OX}" y="${resY - 6}" font-size="9" fill="${isDark ? '#a8a29e' : '#6b6354'}" letter-spacing="0.1em">ZONA TÉCNICA</text>
           ${resItems
             .map(
               (it) => `
             <g>
-              <rect x="${it.x}" y="${resY + (34 - it.h) / 2}" width="${it.w}" height="${it.h}" rx="6" fill="#cbd5e1" stroke="#64748b" stroke-width="1.4"/>
-              <text x="${it.x + it.w / 2}" y="${resY + 19}" text-anchor="middle" font-size="8.5" font-weight="600" fill="#0f172a">${esc(it.label)}</text>
+              <rect x="${it.x}" y="${resY + (34 - it.h) / 2}" width="${it.w}" height="${it.h}" rx="6" fill="${isDark ? '#334155' : '#cbd5e1'}" stroke="${isDark ? '#64748b' : '#94a3b8'}" stroke-width="1.4"/>
+              <text x="${it.x + it.w / 2}" y="${resY + 19}" text-anchor="middle" font-size="8.5" font-weight="600" fill="${isDark ? '#f8fafc' : '#0f172a'}">${esc(it.label)}</text>
             </g>`
             )
             .join("")}
@@ -3495,21 +3570,21 @@ function GrowinStones() {
 
     const shoppingListHtml = (Array.isArray(shoppingListItems) && shoppingListItems.length > 0)
       ? `<div style="margin-top:28px;">
-          <h2 style="font-size:14px; text-transform:uppercase; letter-spacing:0.12em; color:#0369a1; border-bottom:2px solid #bae6fd; padding-bottom:8px; margin-bottom:16px;">Lista de compras com QR Codes</h2>
+          <h2 style="font-size:14px; text-transform:uppercase; letter-spacing:0.12em; color:${isDark ? '#38bdf8' : '#0369a1'}; border-bottom:2px solid ${isDark ? '#0369a1' : '#bae6fd'}; padding-bottom:8px; margin-bottom:16px;">Lista de compras com QR Codes</h2>
           <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:14px;">
             ${shoppingListItems.map((item) => {
               const itemUrl = typeof item?.url === "string" ? item.url.trim() : "";
               const qrImg = itemUrl
                 ? `<img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(itemUrl)}&size=200x200" alt="QR Code" style="width:90px; height:90px; border-radius:8px; border:1px solid #e2e8f0; background:#ffffff; padding:4px;" />`
-                : `<div style="width:90px; height:90px; border-radius:8px; background:#f1f5f9; border:1px solid #cbd5e1; display:flex; align-items:center; justify-content:center; font-size:11px; color:#94a3b8;">Sem link</div>`;
+                : `<div style="width:90px; height:90px; border-radius:8px; background:${isDark ? '#292524' : '#f1f5f9'}; border:1px solid ${isDark ? '#44403c' : '#cbd5e1'}; display:flex; align-items:center; justify-content:center; font-size:11px; color:#94a3b8;">Sem link</div>`;
               return `
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; background:#ffffff; border-radius:14px; padding:14px; border:1px solid #e2e8f0; box-shadow:0 4px 12px rgba(0,0,0,0.03);">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; background:${isDark ? '#1c1917' : '#ffffff'}; border-radius:14px; padding:14px; border:1px solid ${isDark ? '#292524' : '#e2dccc'}; box-shadow:${isDark ? '0 4px 12px rgba(0,0,0,0.2)' : '0 4px 12px rgba(0,0,0,0.03)'};">
                   <div style="flex:1; min-width:0;">
-                    <b style="font-size:13px; color:#0f172a; display:block; margin-bottom:4px; line-height:1.3;">${esc(item.name)}</b>
-                    <div style="font-size:11px; color:#64748b; line-height:1.5;">
-                      <div>Qtd: <b style="color:#0f172a;">${item.qty} un</b></div>
+                    <b style="font-size:13px; color:${isDark ? '#f5f5f4' : '#1f1b16'}; display:block; margin-bottom:4px; line-height:1.3;">${esc(item.name)}</b>
+                    <div style="font-size:11px; color:${isDark ? '#a8a29e' : '#6b6354'}; line-height:1.5;">
+                      <div>Qtd: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${item.qty} un</b></div>
                       <div>Unit.: <b>${fmtBRL(item.unitCost)}</b></div>
-                      <div style="margin-top:2px; font-weight:700; color:#0284c7;">Subtotal: ${fmtBRL(item.subtotal)}</div>
+                      <div style="margin-top:2px; font-weight:700; color:${isDark ? '#38bdf8' : '#0284c7'};">Subtotal: ${fmtBRL(item.subtotal)}</div>
                     </div>
                   </div>
                   <div style="shrink:0;">
@@ -3522,6 +3597,8 @@ function GrowinStones() {
         </div>`
       : "";
 
+    const logoSvg = getLogoSvgString(30, isDark ? "#f59e0b" : "#1f1b16");
+
     return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -3531,34 +3608,89 @@ function GrowinStones() {
 <link href="https://fonts.googleapis.com/css2?family=Berkshire+Swash&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; }
-  body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #0c0a09; color: #f5f5f4; margin: 0; padding: 0; min-height: 100vh; }
-  header { background: #1c1917; border-bottom: 1px solid #292524; position: sticky; top: 0; z-index: 50; }
+  body { 
+    font-family: 'Inter', system-ui, -apple-system, sans-serif; 
+    background: ${isDark ? '#0c0a09' : '#f5f1e7'}; 
+    color: ${isDark ? '#f5f5f4' : '#1f1b16'}; 
+    margin: 0; 
+    padding: 0; 
+    min-height: 100vh; 
+  }
+  header { 
+    background: ${isDark ? '#1c1917' : '#ffffff'}; 
+    border-bottom: 1px solid ${isDark ? '#292524' : '#e2dccc'}; 
+    position: sticky; 
+    top: 0; 
+    z-index: 50; 
+  }
   .header-in { max-width: 1100px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-  .brand { font-family: 'Berkshire Swash', cursive; font-size: 24px; color: #f59e0b; text-decoration: none; display: flex; align-items: center; gap: 8px; }
-  .badge-live { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(16,185,129,0.15); border: 1px solid #10b981; color: #34d399; font-size: 11.5px; font-weight: 700; border-radius: 20px; text-decoration: none; }
-  .badge-live::before { content: ""; width: 7px; height: 7px; background: #10b981; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #10b981; }
+  .badge-live { 
+    display: inline-flex; 
+    align-items: center; 
+    gap: 6px; 
+    padding: 4px 12px; 
+    background: ${isDark ? 'rgba(16,185,129,0.15)' : 'rgba(5,150,105,0.1)'}; 
+    border: 1px solid ${isDark ? '#10b981' : '#059669'}; 
+    color: ${isDark ? '#34d399' : '#047857'}; 
+    font-size: 11.5px; 
+    font-weight: 700; 
+    border-radius: 20px; 
+    text-decoration: none; 
+  }
+  .badge-live::before { content: ""; width: 7px; height: 7px; background: ${isDark ? '#10b981' : '#059669'}; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px ${isDark ? '#10b981' : '#059669'}; }
   .container { max-width: 1100px; margin: 24px auto; padding: 0 20px 60px; }
-  .hero-card { background: linear-gradient(135deg, #1c1917 0%, #292524 100%); border: 1px solid #44403c; border-radius: 20px; padding: 28px; margin-bottom: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+  .hero-card { 
+    background: ${isDark ? 'linear-gradient(135deg, #1c1917 0%, #292524 100%)' : 'linear-gradient(135deg, #ffffff 0%, #faf7f0 100%)'}; 
+    border: 1px solid ${isDark ? '#44403c' : '#e2dccc'}; 
+    border-radius: 20px; 
+    padding: 28px; 
+    margin-bottom: 24px; 
+    box-shadow: ${isDark ? '0 20px 40px rgba(0,0,0,0.3)' : '0 10px 30px rgba(0,0,0,0.03)'}; 
+  }
   .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 28px; }
-  .kpi-card { background: #1c1917; border: 1px solid #292524; border-radius: 16px; padding: 20px; }
-  .kpi-val { font-size: 24px; font-weight: 800; color: #38bdf8; margin: 4px 0 2px; }
-  .kpi-lbl { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: #a8a29e; }
-  .sec-card { background: #1c1917; border: 1px solid #292524; border-radius: 20px; padding: 24px; margin-bottom: 24px; }
-  .sec-title { font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #f59e0b; border-bottom: 1px solid #292524; padding-bottom: 10px; margin-top: 0; margin-bottom: 16px; }
-  .kv-row { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid #292524; font-size: 13px; }
-  .kv-row span { color: #a8a29e; } .kv-row b { font-weight: 600; color: #f5f5f4; }
+  .kpi-card { 
+    background: ${isDark ? '#1c1917' : '#ffffff'}; 
+    border: 1px solid ${isDark ? '#292524' : '#e2dccc'}; 
+    border-radius: 16px; 
+    padding: 20px; 
+    box-shadow: ${isDark ? 'none' : '0 4px 14px rgba(0,0,0,0.02)'};
+  }
+  .kpi-val { font-size: 24px; font-weight: 800; margin: 4px 0 2px; }
+  .kpi-lbl { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: ${isDark ? '#a8a29e' : '#6b6354'}; }
+  .sec-card { 
+    background: ${isDark ? '#1c1917' : '#ffffff'}; 
+    border: 1px solid ${isDark ? '#292524' : '#e2dccc'}; 
+    border-radius: 20px; 
+    padding: 24px; 
+    margin-bottom: 24px; 
+    box-shadow: ${isDark ? 'none' : '0 4px 14px rgba(0,0,0,0.02)'};
+  }
+  .sec-title { 
+    font-size: 15px; 
+    font-weight: 700; 
+    text-transform: uppercase; 
+    letter-spacing: 0.1em; 
+    color: ${isDark ? '#f59e0b' : '#b45309'}; 
+    border-bottom: 1px solid ${isDark ? '#292524' : '#e2dccc'}; 
+    padding-bottom: 10px; 
+    margin-top: 0; 
+    margin-bottom: 16px; 
+  }
+  .kv-row { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid ${isDark ? '#292524' : '#e2dccc'}; font-size: 13px; }
+  .kv-row span { color: ${isDark ? '#a8a29e' : '#6b6354'}; } 
+  .kv-row b { font-weight: 600; color: ${isDark ? '#f5f5f4' : '#1f1b16'}; }
   table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
-  th { text-align: left; padding: 12px; border-bottom: 2px solid #292524; color: #a8a29e; font-size: 11px; text-transform: uppercase; }
-  td { padding: 12px; border-bottom: 1px solid #292524; color: #e7e5e4; }
-  .footer { text-align: center; font-size: 12px; color: #78716c; margin-top: 40px; }
+  th { text-align: left; padding: 12px; border-bottom: 2px solid ${isDark ? '#292524' : '#e2dccc'}; color: ${isDark ? '#a8a29e' : '#6b6354'}; font-size: 11px; text-transform: uppercase; }
+  td { padding: 12px; border-bottom: 1px solid ${isDark ? '#292524' : '#e2dccc'}; color: ${isDark ? '#e7e5e4' : '#1f1b16'}; }
+  .footer { text-align: center; font-size: 12px; color: ${isDark ? '#78716c' : '#a39a87'}; margin-top: 40px; }
 </style>
 </head>
 <body>
 <header>
   <div class="header-in">
     <div style="display:flex; align-items:center; gap:12px;">
-      ${getLogoSvgString(30, "#f59e0b")}
-      <span style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.14em; color:#a8a29e; border-left:1px solid #44403c; padding-left:10px;">Dashboard Interativo</span>
+      ${logoSvg}
+      <span style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.14em; color:${isDark ? '#a8a29e' : '#78716c'}; border-left:1px solid ${isDark ? '#44403c' : '#d6d3d1'}; padding-left:10px;">Dashboard Interativo</span>
     </div>
     <a href="https://${displaySlug}.thegrowinstones.com" target="_blank" class="badge-live">https://${displaySlug}.thegrowinstones.com</a>
   </div>
@@ -3567,35 +3699,38 @@ function GrowinStones() {
   <div class="hero-card">
     <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
       <div>
-        <h1 style="font-size:28px; font-weight:800; margin:0 0 6px; color:#ffffff;">${esc(growName || "GrowinStones")}</h1>
-        <div style="font-size:13px; color:#a8a29e;">
-          ${owner ? `Responsável: <b style="color:#f5f5f4;">${esc(owner)}</b> · ` : ""}Genética: <b style="color:#f5f5f4;">${esc(strain || "Não informada")}</b> · Atualizado em ${today}
+        <h1 style="font-size:28px; font-weight:800; margin:0 0 6px; color:${isDark ? '#ffffff' : '#1f1b16'};">${esc(growName || "GrowinStones")}</h1>
+        <div style="font-size:13px; color:${isDark ? '#a8a29e' : '#6b6354'};">
+          ${owner ? `Responsável: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(owner)}</b> · ` : ""}Genética: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(strain || "Não informada")}</b> · Atualizado em ${today}
         </div>
       </div>
-      <button onclick="window.print()" style="background:#0284c7; color:#fff; border:none; padding:10px 18px; border-radius:12px; font:700 13px Inter; cursor:pointer;">Exportar PDF</button>
+      <button onclick="window.print()" style="background:${isDark ? '#0284c7' : '#1f1b16'}; color:#ffffff; border:none; padding:10px 18px; border-radius:12px; font:700 13px Inter; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+        <span>Exportar PDF</span>
+      </button>
     </div>
   </div>
 
   <div class="kpi-grid">
     <div class="kpi-card">
       <div class="kpi-lbl">Investimento (CAPEX)</div>
-      <div class="kpi-val" style="color:#38bdf8;">${fmtBRL(capex)}</div>
-      <div style="font-size:11px; color:#78716c;">≈ ${fmtBRL(capexPerPlant)} / planta</div>
+      <div class="kpi-val" style="color:${isDark ? '#38bdf8' : '#0284c7'};">${fmtBRL(capex)}</div>
+      <div style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">≈ ${fmtBRL(capexPerPlant)} / planta</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-lbl">Produção Anual Estimada</div>
-      <div class="kpi-val" style="color:#34d399;">${fmtG(yieldYear)}</div>
-      <div style="font-size:11px; color:#78716c;">${harvestsYear.toFixed(1)} safras/ano (${yieldPerPlant}g/planta)</div>
+      <div class="kpi-val" style="color:${isDark ? '#34d399' : '#059669'};">${fmtG(yieldYear)}</div>
+      <div style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">${harvestsYear.toFixed(1)} safras/ano (${yieldPerPlant}g/planta)</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-lbl">Receita Estimada / Ano</div>
-      <div class="kpi-val" style="color:#f59e0b;">${priceG > 0 ? fmtBRL(revenueYear) : "—"}</div>
-      <div style="font-size:11px; color:#78716c;">${priceG > 0 ? `${fmtBRL(priceG)}/g` : "Preço/g não preenchido"}</div>
+      <div class="kpi-val" style="color:${isDark ? '#f59e0b' : '#b45309'};">${priceG > 0 ? fmtBRL(revenueYear) : "—"}</div>
+      <div style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">${priceG > 0 ? `${fmtBRL(priceG)}/g` : "Preço/g não preenchido"}</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-lbl">Payback Estimado</div>
-      <div class="kpi-val" style="color:#a78bfa;">${paybackMonths ? `${paybackMonths.toFixed(1)} m` : "—"}</div>
-      <div style="font-size:11px; color:#78716c;">${paybackMonths ? `~${(paybackMonths / (cycleDays / 30)).toFixed(1)} safras` : "Retorno não atingido"}</div>
+      <div class="kpi-val" style="color:${isDark ? '#a78bfa' : '#7c3aed'};">${paybackMonths ? `${paybackMonths.toFixed(1)} m` : "—"}</div>
+      <div style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">${paybackMonths ? `~${(paybackMonths / (cycleDays / 30)).toFixed(1)} safras` : "Retorno não atingido"}</div>
     </div>
   </div>
 
@@ -3629,18 +3764,18 @@ function GrowinStones() {
 
   <div class="sec-card">
     <h2 class="sec-title">Planta Baixa Interativa</h2>
-    <div style="background:#f5f1e7; border-radius:14px; padding:16px; text-align:center;">
+    <div style="background:${isDark ? '#141210' : '#f5f1e7'}; border-radius:14px; padding:16px; text-align:center; border:1px solid ${isDark ? '#292524' : '#e2dccc'};">
       <svg width="${svgW}" height="${totalSvgH}" viewBox="0 0 ${svgW} ${totalSvgH}" style="width:100%; max-width:${svgW}px; height:auto; display:block; margin:0 auto;">
-        <rect x="${OX}" y="${OY}" width="${topW}" height="${topH}" rx="10" fill="#ffffff" stroke="#1f1b16" stroke-width="1.5"/>
-        <text x="${OX + topW / 2}" y="${OY - 8}" text-anchor="middle" font-size="11" fill="#6b6354">${width} cm</text>
-        <text x="${OX - 10}" y="${OY + topH / 2}" text-anchor="middle" font-size="11" fill="#6b6354" transform="rotate(-90, ${OX - 10}, ${OY + topH / 2})">${depth} cm</text>
+        <rect x="${OX}" y="${OY}" width="${topW}" height="${topH}" rx="10" fill="${isDark ? '#1c1917' : '#ffffff'}" stroke="${isDark ? '#57534e' : '#1f1b16'}" stroke-width="1.5"/>
+        <text x="${OX + topW / 2}" y="${OY - 8}" text-anchor="middle" font-size="11" fill="${isDark ? '#a8a29e' : '#6b6354'}">${width} cm</text>
+        <text x="${OX - 10}" y="${OY + topH / 2}" text-anchor="middle" font-size="11" fill="${isDark ? '#a8a29e' : '#6b6354'}" transform="rotate(-90, ${OX - 10}, ${OY + topH / 2})">${depth} cm</text>
         ${segsSvg}
         ${dropLineSvgReport}
         ${potsSvgReport}
         ${cotasSvg}
         ${resSvgReport}
       </svg>
-      <div style="font-size:11px; color:#6b6354; margin-top:10px;">Planta baixa (${width} × ${depth} cm) · ${plants} vaso(s) de ${esc(pot.label)} (${esc(potDesc)})</div>
+      <div style="font-size:11px; color:${isDark ? '#a8a29e' : '#6b6354'}; margin-top:10px;">Planta baixa (${width} × ${depth} cm) · ${plants} vaso(s) de ${esc(pot.label)} (${esc(potDesc)})</div>
     </div>
   </div>
 
@@ -3656,12 +3791,12 @@ function GrowinStones() {
         </tr>
       </thead>
       <tbody>
-        ${materialRows.map((r) => `<tr><td>${esc(r.label)}</td><td style="text-align:right;">${r.qty}</td><td style="text-align:right;">${fmtBRL(r.unitCost)}</td><td style="text-align:right; font-weight:700;">${fmtBRL(r.subtotal)}</td></tr>`).join("")}
+        ${rowsHtml}
         <tr>
           <td colspan="3" style="font-weight:700;">Custos Extras (frete, estrutura, elétrica)</td>
           <td style="text-align:right; font-weight:700;">${fmtBRL(extraCost)}</td>
         </tr>
-        <tr style="font-size:15px; font-weight:800; color:#38bdf8;">
+        <tr style="font-size:15px; font-weight:800; color:${isDark ? '#38bdf8' : '#0284c7'};">
           <td colspan="3">INVESTIMENTO TOTAL (CAPEX)</td>
           <td style="text-align:right;">${fmtBRL(capex)}</td>
         </tr>
@@ -3674,9 +3809,9 @@ function GrowinStones() {
   ${safeNotes || safeInst || safeTerms ? `
   <div class="sec-card">
     <h2 class="sec-title">Notas, Instruções & Termos</h2>
-    ${safeNotes ? `<div style="margin-bottom:12px;"><b style="color:#f59e0b; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Observações</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeNotes)}</div></div>` : ""}
-    ${safeInst ? `<div style="margin-bottom:12px;"><b style="color:#f59e0b; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Instruções de Operação</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeInst)}</div></div>` : ""}
-    ${safeTerms ? `<div><b style="color:#f59e0b; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Termos & Condições</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeTerms)}</div></div>` : ""}
+    ${safeNotes ? `<div style="margin-bottom:12px;"><b style="color:${isDark ? '#f59e0b' : '#b45309'}; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Observações</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeNotes)}</div></div>` : ""}
+    ${safeInst ? `<div style="margin-bottom:12px;"><b style="color:${isDark ? '#f59e0b' : '#b45309'}; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Instruções de Operação</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeInst)}</div></div>` : ""}
+    ${safeTerms ? `<div><b style="color:${isDark ? '#f59e0b' : '#b45309'}; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Termos & Condições</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeTerms)}</div></div>` : ""}
   </div>` : ""}
 
   <div class="footer">
