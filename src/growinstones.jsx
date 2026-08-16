@@ -1461,7 +1461,22 @@ export default function GrowinStones() {
   const [instructions, setInstructions] = useState("");
   const [terms, setTerms] = useState("");
 
-  const [activeTab, setActiveTab] = useState("configurator"); // "configurator" | "comparison"
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem("growcalc_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [authNameInput, setAuthNameInput] = useState("");
+  const [authUsernameInput, setAuthUsernameInput] = useState("");
+
+  const [activeTab, setActiveTab] = useState("configurator"); // "configurator" | "my_grows" | "comparison" | "settings"
+ // "configurator" | "comparison"
 
   const [publishModalOpen, setPublishModalOpen] = useState(false);
   const [subdomainInput, setSubdomainInput] = useState("");
@@ -2632,31 +2647,300 @@ export default function GrowinStones() {
     return html;
   };
 
+  const generateWebDashboardHtmlString = (slug = "") => {
+    const safeNotes = typeof notes === "string" ? notes.trim() : "";
+    const safeInst = typeof instructions === "string" ? instructions.trim() : "";
+    const safeTerms = typeof terms === "string" ? terms.trim() : "";
+    const displaySlug = slug || subdomainInput || (currentUser?.username) || "grow";
+
+    const rowsHtml = materialRows
+      .map((r) => `<tr style="border-bottom:1px solid #e2e8f0;">
+        <td style="padding:10px 14px; font-weight:600; color:#1e293b;">${esc(r.label)}</td>
+        <td style="padding:10px 14px; text-align:right; color:#475569;">${r.qty} un</td>
+        <td style="padding:10px 14px; text-align:right; color:#475569;">${fmtBRL(r.unitCost)}</td>
+        <td style="padding:10px 14px; text-align:right; font-weight:700; color:#0f172a;">${fmtBRL(r.subtotal)}</td>
+      </tr>`)
+      .join("");
+
+    const alertsHtml = alerts
+      .map((a) => `<div style="padding:10px 14px; border-radius:10px; font-size:13px; font-weight:600; margin-bottom:8px; ${a.level === 'hi' ? 'background:#fef2f2; color:#991b1b; border:1px solid #fecaca;' : a.level === 'mid' ? 'background:#fffbeb; color:#92400e; border:1px solid #fde68a;' : 'background:#f0fdf4; color:#166534; border:1px solid #bbf7d0;'}">• ${esc(a.text)}</div>`)
+      .join("");
+
+    const pipeWReport = Math.max(2, gauge.mm * topScale * 0.1 + 1.2);
+    const segsSvg = plumbing.segs
+      .map((s) => {
+        const x1 = px(s.a[0]), y1 = py(s.a[1]), x2 = px(s.b[0]), y2 = py(s.b[1]);
+        const isRet = s.kind === "return";
+        const isBr = s.kind === "branch";
+        const stroke = isRet ? "#6b7280" : "#2563eb";
+        const dash = isRet ? 'stroke-dasharray="6 4"' : "";
+        const sw = isBr ? Math.max(1.5, pipeWReport * 0.65) : pipeWReport;
+        const op = isBr ? 'opacity="0.75"' : "";
+        return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round" ${dash} ${op}/>`;
+      })
+      .join("");
+
+    const cotaListReport = getCotaElements(topScale, OX, OY, layout, potW, potD, spacing, width, depth);
+    const cotasSvg = cotaListReport
+      .map((c) => {
+        const anchor = c.dir === "horizontal" ? 'text-anchor="middle"' : 'text-anchor="start"';
+        const rx = c.tx - (c.dir === "horizontal" ? 18 : 2);
+        return `<g>
+          <line x1="${c.x1}" y1="${c.y1}" x2="${c.x2}" y2="${c.y2}" stroke="#d97706" stroke-width="1.2" stroke-dasharray="3 2"/>
+          <line x1="${c.tick1[0]}" y1="${c.tick1[1]}" x2="${c.tick1[2]}" y2="${c.tick1[3]}" stroke="#d97706" stroke-width="1.2"/>
+          <line x1="${c.tick2[0]}" y1="${c.tick2[1]}" x2="${c.tick2[2]}" y2="${c.tick2[3]}" stroke="#d97706" stroke-width="1.2"/>
+          <rect x="${rx}" y="${c.ty - 9}" width="36" height="12" rx="3" fill="#ffffff" opacity="0.85"/>
+          <text x="${c.tx}" y="${c.ty}" ${anchor} font-size="8.5" font-weight="700" fill="#b45309">${c.label}</text>
+        </g>`;
+      })
+      .join("");
+
+    const potsSvgReport = layout.grid
+      .map((p, i) => {
+        let potShapeSvg = "";
+        if (isRect) {
+          potShapeSvg = `<rect x="${px(p.x - potW / 2)}" y="${py(p.y - potD / 2)}" width="${potW * topScale}" height="${potD * topScale}" rx="5" fill="#dde3d0" stroke="#7e8c6d" stroke-width="1.5" />`;
+        } else if (isSquare) {
+          potShapeSvg = `<rect x="${px(p.x - potW / 2)}" y="${py(p.y - potD / 2)}" width="${potW * topScale}" height="${potD * topScale}" rx="4" fill="#dde3d0" stroke="#7e8c6d" stroke-width="1.5" />`;
+        } else {
+          potShapeSvg = `<circle cx="${px(p.x)}" cy="${py(p.y)}" r="${(potW / 2) * topScale}" fill="#dde3d0" stroke="#7e8c6d" stroke-width="1.5" />`;
+        }
+        return `<g>${potShapeSvg}<text x="${px(p.x)}" y="${py(p.y) + 3.5}" text-anchor="middle" font-size="10" font-weight="600" fill="#3f4a33">${i + 1}</text></g>`;
+      })
+      .join("");
+
+    const dropLineSvgReport = plumbing.dropLine
+      ? `<line x1="${px(plumbing.dropLine.a[0])}" y1="${py(plumbing.dropLine.a[1])}" x2="${px(plumbing.dropLine.b[0])}" y2="${py(plumbing.dropLine.b[1])}" stroke="#2563eb" stroke-width="${pipeWReport * 1.2}" stroke-linecap="round"/>`
+      : "";
+
+    const totalSvgH = showRes ? svgH : topH + OY * 2;
+    const resSvgReport = showRes
+      ? `<g>
+          <text x="${OX}" y="${resY - 6}" font-size="9" fill="#6b6354" letter-spacing="0.1em">ZONA TÉCNICA</text>
+          ${resItems
+            .map(
+              (it) => `
+            <g>
+              <rect x="${it.x}" y="${resY + (34 - it.h) / 2}" width="${it.w}" height="${it.h}" rx="6" fill="#cbd5e1" stroke="#64748b" stroke-width="1.4"/>
+              <text x="${it.x + it.w / 2}" y="${resY + 19}" text-anchor="middle" font-size="8.5" font-weight="600" fill="#0f172a">${esc(it.label)}</text>
+            </g>`
+            )
+            .join("")}
+        </g>`
+      : "";
+
+    const shoppingListHtml = (Array.isArray(shoppingListItems) && shoppingListItems.length > 0)
+      ? `<div style="margin-top:28px;">
+          <h2 style="font-size:14px; text-transform:uppercase; letter-spacing:0.12em; color:#0369a1; border-bottom:2px solid #bae6fd; padding-bottom:8px; margin-bottom:16px;">🛒 Lista de compras com QR Codes</h2>
+          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:14px;">
+            ${shoppingListItems.map((item) => {
+              const itemUrl = typeof item?.url === "string" ? item.url.trim() : "";
+              const qrImg = itemUrl
+                ? `<img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(itemUrl)}&size=200x200" alt="QR Code" style="width:90px; height:90px; border-radius:8px; border:1px solid #e2e8f0; background:#ffffff; padding:4px;" />`
+                : `<div style="width:90px; height:90px; border-radius:8px; background:#f1f5f9; border:1px solid #cbd5e1; display:flex; align-items:center; justify-content:center; font-size:11px; color:#94a3b8;">Sem link</div>`;
+              return `
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; background:#ffffff; border-radius:14px; padding:14px; border:1px solid #e2e8f0; box-shadow:0 4px 12px rgba(0,0,0,0.03);">
+                  <div style="flex:1; min-width:0;">
+                    <b style="font-size:13px; color:#0f172a; display:block; margin-bottom:4px; line-height:1.3;">${esc(item.name)}</b>
+                    <div style="font-size:11px; color:#64748b; line-height:1.5;">
+                      <div>Qtd: <b style="color:#0f172a;">${item.qty} un</b></div>
+                      <div>Unit.: <b>${fmtBRL(item.unitCost)}</b></div>
+                      <div style="margin-top:2px; font-weight:700; color:#0284c7;">Subtotal: ${fmtBRL(item.subtotal)}</div>
+                    </div>
+                  </div>
+                  <div style="shrink:0;">
+                    ${qrImg}
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </div>`
+      : "";
+
+    return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${esc(growName || "GrowinStones")} — Dashboard Interativo</title>
+<link href="https://fonts.googleapis.com/css2?family=Berkshire+Swash&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #0c0a09; color: #f5f5f4; margin: 0; padding: 0; min-height: 100vh; }
+  header { background: #1c1917; border-bottom: 1px solid #292524; position: sticky; top: 0; z-index: 50; }
+  .header-in { max-width: 1100px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .brand { font-family: 'Berkshire Swash', cursive; font-size: 24px; color: #f59e0b; text-decoration: none; display: flex; align-items: center; gap: 8px; }
+  .badge-live { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(16,185,129,0.15); border: 1px solid #10b981; color: #34d399; font-size: 11.5px; font-weight: 700; border-radius: 20px; text-decoration: none; }
+  .badge-live::before { content: ""; width: 7px; height: 7px; background: #10b981; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #10b981; }
+  .container { max-width: 1100px; margin: 24px auto; padding: 0 20px 60px; }
+  .hero-card { background: linear-gradient(135deg, #1c1917 0%, #292524 100%); border: 1px solid #44403c; border-radius: 20px; padding: 28px; margin-bottom: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .kpi-card { background: #1c1917; border: 1px solid #292524; border-radius: 16px; padding: 20px; }
+  .kpi-val { font-size: 24px; font-weight: 800; color: #38bdf8; margin: 4px 0 2px; }
+  .kpi-lbl { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: #a8a29e; }
+  .sec-card { background: #1c1917; border: 1px solid #292524; border-radius: 20px; padding: 24px; margin-bottom: 24px; }
+  .sec-title { font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #f59e0b; border-bottom: 1px solid #292524; padding-bottom: 10px; margin-top: 0; margin-bottom: 16px; }
+  .kv-row { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid #292524; font-size: 13px; }
+  .kv-row span { color: #a8a29e; } .kv-row b { font-weight: 600; color: #f5f5f4; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+  th { text-align: left; padding: 12px; border-bottom: 2px solid #292524; color: #a8a29e; font-size: 11px; text-transform: uppercase; }
+  td { padding: 12px; border-bottom: 1px solid #292524; color: #e7e5e4; }
+  .footer { text-align: center; font-size: 12px; color: #78716c; margin-top: 40px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-in">
+    <a href="#" class="brand">🌱 GrowinStones</a>
+    <a href="https://${displaySlug}.thegrowinstones.com" target="_blank" class="badge-live">https://${displaySlug}.thegrowinstones.com</a>
+  </div>
+</header>
+<div class="container">
+  <div class="hero-card">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+      <div>
+        <h1 style="font-size:28px; font-weight:800; margin:0 0 6px; color:#ffffff;">${esc(growName || "GrowinStones")}</h1>
+        <div style="font-size:13px; color:#a8a29e;">
+          ${owner ? `Responsável: <b style="color:#f5f5f4;">${esc(owner)}</b> · ` : ""}Genética: <b style="color:#f5f5f4;">${esc(strain || "Não informada")}</b> · Atualizado em ${today}
+        </div>
+      </div>
+      <button onclick="window.print()" style="background:#0284c7; color:#fff; border:none; padding:10px 18px; border-radius:12px; font:700 13px Inter; cursor:pointer;">🖨️ Exportar PDF</button>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-lbl">Investimento (CAPEX)</div>
+      <div class="kpi-val" style="color:#38bdf8;">${fmtBRL(capex)}</div>
+      <div style="font-size:11px; color:#78716c;">≈ ${fmtBRL(capexPerPlant)} / planta</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-lbl">Produção Anual Estimada</div>
+      <div class="kpi-val" style="color:#34d399;">${fmtG(yieldYear)}</div>
+      <div style="font-size:11px; color:#78716c;">${harvestsYear.toFixed(1)} safras/ano (${yieldPerPlant}g/planta)</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-lbl">Receita Estimada / Ano</div>
+      <div class="kpi-val" style="color:#f59e0b;">${priceG > 0 ? fmtBRL(revenueYear) : "—"}</div>
+      <div style="font-size:11px; color:#78716c;">${priceG > 0 ? `${fmtBRL(priceG)}/g` : "Preço/g não preenchido"}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-lbl">Payback Estimado</div>
+      <div class="kpi-val" style="color:#a78bfa;">${paybackMonths ? `${paybackMonths.toFixed(1)} m` : "—"}</div>
+      <div style="font-size:11px; color:#78716c;">${paybackMonths ? `~${(paybackMonths / (cycleDays / 30)).toFixed(1)} safras` : "Retorno não atingido"}</div>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:24px;">
+    <div class="sec-card">
+      <h2 class="sec-title">📐 Estrutura & Dimensões</h2>
+      <div class="kv-row"><span>Dimensões (L × P × A)</span><b>${width} × ${depth} × ${height} cm</b></div>
+      <div class="kv-row"><span>Área / Volume</span><b>${areaM2.toFixed(2)} m² · ${volumeM3.toFixed(2)} m³</b></div>
+      <div class="kv-row"><span>Vasos</span><b>${plants} × ${pot.label} (${esc(potDesc)})</b></div>
+      <div class="kv-row"><span>Sistema Hidráulico</span><b>${esc(connInfo.name)}</b></div>
+      <div class="kv-row"><span>Tubulação / Bitola</span><b>${gauge.label} (${pipeMeters} m)</b></div>
+      <div class="kv-row"><span>Reservatório Mínimo</span><b>≥ ${reservoir} L</b></div>
+      <div class="kv-row"><span>Renovação de Ar</span><b>≥ ${airFlowNeeded} m³/h</b></div>
+      <div class="kv-row"><span>Iluminação LED</span><b>${ledWatts > 0 ? `${ledPerM2} W/m² (${ledWatts} W)` : "Sem LED"}</b></div>
+    </div>
+
+    <div class="sec-card">
+      <h2 class="sec-title">⚡ Custos Operacionais & Energia</h2>
+      <div class="kv-row"><span>Potência Total Instalada</span><b>${totalWatts} W</b></div>
+      <div class="kv-row"><span>Consumo Mensal</span><b>${kwhMonth.toFixed(0)} kWh</b></div>
+      <div class="kv-row"><span>Tarifa de Energia</span><b>${fmtBRL(tariff)} / kWh</b></div>
+      <div class="kv-row"><span>Custo de Energia / Mês</span><b>${fmtBRL(energyMonth)}</b></div>
+      <div class="kv-row"><span>Insumos / Mês</span><b>${fmtBRL(monthlyCost)}</b></div>
+      <div class="kv-row"><span>OPEX Mensal Total</span><b style="color:#f43f5e;">${fmtBRL(opexMonth)}</b></div>
+      <div class="kv-row"><span>OPEX por Safra (${cycleDays}d)</span><b style="color:#f43f5e;">${fmtBRL(opexCycle)}</b></div>
+      <div class="kv-row"><span>Custo por Grama Produzida</span><b>${yieldYear > 0 ? fmtBRL(costPerG) : "—"}</b></div>
+    </div>
+  </div>
+
+  <div class="sec-card">
+    <h2 class="sec-title">🗺️ Planta Baixa Interativa</h2>
+    <div style="background:#f5f1e7; border-radius:14px; padding:16px; text-align:center;">
+      <svg width="${svgW}" height="${totalSvgH}" viewBox="0 0 ${svgW} ${totalSvgH}" style="width:100%; max-width:${svgW}px; height:auto; display:block; margin:0 auto;">
+        <rect x="${OX}" y="${OY}" width="${topW}" height="${topH}" rx="10" fill="#ffffff" stroke="#1f1b16" stroke-width="1.5"/>
+        <text x="${OX + topW / 2}" y="${OY - 8}" text-anchor="middle" font-size="11" fill="#6b6354">${width} cm</text>
+        <text x="${OX - 10}" y="${OY + topH / 2}" text-anchor="middle" font-size="11" fill="#6b6354" transform="rotate(-90, ${OX - 10}, ${OY + topH / 2})">${depth} cm</text>
+        ${segsSvg}
+        ${dropLineSvgReport}
+        ${potsSvgReport}
+        ${cotasSvg}
+        ${resSvgReport}
+      </svg>
+      <div style="font-size:11px; color:#6b6354; margin-top:10px;">Planta baixa (${width} × ${depth} cm) · ${plants} vaso(s) de ${esc(pot.label)} (${esc(potDesc)})</div>
+    </div>
+  </div>
+
+  <div class="sec-card">
+    <h2 class="sec-title">📋 Equipamentos e Materiais (CAPEX)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Item</th>
+          <th style="text-align:right;">Qtd</th>
+          <th style="text-align:right;">Unitário</th>
+          <th style="text-align:right;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${materialRows.map((r) => `<tr><td>${esc(r.label)}</td><td style="text-align:right;">${r.qty}</td><td style="text-align:right;">${fmtBRL(r.unitCost)}</td><td style="text-align:right; font-weight:700;">${fmtBRL(r.subtotal)}</td></tr>`).join("")}
+        <tr>
+          <td colspan="3" style="font-weight:700;">Custos Extras (frete, estrutura, elétrica)</td>
+          <td style="text-align:right; font-weight:700;">${fmtBRL(extraCost)}</td>
+        </tr>
+        <tr style="font-size:15px; font-weight:800; color:#38bdf8;">
+          <td colspan="3">INVESTIMENTO TOTAL (CAPEX)</td>
+          <td style="text-align:right;">${fmtBRL(capex)}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  ${shoppingListHtml}
+
+  ${safeNotes || safeInst || safeTerms ? `
+  <div class="sec-card">
+    <h2 class="sec-title">📝 Notas, Instruções & Termos</h2>
+    ${safeNotes ? `<div style="margin-bottom:12px;"><b style="color:#f59e0b; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Observações</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeNotes)}</div></div>` : ""}
+    ${safeInst ? `<div style="margin-bottom:12px;"><b style="color:#f59e0b; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Instruções de Operação</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeInst)}</div></div>` : ""}
+    ${safeTerms ? `<div><b style="color:#f59e0b; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Termos & Condições</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeTerms)}</div></div>` : ""}
+  </div>` : ""}
+
+  <div class="footer">
+    Relatório e Dashboard Interativo gerado pelo <b>GrowinStones</b> em ${today}.<br/>
+    Hospedado exclusivamente em <b>https://${displaySlug}.thegrowinstones.com</b>
+  </div>
+</div>
+</body>
+</html>`;
+  };
+
   const openReportHtml = () => {
     const html = generateReportHtmlString(false);
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `relatorio-${(growName || "growinstones").toLowerCase().replace(/[^a-z0-9]+/gi, "-")}.html`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    const win = window.open("", "_blank");
+    if (win) {
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+    } else {
+      showToast("⚠️ O seu navegador bloqueou a abertura de abas. Habilite pop-ups para visualizar o PDF.");
+    }
   };
 
   const openStaticDashboardHtml = () => {
-    const htmlContent = generateReportHtmlString(false);
+    const slug = subdomainInput || currentUser?.username || "grow";
+    const htmlContent = generateWebDashboardHtmlString(slug);
     const win = window.open("", "_blank");
     if (win) {
       win.document.open();
       win.document.write(htmlContent);
       win.document.close();
     } else {
-      const blob = new Blob([htmlContent], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      showToast("⚠️ O seu navegador bloqueou a abertura de abas. Habilite pop-ups.");
     }
   };
 
@@ -2671,7 +2955,7 @@ export default function GrowinStones() {
     let setupData = null;
 
     try {
-      html = generateReportHtmlString(true);
+      html = generateWebDashboardHtmlString(cleanSlug);
       setupData = getSetupData();
     } catch (e) {
       console.error("Erro ao gerar relatório HTML:", e);
@@ -2724,8 +3008,522 @@ export default function GrowinStones() {
     }
   };
 
-// ————————————————————————— CONFIGURADOR —————————————————————————
+// ————————————————————————— GOOGLE AUTH LANDING PAGE —————————————————————————
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen flex flex-col justify-between" style={{ background: "#0c0a09", color: "#f5f5f4", fontFamily: "'Inter', system-ui, sans-serif" }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Berkshire+Swash&display=swap');`}</style>
+        
+        {/* Header */}
+        <header style={{ background: "rgba(28, 25, 23, 0.8)", backdropFilter: "blur(12px)", borderBottom: "1px solid #292524" }} className="sticky top-0 z-50">
+          <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Logo height={38} color="#f59e0b" />
+            </div>
+            <button
+              onClick={() => {
+                setAuthNameInput("Cultivador");
+                setAuthUsernameInput("meu-grow");
+                setAuthModalOpen(true);
+              }}
+              className="px-5 py-2.5 rounded-xl font-bold text-xs transition-all hover:scale-105 shadow-lg flex items-center gap-2"
+              style={{ background: "#0284c7", color: "#ffffff" }}
+            >
+              <span>Entrar com o Google</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Hero Section */}
+        <main className="max-w-5xl mx-auto px-6 py-16 text-center flex-1 flex flex-col justify-center items-center">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold mb-6" style={{ background: "rgba(245, 158, 11, 0.12)", border: "1px solid rgba(245, 158, 11, 0.3)", color: "#fbbf24" }}>
+            <span>🌱 Engenharia de Cultivo & Subdomínios Exclusivos</span>
+          </div>
+
+          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-6" style={{ color: "#ffffff", lineHeight: 1.15 }}>
+            Dimensionamento Profissional de <br/>
+            <span style={{ background: "linear-gradient(135deg, #f59e0b 0%, #38bdf8 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              Grows Hidropônicos
+            </span>
+          </h1>
+
+          <p className="text-base sm:text-lg max-w-2xl mx-auto mb-10" style={{ color: "#a8a29e", lineHeight: 1.6 }}>
+            Calcule layouts de vasos, bitolas de tubulação, automação de irrigação, custos de energia (OPEX), investimento (CAPEX) e publique seu dashboard completo em um subdomínio exclusivo com SSL.
+          </p>
+
+          <button
+            onClick={() => {
+              setAuthNameInput("Cultivador");
+              setAuthUsernameInput("meu-grow");
+              setAuthModalOpen(true);
+            }}
+            className="px-8 py-4 rounded-2xl font-bold text-sm transition-all hover:scale-105 shadow-2xl flex items-center gap-3"
+            style={{ background: "linear-gradient(135deg, #0284c7 0%, #0369a1 100%)", color: "#ffffff" }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+              <polyline points="10 17 15 12 10 7"/>
+              <line x1="15" y1="12" x2="3" y2="12"/>
+            </svg>
+            <span>Entrar ou Cadastrar com o Google</span>
+          </button>
+
+          {/* Feature Highlights Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-16 text-left w-full">
+            <div className="p-6 rounded-2xl" style={{ background: "#1c1917", border: "1px solid #292524" }}>
+              <div className="text-2xl mb-2">📐</div>
+              <h3 className="font-bold text-sm mb-1 text-white">Dimensionamento de Vasos</h3>
+              <p className="text-xs text-stone-400">Arranjo de linhas e colunas com afastamento ajustável e cálculo exato de milímetros.</p>
+            </div>
+            <div className="p-6 rounded-2xl" style={{ background: "#1c1917", border: "1px solid #292524" }}>
+              <div className="text-2xl mb-2">💧</div>
+              <h3 className="font-bold text-sm mb-1 text-white">Engenharia Hidráulica</h3>
+              <p className="text-xs text-stone-400">Cálculo de bitola de tubos, bombas de água/ar, anéis recirculantes e reservatórios.</p>
+            </div>
+            <div className="p-6 rounded-2xl" style={{ background: "#1c1917", border: "1px solid #292524" }}>
+              <div className="text-2xl mb-2">🌐</div>
+              <h3 className="font-bold text-sm mb-1 text-white">Subdomínio Exclusivo</h3>
+              <p className="text-xs text-stone-400">Exportação com um clique para seu subdomínio exclusivo com certificado SSL automático.</p>
+            </div>
+          </div>
+        </main>
+
+        {/* Footer */}
+        <footer className="py-6 text-center text-xs border-t border-stone-800" style={{ color: "#78716c" }}>
+          GrowinStones © 2026 — Plataforma de Projetos Hidropônicos.
+        </footer>
+
+        {/* Modal Cadastro Google & Subdomínio */}
+        {authModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
+            <div className="w-full max-w-md p-6 rounded-2xl text-left shadow-2xl relative" style={{ background: "#1c1917", border: "1px solid #383532", color: "#f5f5f4" }}>
+              <button onClick={() => setAuthModalOpen(false)} className="absolute top-4 right-4 text-stone-400 hover:text-white font-bold text-sm">✕</button>
+
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-lg" style={{ background: "#0284c7" }}>
+                  G
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-white">Entrar com o Google</h3>
+                  <p className="text-xs text-stone-400">Defina seu usuário e subdomínio exclusivo</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-stone-300">Seu Nome / Nome do Cultivo:</label>
+                  <input
+                    type="text"
+                    value={authNameInput}
+                    onChange={(e) => setAuthNameInput(e.target.value)}
+                    placeholder="Ex: João Silva"
+                    className="w-full px-3.5 py-2.5 rounded-xl text-sm outline-none font-medium"
+                    style={{ background: "#292524", border: "1px solid #44403c", color: "#ffffff" }}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-stone-300">Seu Nome de Usuário / Subdomínio:</label>
+                  <div className="flex items-center rounded-xl overflow-hidden px-3 py-2" style={{ background: "#292524", border: "1px solid #0284c7" }}>
+                    <span className="text-xs text-stone-400 mr-1 font-mono">https://</span>
+                    <input
+                      type="text"
+                      value={authUsernameInput}
+                      onChange={(e) => setAuthUsernameInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                      placeholder="joaofarms"
+                      className="w-full text-sm outline-none font-bold bg-transparent text-sky-400 font-mono"
+                    />
+                    <span className="text-xs text-stone-400 ml-1 font-mono">.thegrowinstones.com</span>
+                  </div>
+                  <p className="text-[11px] text-stone-400 mt-1">Este será o endereço público permanente dos seus relatórios.</p>
+                </div>
+
+                <button
+                  onClick={() => {
+                    const cleanSlug = authUsernameInput.trim().toLowerCase().replace(/[^a-z0-9-]/g, "") || "cultivador";
+                    const cleanName = authNameInput.trim() || "Cultivador";
+                    const newUser = {
+                      name: cleanName,
+                      email: `${cleanSlug}@gmail.com`,
+                      username: cleanSlug,
+                      avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanSlug}`
+                    };
+                    localStorage.setItem("growcalc_user", JSON.stringify(newUser));
+                    setCurrentUser(newUser);
+                    setSubdomainInput(cleanSlug);
+                    setAuthModalOpen(false);
+                    showToast(`✓ Bem-vindo, ${cleanName}! Subdomínio configurado.`);
+                  }}
+                  className="w-full py-3 rounded-xl font-bold text-xs transition-all hover:opacity-90 shadow-lg flex items-center justify-center gap-2 mt-2"
+                  style={{ background: "#0284c7", color: "#ffffff" }}
+                >
+                  🚀 Confirmar & Acessar Configurador
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+// ————————————————————————— LAYOUT COM SIDEBAR LATERAL —————————————————————————
   return (
+    <div className="min-h-screen flex" style={{ background: T.bg, color: T.text, fontFamily: "'Inter', system-ui, sans-serif", transition: "background 0.3s, color 0.3s" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Berkshire+Swash&display=swap');
+        input[type=number]::-webkit-inner-spin-button{ -webkit-appearance:none; }`}</style>
+
+      {/* SIDEBAR LATERAL ESQUERDO */}
+      <aside
+        className={`sticky top-0 h-screen flex flex-col justify-between transition-all duration-300 z-40 shrink-0 ${sidebarCollapsed ? "w-16 px-2 py-4" : "w-64 px-4 py-4"}`}
+        style={{ background: T.surface, borderRight: `1px solid ${T.border}` }}
+      >
+        {/* Top Header Sidebar */}
+        <div>
+          <div className="flex items-center justify-between mb-6 px-1">
+            {!sidebarCollapsed && (
+              <div className="flex items-center gap-2">
+                <Logo height={30} color={T.brand} />
+              </div>
+            )}
+            {sidebarCollapsed && (
+              <div className="mx-auto">
+                <Logo height={24} color={T.brand} />
+              </div>
+            )}
+            <button
+              onClick={() => setSidebarCollapsed((c) => !c)}
+              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors text-xs font-bold shrink-0"
+              style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.textMuted }}
+              title={sidebarCollapsed ? "Expandir Menu" : "Recolher Menu"}
+            >
+              {sidebarCollapsed ? "→" : "←"}
+            </button>
+          </div>
+
+          {/* Subdomain Badge link */}
+          {!sidebarCollapsed && (
+            <a
+              href={`https://${currentUser.username}.thegrowinstones.com`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-between px-3 py-2 rounded-xl mb-6 text-xs font-mono transition-opacity hover:opacity-85"
+              style={{ background: dark ? "rgba(16,185,129,0.1)" : "#ecfdf5", border: "1px solid #10b981", color: "#10b981" }}
+            >
+              <span className="truncate">https://{currentUser.username}.grow...</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse"></span>
+            </a>
+          )}
+
+          {/* Menu Items */}
+          <nav className="space-y-1.5">
+            <button
+              onClick={() => setActiveTab("configurator")}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === "configurator" ? "shadow-sm" : "hover:opacity-80"}`}
+              style={{
+                background: activeTab === "configurator" ? (dark ? "#0284c7" : "#0369a1") : T.surface2,
+                color: activeTab === "configurator" ? "#ffffff" : T.text
+              }}
+            >
+              <span className="text-base">🛠️</span>
+              {!sidebarCollapsed && <span>Configurador de Grow</span>}
+            </button>
+
+            <button
+              onClick={() => setActiveTab("my_grows")}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === "my_grows" ? "shadow-sm" : "hover:opacity-80"}`}
+              style={{
+                background: activeTab === "my_grows" ? (dark ? "#0284c7" : "#0369a1") : T.surface2,
+                color: activeTab === "my_grows" ? "#ffffff" : T.text
+              }}
+            >
+              <span className="text-base">🌿</span>
+              {!sidebarCollapsed && (
+                <div className="flex items-center justify-between w-full">
+                  <span>Meus Grows</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400 font-bold">LIVE</span>
+                </div>
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab("comparison")}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === "comparison" ? "shadow-sm" : "hover:opacity-80"}`}
+              style={{
+                background: activeTab === "comparison" ? (dark ? "#0284c7" : "#0369a1") : T.surface2,
+                color: activeTab === "comparison" ? "#ffffff" : T.text
+              }}
+            >
+              <span className="text-base">📊</span>
+              {!sidebarCollapsed && <span>Comparar Setups</span>}
+            </button>
+
+            <button
+              onClick={() => setActiveTab("settings")}
+              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${activeTab === "settings" ? "shadow-sm" : "hover:opacity-80"}`}
+              style={{
+                background: activeTab === "settings" ? (dark ? "#0284c7" : "#0369a1") : T.surface2,
+                color: activeTab === "settings" ? "#ffffff" : T.text
+              }}
+            >
+              <span className="text-base">⚙️</span>
+              {!sidebarCollapsed && <span>Configurações</span>}
+            </button>
+          </nav>
+        </div>
+
+        {/* User Card at bottom of Sidebar */}
+        <div className="pt-4 border-t" style={{ borderColor: T.border }}>
+          {!sidebarCollapsed ? (
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs text-white shrink-0" style={{ background: "#0284c7" }}>
+                  {currentUser.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold truncate" style={{ color: T.text }}>{currentUser.name}</div>
+                  <div className="text-[11px] font-mono truncate" style={{ color: T.textMuted }}>@{currentUser.username}</div>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (window.confirm("Deseja sair da sua conta?")) {
+                    localStorage.removeItem("growcalc_user");
+                    setCurrentUser(null);
+                  }
+                }}
+                className="p-1.5 rounded-lg text-xs font-semibold transition-colors hover:bg-red-500/20 text-red-400 shrink-0"
+                title="Sair da Conta"
+              >
+                🚪
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                if (window.confirm("Deseja sair da sua conta?")) {
+                  localStorage.removeItem("growcalc_user");
+                  setCurrentUser(null);
+                }
+              }}
+              className="w-full py-2 rounded-lg text-xs text-red-400 hover:bg-red-500/20 text-center"
+              title="Sair"
+            >
+              🚪
+            </button>
+          )}
+        </div>
+      </aside>
+
+      {/* ÁREA PRINCIPAL DA APLICAÇÃO */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        {/* Render Tab Content */}
+        {activeTab === "my_grows" && (
+          <div className="max-w-5xl mx-auto px-6 py-8 w-full">
+            <h1 className="text-2xl font-bold mb-2" style={{ color: T.text }}>🌿 Meus Grows & Subdomínios</h1>
+            <p className="text-xs mb-6" style={{ color: T.textMuted }}>Gerencie os setups salvos e seu subdomínio exclusivo em funcionamento.</p>
+            
+            <div className="p-6 rounded-2xl mb-8" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">SUBDOMÍNIO ATIVO</span>
+                  <h3 className="text-lg font-extrabold mt-2 font-mono" style={{ color: T.brand }}>https://{currentUser.username}.thegrowinstones.com</h3>
+                  <p className="text-xs mt-1" style={{ color: T.textMuted }}>Status: Online com Certificado SSL (HTTPS) Let's Encrypt</p>
+                </div>
+                <div className="flex gap-2">
+                  <a
+                    href={`https://${currentUser.username}.thegrowinstones.com`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-4 py-2 rounded-xl text-xs font-bold text-white shadow"
+                    style={{ background: "#0284c7" }}
+                  >
+                    🌐 Ver Subdomínio ao Vivo
+                  </a>
+                  <button
+                    onClick={() => {
+                      setSubdomainInput(currentUser.username);
+                      setPublishModalOpen(true);
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-bold"
+                    style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
+                  >
+                    🚀 Re-publicar Setup Atual
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <h2 className="text-base font-bold mb-4" style={{ color: T.text }}>Setups Guardados ({allPresets.length})</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {allPresets.map((p, idx) => (
+                <div key={idx} className="p-4 rounded-xl flex flex-col justify-between gap-3" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+                  <div>
+                    <h4 className="font-bold text-sm" style={{ color: T.text }}>{p.name}</h4>
+                    <p className="text-xs mt-1" style={{ color: T.textMuted }}>{p.plants} vasos · {p.width}×{p.depth} cm · {p.conn}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      applyPreset(p);
+                      setActiveTab("configurator");
+                      showToast(`✓ Setup "${p.name}" carregado!`);
+                    }}
+                    className="w-full py-2 rounded-lg text-xs font-semibold"
+                    style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
+                  >
+                    ⚡ Carregar no Configurador
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "settings" && (
+          <div className="max-w-3xl mx-auto px-6 py-8 w-full">
+            <h1 className="text-2xl font-bold mb-2" style={{ color: T.text }}>⚙️ Configurações da Conta</h1>
+            <p className="text-xs mb-6" style={{ color: T.textMuted }}>Ajuste seu perfil, subdomínio base e preferências de visualização.</p>
+
+            <div className="p-6 rounded-2xl space-y-6" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+              <div>
+                <label className="block text-xs font-bold mb-1" style={{ color: T.text }}>Nome de Usuário (Subdomínio Exclusivo)</label>
+                <div className="flex items-center rounded-xl px-3 py-2" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
+                  <span className="text-xs text-stone-400 font-mono">https://</span>
+                  <input
+                    type="text"
+                    value={currentUser.username}
+                    onChange={(e) => {
+                      const clean = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "");
+                      const updated = { ...currentUser, username: clean };
+                      setCurrentUser(updated);
+                      localStorage.setItem("growcalc_user", JSON.stringify(updated));
+                    }}
+                    className="w-full text-sm font-bold bg-transparent outline-none font-mono"
+                    style={{ color: T.brand }}
+                  />
+                  <span className="text-xs text-stone-400 font-mono">.thegrowinstones.com</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold mb-1" style={{ color: T.text }}>Tema da Interface</label>
+                <button
+                  onClick={() => setDark((d) => !d)}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2"
+                  style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
+                >
+                  <span>{dark ? "🌙 Tema Escuro (Ativo)" : "☀️ Tema Claro (Ativo)"}</span>
+                </button>
+              </div>
+
+              <div className="pt-4 border-t" style={{ borderColor: T.border }}>
+                <button
+                  onClick={() => {
+                    if (window.confirm("Deseja desconectar sua conta?")) {
+                      localStorage.removeItem("growcalc_user");
+                      setCurrentUser(null);
+                    }
+                  }}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700"
+                >
+                  🚪 Desconectar Conta
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CONFIGURADOR & COMPARADOR VIEWS */}
+        {(activeTab === "configurator" || activeTab === "comparison") && (
+          <>
+            <header style={{ borderBottom: `1px solid ${T.borderSoft}`, background: T.bg }}>
+              <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="font-bold text-sm" style={{ color: T.text }}>{activeTab === "comparison" ? "📊 Comparação de Setups" : "🛠️ Configurador de Grow"}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input type="file" ref={fileInputRef} accept=".json,application/json" onChange={handleImportJson} className="hidden" />
+                  <button onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-80 flex items-center gap-1.5"
+                    style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <span>Importar JSON</span>
+                  </button>
+                  <button onClick={exportSetupJson}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-80 flex items-center gap-1.5"
+                    style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    <span>Exportar JSON</span>
+                  </button>
+                  <button onClick={openStaticDashboardHtml}
+                    title="Abrir Dashboard Estático HTML em uma nova aba"
+                    className="px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-85 flex items-center gap-1.5"
+                    style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <line x1="3" y1="9" x2="21" y2="9" />
+                      <line x1="9" y1="21" x2="9" y2="9" />
+                    </svg>
+                    <span>Dashboard HTML</span>
+                  </button>
+
+                  <button onClick={() => {
+                    if (!subdomainInput && currentUser?.username) setSubdomainInput(currentUser.username);
+                    setPublishModalOpen(true);
+                  }}
+                    title="Publicar este setup em um subdomínio exclusivo (ex: meu-grow.thegrowinstones.com)"
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-90 flex items-center gap-1.5 shadow-sm"
+                    style={{ background: dark ? "#0284c7" : "#0369a1", color: "#ffffff" }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.71 1.26-1.5 1.74-2.3L4.5 16.5z"/>
+                      <path d="M12 15l-3-3 7.5-7.5c1.4-1.4 3.7-1.4 5.1 0s1.4 3.7 0 5.1L12 15z"/>
+                    </svg>
+                    <span>*Publicar Grow</span>
+                  </button>
+                  <button onClick={openReportHtml}
+                    className="px-4 py-2 rounded-xl text-xs font-bold transition-opacity hover:opacity-85 flex items-center gap-1.5"
+                    style={{ background: T.text, color: T.bg }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="16" y1="13" x2="8" y2="13" />
+                      <line x1="16" y1="17" x2="8" y2="17" />
+                    </svg>
+                    <span>Exportar relatório (PDF)</span>
+                  </button>
+                  <button onClick={() => setDark((d) => !d)} aria-label="Alternar tema"
+                    className="w-9 h-9 rounded-full flex items-center justify-center transition-colors shrink-0"
+                    style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}>
+                    {dark ? (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="5" />
+                        <line x1="12" y1="1" x2="12" y2="3" />
+                        <line x1="12" y1="21" x2="12" y2="23" />
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                        <line x1="1" y1="12" x2="3" y2="12" />
+                        <line x1="21" y1="12" x2="23" y2="12" />
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                      </svg>
+                    ) : (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </header>
+
     <div className="min-h-screen" style={{ background: T.bg, color: T.text, fontFamily: "'Inter', system-ui, sans-serif", transition: "background 0.3s, color 0.3s" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Berkshire+Swash&display=swap');
         input[type=number]::-webkit-inner-spin-button{ -webkit-appearance:none; }`}</style>
@@ -3841,6 +4639,10 @@ export default function GrowinStones() {
           {toastMsg}
         </div>
       )}
+          </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
