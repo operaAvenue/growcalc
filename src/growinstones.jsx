@@ -2133,6 +2133,7 @@ function GrowinStones() {
   const [subdomainInput, setSubdomainInput] = useState("");
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Presets unificados e todos removíveis (padrão + customizados)
   const [allPresets, setAllPresets] = useState(() => {
@@ -4573,16 +4574,15 @@ function GrowinStones() {
 
       {/* BARRA SUPERIOR EXCLUSIVA PARA MOBILE (< md) */}
       <header
-        className="md:hidden sticky top-0 z-50 w-full backdrop-blur-md px-3.5 py-2.5 border-b flex flex-col gap-2 shadow-sm"
+        className="md:hidden sticky top-0 z-50 w-full backdrop-blur-md px-3.5 py-2.5 border-b shadow-sm"
         style={{ background: T.surface, borderColor: T.border }}
       >
-        {/* Linha Superior: Logo, Subdomínio & Avatar */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Logo height={24} color={T.brand} />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 relative">
             {currentUser?.username && (
               <a
                 href={`https://${currentUser.username}.thegrowinstones.com`}
@@ -4592,55 +4592,135 @@ function GrowinStones() {
                 style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.brand }}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span className="truncate max-w-[120px]">@{currentUser.username}</span>
+                <span className="truncate max-w-[110px]">@{currentUser.username}</span>
               </a>
             )}
 
+            {/* BOTÃO DO AVATAR QUE ACIONA O MENU MOBILE */}
             <button
-              onClick={() => setActiveTab("profile")}
-              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden border shadow-sm"
+              onClick={() => setMobileMenuOpen((o) => !o)}
+              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden border shadow-sm transition-all active:scale-95 cursor-pointer"
               style={{
                 background: T.surface2,
-                borderColor: T.border,
+                borderColor: mobileMenuOpen ? T.brand : T.border,
                 color: T.text,
                 backgroundImage: currentUser?.avatarUrl ? `url(${currentUser.avatarUrl})` : "none",
                 backgroundSize: "cover",
-                backgroundPosition: "center"
+                backgroundPosition: "center",
+                outline: mobileMenuOpen ? `2px solid ${T.brand}` : "none"
               }}
-              title="Meu Perfil"
+              title="Menu do Usuário"
+              aria-label="Abrir Menu de Navegação"
             >
               {!currentUser?.avatarUrl && (currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "G")}
             </button>
-          </div>
-        </div>
 
-        {/* Linha Inferior: Abas de Navegação em Carrossel Horizontal */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
-          {[
-            { id: "profile", label: "Perfil", icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
-            { id: "configurator", label: "Configurador", icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg> },
-            { id: "my_grows", label: "Meus Grows", icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22v-9"/><path d="M12 13a6 6 0 0 1 6-6c0 6-6 6-6 6z"/><path d="M12 13a6 6 0 0 0-6-6c0 6 6 6 6 6z"/></svg> },
-            { id: "comparison", label: "Comparar", icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
-            { id: "mqtt", label: "ESP32", icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/></svg> },
-            { id: "settings", label: "Ajustes", icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> }
-          ].map((item) => {
-            const active = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold shrink-0 transition-all ${active ? "shadow-sm" : "opacity-80"}`}
-                style={{
-                  background: active ? T.sidebarActiveBg : T.surface2,
-                  color: active ? T.text : T.muted,
-                  border: active ? `1px solid ${T.border}` : `1px solid ${T.borderSoft}`
-                }}
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
+            {/* DROPDOWN MENU MOBILE */}
+            {mobileMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 bg-black/35 z-40 backdrop-blur-xs transition-opacity"
+                  onClick={() => setMobileMenuOpen(false)}
+                />
+                <div
+                  className="absolute top-full right-0 mt-2 w-64 rounded-2xl border shadow-2xl p-3 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+                  style={{ background: T.surface, borderColor: T.border, color: T.text }}
+                >
+                  {/* Header do Perfil no Menu */}
+                  <div className="flex items-center gap-2.5 pb-3 mb-2 border-b" style={{ borderColor: T.borderSoft }}>
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 border overflow-hidden"
+                      style={{
+                        background: T.surface2,
+                        borderColor: T.border,
+                        color: T.brand,
+                        backgroundImage: currentUser?.avatarUrl ? `url(${currentUser.avatarUrl})` : "none",
+                        backgroundSize: "cover",
+                        backgroundPosition: "center"
+                      }}
+                    >
+                      {!currentUser?.avatarUrl && (currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "G")}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-bold truncate" style={{ color: T.text }}>
+                        {currentUser?.name || "Cultivador"}
+                      </div>
+                      <div className="text-[11px] font-mono font-medium truncate" style={{ color: T.brand }}>
+                        {currentUser?.username ? `@${currentUser.username}` : "Modo Visitante"}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-xs opacity-70 hover:opacity-100"
+                      style={{ color: T.faint }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Lista de Navegação */}
+                  <div className="space-y-1">
+                    {[
+                      { id: "profile", label: "Perfil & Diário", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
+                      { id: "configurator", label: "Configurador de Grow", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg> },
+                      { id: "my_grows", label: "Meus Grows", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22v-9"/><path d="M12 13a6 6 0 0 1 6-6c0 6-6 6-6 6z"/><path d="M12 13a6 6 0 0 0-6-6c0 6 6 6 6 6z"/></svg> },
+                      { id: "comparison", label: "Comparador de Setups", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
+                      { id: "mqtt", label: "Controlador ESP32", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/></svg> },
+                      { id: "settings", label: "Ajustes & Subdomínio", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> }
+                    ].map((item) => {
+                      const active = activeTab === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            setActiveTab(item.id);
+                            setMobileMenuOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all text-left"
+                          style={{
+                            background: active ? T.sidebarActiveBg : "transparent",
+                            color: active ? T.brand : T.text,
+                            border: active ? `1px solid ${T.accentBorder}` : "1px solid transparent"
+                          }}
+                        >
+                          <span style={{ color: active ? T.brand : T.muted }}>{item.icon}</span>
+                          <span>{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Ações de Conta */}
+                  <div className="pt-2.5 mt-2.5 border-t" style={{ borderColor: T.borderSoft }}>
+                    {currentUser?.username ? (
+                      <button
+                        onClick={() => {
+                          if (window.confirm("Deseja desconectar sua conta?")) {
+                            localStorage.removeItem("growcalc_user");
+                            setCurrentUser(null);
+                            setMobileMenuOpen(false);
+                          }
+                        }}
+                        className="w-full py-2 px-3 rounded-xl text-xs font-bold text-red-500 hover:bg-red-500/10 flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <span>Desconectar Conta</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setAuthModalOpen(true);
+                          setMobileMenuOpen(false);
+                        }}
+                        className="w-full py-2.5 px-3 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 flex items-center justify-center gap-1.5 shadow"
+                      >
+                        <span>Entrar ou Cadastrar</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
