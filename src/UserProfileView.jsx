@@ -88,49 +88,147 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
     } catch (e) {}
   }, [posts, storageKey, currentUser]);
 
-  // Handle Avatar Change
-  const handleAvatarFile = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      showToast("A imagem deve ter no máximo 5MB.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setAvatarPreview(reader.result);
-    };
-    reader.readAsDataURL(file);
+  // Função para comprimir e fazer upload permanente de mídia
+  const uploadMediaFile = async (file, type = "media", maxW = 1600, maxH = 1600, quality = 0.82) => {
+    if (!file) return null;
+    return new Promise((resolve, reject) => {
+      if (file.type.startsWith("video/")) {
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const res = await fetch("https://grow.thegrowinstones.com/api/upload", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ file: reader.result, type })
+            });
+            const json = await res.json();
+            if (json.success && json.url) resolve(json.url);
+            else resolve(reader.result);
+          } catch (e) {
+            resolve(reader.result);
+          }
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = async () => {
+          let { width, height } = img;
+          if (width > maxW || height > maxH) {
+            if (width > height) {
+              height = Math.round((height * maxW) / width);
+              width = maxW;
+            } else {
+              width = Math.round((width * maxH) / height);
+              height = maxH;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const mime = file.type === "image/png" ? "image/png" : "image/jpeg";
+          const compressedDataUrl = canvas.toDataURL(mime, quality);
+
+          try {
+            const res = await fetch("https://grow.thegrowinstones.com/api/upload", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ image: compressedDataUrl, type })
+            });
+            const json = await res.json();
+            if (json.success && json.url) {
+              resolve(json.url);
+            } else {
+              resolve(compressedDataUrl);
+            }
+          } catch (err) {
+            console.warn("Upload falhou, usando dataURL local:", err);
+            resolve(compressedDataUrl);
+          }
+        };
+        img.onerror = () => resolve(reader.result);
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   };
 
-  // Handle Banner Change
-  const handleBannerFile = (e) => {
+  // Handle Avatar Change (Upload e salvamento instantâneo permanente)
+  const handleAvatarFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 8 * 1024 * 1024) {
-      showToast("O banner deve ter no máximo 8MB.");
-      return;
+    showToast("Enviando foto de perfil...");
+    try {
+      const uploadedUrl = await uploadMediaFile(file, "avatar", 500, 500, 0.85);
+      if (uploadedUrl) {
+        setAvatarPreview(uploadedUrl);
+        const updated = {
+          ...currentUser,
+          avatarUrl: uploadedUrl
+        };
+        setCurrentUser(updated);
+        try { localStorage.setItem("growcalc_user", JSON.stringify(updated)); } catch(e) {}
+        fetch("https://grow.thegrowinstones.com/api/user/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user: updated, posts })
+        }).catch(() => {});
+        showToast("Foto de perfil atualizada e salva na nuvem!");
+      }
+    } catch (err) {
+      showToast("Erro ao processar imagem de avatar.");
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setBannerPreview(reader.result);
-    };
-    reader.readAsDataURL(file);
+  };
+
+  // Handle Banner Change (Upload e salvamento instantâneo permanente)
+  const handleBannerFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    showToast("Enviando foto de capa...");
+    try {
+      const uploadedUrl = await uploadMediaFile(file, "banner", 1600, 1600, 0.82);
+      if (uploadedUrl) {
+        setBannerPreview(uploadedUrl);
+        const updated = {
+          ...currentUser,
+          bannerUrl: uploadedUrl
+        };
+        setCurrentUser(updated);
+        try { localStorage.setItem("growcalc_user", JSON.stringify(updated)); } catch(e) {}
+        fetch("https://grow.thegrowinstones.com/api/user/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user: updated, posts })
+        }).catch(() => {});
+        showToast("Foto de capa atualizada e salva na nuvem!");
+      }
+    } catch (err) {
+      showToast("Erro ao processar imagem de capa.");
+    }
   };
 
   // Save Profile
   const handleSaveProfile = () => {
     const updated = {
       ...currentUser,
-      name: editName.trim() || currentUser.name,
+      name: editName.trim() || currentUser?.name || "Cultivador",
       bio: editBio.trim(),
       location: editLocation.trim(),
       strainFocus: editStrainFocus.trim(),
-      avatarUrl: avatarPreview || currentUser?.avatarUrl,
-      bannerUrl: bannerPreview || currentUser?.bannerUrl
+      avatarUrl: avatarPreview || currentUser?.avatarUrl || "",
+      bannerUrl: bannerPreview || currentUser?.bannerUrl || ""
     };
     setCurrentUser(updated);
-    localStorage.setItem("growcalc_user", JSON.stringify(updated));
+    try { localStorage.setItem("growcalc_user", JSON.stringify(updated)); } catch(e) {}
     
     // Sync immediately to cloud
     fetch("https://grow.thegrowinstones.com/api/user/sync", {
@@ -144,36 +242,36 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
   };
 
   // Handle Attach Images
-  const handleAttachImages = (e) => {
+  const handleAttachImages = async (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
+    showToast(`Processando ${files.length} imagem(ns)...`);
 
-    files.forEach((file) => {
-      if (file.size > 10 * 1024 * 1024) {
-        showToast("Imagem muito grande (máx 10MB)");
-        return;
+    for (const file of files) {
+      try {
+        const url = await uploadMediaFile(file, "post", 1400, 1400, 0.82);
+        if (url) {
+          setAttachedImages((prev) => [...prev, url]);
+        }
+      } catch (err) {
+        console.warn("Erro ao anexar imagem:", err);
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setAttachedImages((prev) => [...prev, reader.result]);
-      };
-      reader.readAsDataURL(file);
-    });
+    }
   };
 
   // Handle Attach Video
-  const handleAttachVideo = (e) => {
+  const handleAttachVideo = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 50 * 1024 * 1024) {
-      showToast("Vídeo muito grande (máx 50MB)");
-      return;
+    showToast("Processando vídeo...");
+    try {
+      const url = await uploadMediaFile(file, "video");
+      if (url) {
+        setAttachedVideos((prev) => [...prev, url]);
+      }
+    } catch (err) {
+      showToast("Erro ao processar vídeo.");
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setAttachedVideos((prev) => [...prev, reader.result]);
-    };
-    reader.readAsDataURL(file);
   };
 
   // Create Post
