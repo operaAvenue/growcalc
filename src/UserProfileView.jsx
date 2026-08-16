@@ -455,19 +455,26 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
       <input type="file" ref={videoAttachRef} accept="video/*" onChange={handleAttachVideo} className="hidden" />
 
       {/* ————————————————— PROFILE HEADER (TWITTER / X STYLE) ————————————————— */}
-      <div className="rounded-2xl sm:rounded-3xl overflow-hidden shadow-lg border mb-5 w-full max-w-full" style={{ background: T.surface, borderColor: T.border }}>
-        {/* BANNER */}
-        <div className="relative h-36 sm:h-56 w-full" style={bannerStyle}>
+      <div className="rounded-3xl overflow-hidden border shadow-sm relative group mb-6" style={{ background: T.surface, borderColor: T.border }}>
+        <div className="h-44 sm:h-64 w-full relative overflow-hidden" style={{ background: T.surface2 }}>
+          {(bannerPreview || currentUser?.bannerUrl) ? (
+            <img
+              src={bannerPreview || currentUser?.bannerUrl}
+              alt="Banner"
+              className="w-full h-full object-cover"
+              onError={(e) => { e.currentTarget.style.display = "none"; }}
+            />
+          ) : (
+            <div className="w-full h-full" style={{ background: dark ? "linear-gradient(135deg, #1c1917 0%, #292524 50%, #44403c 100%)" : "linear-gradient(135deg, #e2dccc 0%, #d8cfbe 50%, #c4b9a3 100%)" }} />
+          )}
+
+          {/* EDIT BANNER BUTTON */}
           <button
             onClick={() => bannerInputRef.current?.click()}
-            className="absolute top-3 right-3 px-3 py-1.5 rounded-full text-[11px] font-bold backdrop-blur-md transition-all hover:scale-105 flex items-center gap-1.5 shadow"
-            style={{ background: "rgba(0, 0, 0, 0.65)", color: "#ffffff", border: "1px solid rgba(255, 255, 255, 0.25)" }}
-            title="Trocar Foto de Capa"
+            className="absolute top-4 right-4 px-3 py-1.5 rounded-xl bg-black/60 hover:bg-black/80 text-white text-xs font-bold transition-all backdrop-blur-md flex items-center gap-1.5 opacity-90 hover:opacity-100 shadow-md cursor-pointer"
+            title="Alterar Capa"
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-              <circle cx="12" cy="13" r="4"/>
-            </svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
             <span>Alterar Capa</span>
           </button>
         </div>
@@ -478,24 +485,37 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
             {/* AVATAR OVERLAY */}
             <div className="relative group shrink-0 self-start">
               <div
-                className="w-20 h-20 sm:w-32 sm:h-32 min-w-[80px] min-h-[80px] sm:min-w-[128px] sm:min-h-[128px] aspect-square rounded-full overflow-hidden border-4 shadow-xl flex items-center justify-center font-extrabold text-2xl sm:text-3xl shrink-0"
+                className="w-20 h-20 sm:w-32 sm:h-32 min-w-[80px] min-h-[80px] sm:min-w-[128px] sm:min-h-[128px] aspect-square rounded-full overflow-hidden border-4 shadow-xl flex items-center justify-center font-extrabold text-2xl sm:text-3xl shrink-0 relative"
                 style={{
                   background: T.surface2,
                   borderColor: T.surface,
                   color: T.brand
                 }}
               >
-                {(avatarPreview || currentUser?.avatarUrl) ? (
+                {(avatarPreview || currentUser?.avatarUrl) && (
                   <img
                     src={avatarPreview || currentUser?.avatarUrl}
                     alt={currentUser?.name || "Avatar"}
                     className="w-full h-full object-cover rounded-full block"
                     style={{ aspectRatio: "1 / 1" }}
-                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                      const fb = e.currentTarget.nextElementSibling;
+                      if (fb) fb.style.display = "flex";
+                    }}
                   />
-                ) : (
-                  <span>{currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "G"}</span>
                 )}
+                <span
+                  style={{
+                    display: (avatarPreview || currentUser?.avatarUrl) ? "none" : "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "100%",
+                    height: "100%"
+                  }}
+                >
+                  {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "G"}
+                </span>
               </div>
 
               <button
@@ -601,24 +621,37 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
       <div className="p-5 rounded-2xl border shadow-sm mb-8" style={{ background: T.surface, borderColor: T.border }}>
         <div className="flex items-start gap-3.5">
           <div
-            className="w-10 h-10 min-w-[40px] min-h-[40px] aspect-square rounded-full overflow-hidden shrink-0 font-bold flex items-center justify-center text-sm border"
+            className="w-10 h-10 min-w-[40px] min-h-[40px] aspect-square rounded-full overflow-hidden shrink-0 font-bold flex items-center justify-center text-sm border relative"
             style={{
               background: T.surface2,
               borderColor: T.border,
               color: T.brand
             }}
           >
-            {(avatarPreview || currentUser?.avatarUrl) ? (
+            {(avatarPreview || currentUser?.avatarUrl) && (
               <img
                 src={avatarPreview || currentUser?.avatarUrl}
                 alt={currentUser?.name || "Avatar"}
                 className="w-full h-full object-cover rounded-full block"
                 style={{ aspectRatio: "1 / 1" }}
-                onError={(e) => { e.currentTarget.style.display = "none"; }}
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                  const fb = e.currentTarget.nextElementSibling;
+                  if (fb) fb.style.display = "flex";
+                }}
               />
-            ) : (
-              <span>{currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "G"}</span>
             )}
+            <span
+              style={{
+                display: (avatarPreview || currentUser?.avatarUrl) ? "none" : "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+                height: "100%"
+              }}
+            >
+              {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "G"}
+            </span>
           </div>
 
           <div className="flex-1 min-w-0">
@@ -936,24 +969,37 @@ function PostCard({ post, currentUser, T, dark, onToggleLike, onDelete, onAddCom
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-3">
           <div
-            className="w-10 h-10 min-w-[40px] min-h-[40px] aspect-square rounded-full overflow-hidden font-bold flex items-center justify-center text-xs shrink-0 border"
+            className="w-10 h-10 min-w-[40px] min-h-[40px] aspect-square rounded-full overflow-hidden font-bold flex items-center justify-center text-xs shrink-0 border relative"
             style={{
               background: T.surface2,
               borderColor: T.border,
               color: T.brand
             }}
           >
-            {authorAvatar ? (
+            {authorAvatar && (
               <img
                 src={authorAvatar}
                 alt={authorName}
                 className="w-full h-full object-cover rounded-full block"
                 style={{ aspectRatio: "1 / 1" }}
-                onError={(e) => { e.currentTarget.style.display = "none"; }}
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                  const fb = e.currentTarget.nextElementSibling;
+                  if (fb) fb.style.display = "flex";
+                }}
               />
-            ) : (
-              <span>{authorName ? authorName.charAt(0).toUpperCase() : "G"}</span>
             )}
+            <span
+              style={{
+                display: authorAvatar ? "none" : "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+                height: "100%"
+              }}
+            >
+              {authorName ? authorName.charAt(0).toUpperCase() : "G"}
+            </span>
           </div>
 
           <div>
@@ -1000,7 +1046,14 @@ function PostCard({ post, currentUser, T, dark, onToggleLike, onDelete, onAddCom
               className="relative max-h-96 overflow-hidden rounded-xl bg-black/10 cursor-zoom-in group transition-transform hover:scale-[1.005]"
               title="Clique para ver a foto em tamanho real 100%"
             >
-              <img src={img} alt="Post media" className="w-full h-full object-cover max-h-96 block" />
+              <img
+                src={img}
+                alt="Post media"
+                className="w-full h-full object-cover max-h-96 block"
+                onError={(e) => {
+                  e.currentTarget.parentElement.style.display = "none";
+                }}
+              />
               <div className="absolute bottom-2.5 right-2.5 px-2.5 py-1 rounded-lg bg-black/70 text-white text-[11px] font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 backdrop-blur-md shadow-md">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
                 <span>Ver 100%</span>

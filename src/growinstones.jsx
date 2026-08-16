@@ -3834,8 +3834,9 @@ function GrowinStones() {
       return `
         <div class="post-card">
           <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-            <div style="width:42px; height:42px; min-width:42px; min-height:42px; max-width:42px; max-height:42px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; background:${isDark ? '#292524' : '#e2dccc'}; border:1px solid ${isDark ? '#44403c' : '#d8cfbe'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; color:${isDark ? '#f59e0b' : '#b45309'};">
-              ${pAvatar ? `<img src="${pAvatar}" alt="Avatar" style="width:100%; height:100%; aspect-ratio:1/1; object-fit:cover; display:block; border-radius:50%;" />` : pAuthor.charAt(0).toUpperCase()}
+            <div style="width:42px; height:42px; min-width:42px; min-height:42px; max-width:42px; max-height:42px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; background:${isDark ? '#292524' : '#e2dccc'}; border:1px solid ${isDark ? '#44403c' : '#d8cfbe'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; color:${isDark ? '#f59e0b' : '#b45309'}; position:relative;">
+              <img src="${pAvatar || ''}" alt="Avatar" style="width:100%; height:100%; aspect-ratio:1/1; object-fit:cover; display:${pAvatar ? 'block' : 'none'}; border-radius:50%;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+              <span style="display:${pAvatar ? 'none' : 'flex'}; align-items:center; justify-content:center; width:100%; height:100%;">${esc(pAuthor ? pAuthor.charAt(0).toUpperCase() : 'G')}</span>
             </div>
             <div>
               <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
@@ -3853,7 +3854,7 @@ function GrowinStones() {
 
           ${p.images && p.images.length > 0 ? `
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:8px; border-radius:14px; overflow:hidden; margin-bottom:12px;">
-              ${p.images.map((img) => `<img src="${img}" alt="Mídia de Cultivo" onclick="openLightbox('${img}')" style="width:100%; max-height:340px; object-fit:cover; border-radius:12px; border:1px solid ${isDark ? '#292524' : '#e2dccc'}; cursor:zoom-in;" title="Clique para ver a foto em tamanho real 100%" />`).join("")}
+              ${p.images.map((img) => `<img src="${img}" alt="Mídia de Cultivo" onclick="openLightbox('${img}')" style="width:100%; max-height:340px; object-fit:cover; border-radius:12px; border:1px solid ${isDark ? '#292524' : '#e2dccc'}; cursor:zoom-in;" onerror="this.parentElement.style.display='none';" title="Clique para ver a foto em tamanho real 100%" />`).join("")}
             </div>
           ` : ""}
 
@@ -3874,12 +3875,8 @@ function GrowinStones() {
       `;
     }).join("");
 
-    const bannerBg = userBannerUrl
-      ? `background-image:url(${userBannerUrl}); background-size:cover; background-position:center;`
-      : `background:${isDark ? 'linear-gradient(135deg, #1c1917 0%, #292524 50%, #44403c 100%)' : 'linear-gradient(135deg, #e2dccc 0%, #d8cfbe 50%, #c4b9a3 100%)'};`;
-
     return `<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="${isDark ? 'dark' : ''}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -3992,18 +3989,17 @@ function GrowinStones() {
   {/* ————————————————— CARD PRINCIPAL: PERFIL DO CULTIVADOR ————————————————— */}
   <div class="sec-card" style="padding:0; overflow:hidden; margin-bottom:24px;">
     {/* FOTO DE CAPA (BANNER) */}
-    <div style="height:200px; width:100%; position:relative; overflow:hidden; background:${isDark ? '#292524' : '#e2dccc'};">
-      ${userBannerUrl 
-        ? `<img id="user-banner-img" src="${userBannerUrl}" alt="Capa do Perfil" style="width:100%; height:100%; object-fit:cover; display:block;" />` 
-        : `<div id="user-banner-placeholder" style="width:100%; height:100%; background:${isDark ? 'linear-gradient(135deg, #1c1917 0%, #292524 50%, #44403c 100%)' : 'linear-gradient(135deg, #e2dccc 0%, #d8cfbe 50%, #c4b9a3 100%)'};"></div>`
-      }
+    <div style="height:220px; width:100%; position:relative; overflow:hidden; background:${isDark ? '#292524' : '#e2dccc'};">
+      <img id="user-banner-img" src="${userBannerUrl || ''}" alt="Capa do Perfil" style="width:100%; height:100%; object-fit:cover; display:${userBannerUrl ? 'block' : 'none'};" onerror="this.style.display='none'; document.getElementById('user-banner-placeholder').style.display='block';" />
+      <div id="user-banner-placeholder" style="display:${userBannerUrl ? 'none' : 'block'}; width:100%; height:100%; background:${isDark ? 'linear-gradient(135deg, #1c1917 0%, #292524 50%, #44403c 100%)' : 'linear-gradient(135deg, #e2dccc 0%, #d8cfbe 50%, #c4b9a3 100%)'};"></div>
     </div>
 
     <div style="padding:0 24px 24px; position:relative;">
       {/* AVATAR & BADGES & ÍCONE DO PROJETO */}
       <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-top:-50px; margin-bottom:16px;">
-        <div style="width:100px; height:100px; min-width:100px; min-height:100px; max-width:100px; max-height:100px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; border:4px solid ${isDark ? '#1c1917' : '#ffffff'}; background:${isDark ? '#292524' : '#e2dccc'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:32px; color:${isDark ? '#f59e0b' : '#b45309'}; box-shadow:0 10px 25px rgba(0,0,0,0.15);">
-          ${userAvatarUrl ? `<img id="user-avatar-img" src="${userAvatarUrl}" alt="Avatar" style="width:100%; height:100%; aspect-ratio:1/1; object-fit:cover; display:block; border-radius:50%;" />` : `<span id="user-avatar-text">${userDisplayName.charAt(0).toUpperCase()}</span>`}
+        <div style="width:100px; height:100px; min-width:100px; min-height:100px; max-width:100px; max-height:100px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; border:4px solid ${isDark ? '#1c1917' : '#ffffff'}; background:${isDark ? '#292524' : '#e2dccc'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:32px; color:${isDark ? '#f59e0b' : '#b45309'}; box-shadow:0 10px 25px rgba(0,0,0,0.3); position:relative;">
+          <img id="user-avatar-img" src="${userAvatarUrl || ''}" alt="Avatar" style="width:100%; height:100%; aspect-ratio:1/1; object-fit:cover; display:${userAvatarUrl ? 'block' : 'none'}; border-radius:50%;" onerror="this.style.display='none'; document.getElementById('user-avatar-text').style.display='flex';" />
+          <span id="user-avatar-text" style="display:${userAvatarUrl ? 'none' : 'flex'}; align-items:center; justify-content:center; width:100%; height:100%;">${esc(userDisplayName ? userDisplayName.charAt(0).toUpperCase() : 'G')}</span>
         </div>
 
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
