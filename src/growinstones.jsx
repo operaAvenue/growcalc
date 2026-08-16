@@ -3180,41 +3180,12 @@ export default function GrowinStones() {
               </div>
 
               <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 space-y-2">
-                <p className="font-bold">⚠️ Erro 401: invalid_client</p>
-                <p>O Client ID atual não está registrado para a origem <code className="text-white bg-black/40 px-1 py-0.5 rounded">https://grow.thegrowinstones.com</code> no Google Cloud Console.</p>
+                <p className="font-bold text-amber-200">📍 Origem não registrada no Google Cloud (no registered origin)</p>
+                <p>O seu Client ID <code className="text-amber-200 bg-black/40 px-1 py-0.5 rounded font-mono">447903804008...</code> é válido, mas o domínio <code className="text-white bg-black/40 px-1 py-0.5 rounded font-mono">https://grow.thegrowinstones.com</code> precisa ser adicionado como **Origem JavaScript Autorizada** no Google Cloud.</p>
               </div>
 
               <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-semibold mb-1 text-stone-300">Cole seu Google OAuth Client ID:</label>
-                  <input
-                    type="text"
-                    value={customClientIdInput}
-                    onChange={(e) => setCustomClientIdInput(e.target.value)}
-                    placeholder="xxxxxxxxx-xxxxxxx.apps.googleusercontent.com"
-                    className="w-full px-3.5 py-2.5 rounded-xl text-xs outline-none font-mono"
-                    style={{ background: "#292524", border: "1px solid #44403c", color: "#38bdf8" }}
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 pt-2">
-                  <button
-                    onClick={() => {
-                      if (customClientIdInput.trim()) {
-                        localStorage.setItem("growcalc_google_client_id", customClientIdInput.trim());
-                        setGoogleClientId(customClientIdInput.trim());
-                        setGoogleClientIdModalOpen(false);
-                        showToast("✓ Novo Google Client ID salvo! Tentando novamente...");
-                        setTimeout(() => triggerGoogleOAuth(), 500);
-                      } else {
-                        showToast("⚠️ Digite um Client ID válido.");
-                      }
-                    }}
-                    className="flex-1 py-2.5 rounded-xl font-bold text-xs bg-sky-600 hover:bg-sky-500 text-white shadow"
-                  >
-                    💾 Salvar Client ID & Conectar
-                  </button>
-                  
+                <div className="flex items-center gap-2 pt-1">
                   <button
                     onClick={() => {
                       setGoogleClientIdModalOpen(false);
@@ -3222,19 +3193,25 @@ export default function GrowinStones() {
                       setAuthUsernameInput("meu-grow");
                       setAuthModalOpen(true);
                     }}
-                    className="flex-1 py-2.5 rounded-xl font-bold text-xs bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700"
+                    className="flex-1 py-3 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg flex items-center justify-center gap-2"
                   >
-                    🚀 Entrar no Modo Direto
+                    🚀 Entrar no Modo Direto (Acessar Agora)
                   </button>
                 </div>
               </div>
 
-              <div className="text-[11px] text-stone-400 pt-3 border-t border-stone-800 space-y-1">
-                <p className="font-bold text-stone-300">💡 Como obter seu Client ID no Google Cloud (Grátis):</p>
-                <ol className="list-decimal pl-4 space-y-0.5">
-                  <li>Acesse o <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-sky-400 underline">Google Cloud Console</a>.</li>
-                  <li>Crie um **ID do cliente OAuth** do tipo **Aplicação Web**.</li>
-                  <li>Adicione <code className="text-white">https://grow.thegrowinstones.com</code> nas **Origens JavaScript Autorizadas**.</li>
+              <div className="text-[11px] text-stone-300 pt-3 border-t border-stone-800 space-y-1.5">
+                <p className="font-bold text-sky-400">💡 Como autorizar o domínio no Google Cloud (em 15 segundos):</p>
+                <ol className="list-decimal pl-4 space-y-1 text-stone-300">
+                  <li>Acesse **<a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noreferrer" className="text-sky-400 underline font-bold">console.cloud.google.com/apis/credentials</a>**.</li>
+                  <li>Clique no seu Client ID (**447903804008...**).</li>
+                  <li>No campo **Origens JavaScript autorizadas**, adicione:
+                    <div className="font-mono text-[10.5px] text-emerald-400 bg-black/50 p-1.5 rounded my-1">
+                      https://grow.thegrowinstones.com<br/>
+                      http://localhost:5173
+                    </div>
+                  </li>
+                  <li>Clique em **Salvar** no rodapé do Google Cloud!</li>
                 </ol>
               </div>
             </div>
