@@ -4727,20 +4727,27 @@ function GrowinStones() {
             {/* BOTÃO DO AVATAR QUE ACIONA O MENU MOBILE */}
             <button
               onClick={() => setMobileMenuOpen((o) => !o)}
-              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden border shadow-sm transition-all active:scale-95 cursor-pointer"
+              className="w-8 h-8 min-w-[32px] min-h-[32px] aspect-square rounded-full flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden border shadow-sm transition-all active:scale-95 cursor-pointer"
               style={{
                 background: T.surface2,
                 borderColor: mobileMenuOpen ? T.brand : T.border,
                 color: T.text,
-                backgroundImage: currentUser?.avatarUrl ? `url(${currentUser.avatarUrl})` : "none",
-                backgroundSize: "cover",
-                backgroundPosition: "center",
                 outline: mobileMenuOpen ? `2px solid ${T.brand}` : "none"
               }}
               title="Menu do Usuário"
               aria-label="Abrir Menu de Navegação"
             >
-              {!currentUser?.avatarUrl && (currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "G")}
+              {currentUser?.avatarUrl ? (
+                <img
+                  src={currentUser.avatarUrl}
+                  alt={currentUser?.name || "Avatar"}
+                  className="w-full h-full object-cover rounded-full block"
+                  style={{ aspectRatio: "1 / 1" }}
+                  onError={(e) => { e.currentTarget.style.display = "none"; }}
+                />
+              ) : (
+                <span>{currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "G"}</span>
+              )}
             </button>
 
             {/* DROPDOWN MENU MOBILE */}
@@ -4757,17 +4764,24 @@ function GrowinStones() {
                   {/* Header do Perfil no Menu */}
                   <div className="flex items-center gap-2.5 pb-3 mb-2 border-b" style={{ borderColor: T.borderSoft }}>
                     <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 border overflow-hidden"
+                      className="w-10 h-10 min-w-[40px] min-h-[40px] aspect-square rounded-full flex items-center justify-center font-bold text-sm shrink-0 border overflow-hidden"
                       style={{
                         background: T.surface2,
                         borderColor: T.border,
-                        color: T.brand,
-                        backgroundImage: currentUser?.avatarUrl ? `url(${currentUser.avatarUrl})` : "none",
-                        backgroundSize: "cover",
-                        backgroundPosition: "center"
+                        color: T.brand
                       }}
                     >
-                      {!currentUser?.avatarUrl && (currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "G")}
+                      {currentUser?.avatarUrl ? (
+                        <img
+                          src={currentUser.avatarUrl}
+                          alt={currentUser?.name || "Avatar"}
+                          className="w-full h-full object-cover rounded-full block"
+                          style={{ aspectRatio: "1 / 1" }}
+                          onError={(e) => { e.currentTarget.style.display = "none"; }}
+                        />
+                      ) : (
+                        <span>{currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "G"}</span>
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-bold truncate" style={{ color: T.text }}>
@@ -4968,17 +4982,24 @@ function GrowinStones() {
                 className="flex items-center gap-2.5 min-w-0 flex-1 text-left p-1 rounded-xl transition-opacity hover:opacity-85"
               >
                 <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden"
+                  className="w-8 h-8 min-w-[32px] min-h-[32px] aspect-square rounded-full flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden"
                   style={{
                     background: T.surface2,
                     border: `1px solid ${T.border}`,
-                    color: T.text,
-                    backgroundImage: currentUser?.avatarUrl ? `url(${currentUser.avatarUrl})` : "none",
-                    backgroundSize: "cover",
-                    backgroundPosition: "center"
+                    color: T.text
                   }}
                 >
-                  {!currentUser?.avatarUrl && (currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "G")}
+                  {currentUser?.avatarUrl ? (
+                    <img
+                      src={currentUser.avatarUrl}
+                      alt={currentUser?.name || "Avatar"}
+                      className="w-full h-full object-cover rounded-full block"
+                      style={{ aspectRatio: "1 / 1" }}
+                      onError={(e) => { e.currentTarget.style.display = "none"; }}
+                    />
+                  ) : (
+                    <span>{currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "G"}</span>
+                  )}
                 </div>
                 <div className="min-w-0">
                   <div className="text-xs font-bold truncate" style={{ color: T.text }}>{currentUser?.name}</div>

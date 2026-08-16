@@ -22,6 +22,16 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
   const [cropImageSrc, setCropImageSrc] = useState(null);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
 
+  // Sync whenever currentUser updates from cloud or login
+  useEffect(() => {
+    if (currentUser?.avatarUrl) setAvatarPreview(currentUser.avatarUrl);
+    if (currentUser?.bannerUrl) setBannerPreview(currentUser.bannerUrl);
+    if (currentUser?.name) setEditName(currentUser.name);
+    if (currentUser?.bio) setEditBio(currentUser.bio);
+    if (currentUser?.location) setEditLocation(currentUser.location);
+    if (currentUser?.strainFocus) setEditStrainFocus(currentUser.strainFocus);
+  }, [currentUser]);
+
   // Close lightbox on Escape key
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -468,22 +478,29 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
             {/* AVATAR OVERLAY */}
             <div className="relative group shrink-0 self-start">
               <div
-                className="w-20 h-20 sm:w-32 sm:h-32 rounded-full overflow-hidden border-4 shadow-xl flex items-center justify-center font-extrabold text-2xl sm:text-3xl"
+                className="w-20 h-20 sm:w-32 sm:h-32 min-w-[80px] min-h-[80px] sm:min-w-[128px] sm:min-h-[128px] aspect-square rounded-full overflow-hidden border-4 shadow-xl flex items-center justify-center font-extrabold text-2xl sm:text-3xl shrink-0"
                 style={{
                   background: T.surface2,
                   borderColor: T.surface,
-                  color: T.brand,
-                  backgroundImage: (avatarPreview || currentUser?.avatarUrl) ? `url(${avatarPreview || currentUser?.avatarUrl})` : "none",
-                  backgroundSize: "cover",
-                  backgroundPosition: "center"
+                  color: T.brand
                 }}
               >
-                {!(avatarPreview || currentUser?.avatarUrl) && (currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "G")}
+                {(avatarPreview || currentUser?.avatarUrl) ? (
+                  <img
+                    src={avatarPreview || currentUser?.avatarUrl}
+                    alt={currentUser?.name || "Avatar"}
+                    className="w-full h-full object-cover rounded-full block"
+                    style={{ aspectRatio: "1 / 1" }}
+                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                  />
+                ) : (
+                  <span>{currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "G"}</span>
+                )}
               </div>
 
               <button
                 onClick={() => avatarInputRef.current?.click()}
-                className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[10px] sm:text-[11px] font-bold"
+                className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[10px] sm:text-[11px] font-bold cursor-pointer"
                 title="Alterar Avatar"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -584,17 +601,24 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
       <div className="p-5 rounded-2xl border shadow-sm mb-8" style={{ background: T.surface, borderColor: T.border }}>
         <div className="flex items-start gap-3.5">
           <div
-            className="w-10 h-10 rounded-full overflow-hidden shrink-0 font-bold flex items-center justify-center text-sm border"
+            className="w-10 h-10 min-w-[40px] min-h-[40px] aspect-square rounded-full overflow-hidden shrink-0 font-bold flex items-center justify-center text-sm border"
             style={{
               background: T.surface2,
               borderColor: T.border,
-              color: T.brand,
-              backgroundImage: (avatarPreview || currentUser?.avatarUrl) ? `url(${avatarPreview || currentUser?.avatarUrl})` : "none",
-              backgroundSize: "cover",
-              backgroundPosition: "center"
+              color: T.brand
             }}
           >
-            {!(avatarPreview || currentUser?.avatarUrl) && (currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "G")}
+            {(avatarPreview || currentUser?.avatarUrl) ? (
+              <img
+                src={avatarPreview || currentUser?.avatarUrl}
+                alt={currentUser?.name || "Avatar"}
+                className="w-full h-full object-cover rounded-full block"
+                style={{ aspectRatio: "1 / 1" }}
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
+              />
+            ) : (
+              <span>{currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "G"}</span>
+            )}
           </div>
 
           <div className="flex-1 min-w-0">
@@ -916,13 +940,20 @@ function PostCard({ post, currentUser, T, dark, onToggleLike, onDelete, onAddCom
             style={{
               background: T.surface2,
               borderColor: T.border,
-              color: T.brand,
-              backgroundImage: authorAvatar ? `url(${authorAvatar})` : "none",
-              backgroundSize: "cover",
-              backgroundPosition: "center"
+              color: T.brand
             }}
           >
-            {!authorAvatar && (authorName ? authorName.charAt(0).toUpperCase() : "G")}
+            {authorAvatar ? (
+              <img
+                src={authorAvatar}
+                alt={authorName}
+                className="w-full h-full object-cover rounded-full block"
+                style={{ aspectRatio: "1 / 1" }}
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
+              />
+            ) : (
+              <span>{authorName ? authorName.charAt(0).toUpperCase() : "G"}</span>
+            )}
           </div>
 
           <div>
