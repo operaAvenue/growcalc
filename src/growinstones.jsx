@@ -584,6 +584,976 @@ function CollapsibleCard({ title, subtitle, defaultOpen = true, children, action
   );
 }
 
+const calculatePresetMetrics = (preset) => {
+  const data = preset.data || {};
+  const apply = preset.apply || {};
+  const equipData = preset.equip || data.equip || {};
+
+  const w = data.width || apply.width || 240;
+  const d = data.depth || apply.depth || 120;
+  const h = data.height || apply.height || 200;
+  const potCount = data.potCount || apply.potCount || 8;
+  const potIdx = data.potIdx !== undefined ? data.potIdx : (apply.potIdx !== undefined ? apply.potIdx : 2);
+
+  const isCustomPot = potIdx >= POT_SIZES.length;
+  let potObj;
+  if (isCustomPot) {
+    const cW = data.customPotW !== undefined ? data.customPotW : (apply.customPotW !== undefined ? apply.customPotW : 30);
+    const cL = data.customPotL !== undefined ? data.customPotL : (apply.customPotL !== undefined ? apply.customPotL : 30);
+    const cH = data.customPotH !== undefined ? data.customPotH : (apply.customPotH !== undefined ? apply.customPotH : 30);
+    const customLiters = Math.round(((cW * cL * cH) / 1000) * 10) / 10;
+    potObj = {
+      label: `${customLiters} L (Custom)`,
+      liters: customLiters,
+      widthCm: cW,
+      depthCm: cL,
+      heightCm: cH,
+      isCustom: true,
+    };
+  } else {
+    potObj = POT_SIZES[potIdx] || POT_SIZES[2];
+  }
+
+  const areaM2 = (w * d) / 10000;
+  const volM3 = (areaM2 * h) / 100;
+
+  const yPerPlant = data.yieldPerPlant !== undefined ? data.yieldPerPlant : 80;
+  const pG = data.priceG !== undefined ? data.priceG : 50;
+  const trf = data.tariff !== undefined ? data.tariff : 0.95;
+
+  const vDays = data.vegaDays !== undefined ? data.vegaDays : 30;
+  const fDays = data.floraDays !== undefined ? data.floraDays : 60;
+  const cDays = Math.max(1, vDays + fDays);
+  const hYear = 365 / cDays;
+
+  const yieldHarvestG = potCount * yPerPlant;
+  const yieldYearG = yieldHarvestG * hYear;
+  const yieldM2 = areaM2 > 0 ? yieldHarvestG / areaM2 : 0;
+
+  const wattsMap = data.watts || Object.fromEntries(EQUIPMENT.map((e) => [e.id, e.defW]));
+  let totalW = 0;
+  EQUIPMENT.forEach((eq) => {
+    const qty = equipData[eq.id] || 0;
+    const wVal = wattsMap[eq.id] || eq.defW;
+    totalW += qty * wVal;
+  });
+
+  const gPerW = totalW > 0 ? yieldYearG / totalW : 0;
+
+  const costsMap = data.costs || { ...BASE_COSTS, ...Object.fromEntries(EQUIPMENT.map((e) => [e.id, e.defCost])) };
+  let capex = 0;
+  capex += potCount * (costsMap.pot || 15);
+  capex += (w / 100) * 2 * (costsMap.pipeM || 4);
+  capex += potCount * 2 * (costsMap.fitting || 3);
+  capex += costsMap.reservoir || 120;
+  EQUIPMENT.forEach((eq) => {
+    const qty = equipData[eq.id] || 0;
+    const unitCost = costsMap[eq.id] || eq.defCost;
+    capex += qty * unitCost;
+  });
+  capex += data.extraCost || 0;
+
+  const capexPerPlant = potCount > 0 ? capex / potCount : 0;
+
+  const vHours = data.vegaHours || 18;
+  const fHours = data.floraHours || 12;
+  const avgHoursDay = cDays > 0 ? (vDays * vHours + fDays * fHours) / cDays : 18;
+  const kwhMonth = (totalW * avgHoursDay * 30) / 1000;
+  const energyCostMonth = kwhMonth * trf;
+  const monthlyInsumos = data.monthlyCost || 0;
+  const opexMonth = energyCostMonth + monthlyInsumos;
+  const opexCycle = opexMonth * (cDays / 30);
+  const opexYear = opexMonth * 12;
+
+  const revHarvest = yieldHarvestG * pG;
+  const revYear = yieldYearG * pG;
+  const netProfitYear = revYear - opexYear;
+  const profitHarvest = revHarvest - opexCycle;
+  const paybackMonths = profitHarvest > 0 ? capex / (profitHarvest / (cDays / 30)) : null;
+
+  // Cost-to-Return & Cost per Gram Ratios
+  const ratioHarvest = opexCycle > 0 && pG > 0 ? revHarvest / opexCycle : 0;
+  const ratioYear = opexYear > 0 && pG > 0 ? revYear / opexYear : 0;
+  const capexRoiYear = capex > 0 && pG > 0 ? (netProfitYear / capex) * 100 : 0;
+  const costPerGramOpex = yieldYearG > 0 ? opexYear / yieldYearG : 0;
+  const costPerGramTotal = yieldYearG > 0 ? (capex + opexYear) / yieldYearG : 0;
+
+  return {
+    id: preset.id || preset.name,
+    name: preset.name,
+    width: w, depth: d, height: h,
+    areaM2, volM3,
+    potCount, potLabel: potObj.label,
+    yPerPlant,
+    cDays, hYear,
+    yieldHarvestG, yieldYearG, yieldM2,
+    totalW, gPerW,
+    kwhMonth, opexMonth, opexCycle, opexYear,
+    capex, capexPerPlant,
+    priceG: pG,
+    revHarvest, revYear,
+    netProfitYear, profitHarvest, paybackMonths,
+    ratioHarvest, ratioYear, capexRoiYear,
+    costPerGramOpex, costPerGramTotal,
+  };
+};
+
+function ComparisonView({ allPresets, loadPreset, removePreset, restoreDefaultPresets, addCurrentAsPreset, T, dark }) {
+  const [compMode, setCompMode] = useState("all"); // "all" | "custom" | "individual"
+  const [selectedIds, setSelectedIds] = useState(() => allPresets.map((p) => p.id || p.name));
+  const [singleId, setSingleId] = useState(() => (allPresets.length > 0 ? (allPresets[0].id || allPresets[0].name) : ""));
+
+  useEffect(() => {
+    if (compMode === "all") {
+      setSelectedIds(allPresets.map((p) => p.id || p.name));
+    }
+  }, [allPresets, compMode]);
+
+  if (!allPresets || allPresets.length === 0) {
+    return (
+      <div className="rounded-2xl p-12 text-center my-8" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
+        <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: T.surface, border: `1px solid ${T.accentBorder}`, color: T.text }}>
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
+        </div>
+        <h3 className="text-xl font-bold mb-2" style={{ color: T.text }}>Nenhum chip de setup para comparar</h3>
+        <p className="text-sm max-w-md mx-auto mb-6" style={{ color: T.muted }}>
+          Adicione o setup atual como um novo chip ou restaure os presets padrão para visualizar gráficos e tabelas comparativas.
+        </p>
+        <div className="flex items-center justify-center gap-3 flex-wrap">
+          <button onClick={addCurrentAsPreset} className="px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+            style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Salvar setup atual como chip</span>
+          </button>
+          <button onClick={restoreDefaultPresets} className="px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+            style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            <span>Restaurar presets padrão</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const toggleSelectId = (id) => {
+    if (selectedIds.includes(id)) {
+      if (selectedIds.length === 1) return;
+      setSelectedIds(selectedIds.filter((x) => x !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
+  };
+
+  const allMetrics = allPresets.map((p) => calculatePresetMetrics(p));
+
+  const activeMetricsList = compMode === "individual"
+    ? allMetrics.filter((m) => m.id === (singleId || (allPresets[0].id || allPresets[0].name)))
+    : compMode === "custom"
+    ? allMetrics.filter((m) => selectedIds.includes(m.id))
+    : allMetrics;
+
+  const metricsList = activeMetricsList.length > 0 ? activeMetricsList : allMetrics;
+
+  const topYield = [...metricsList].sort((a, b) => b.yieldYearG - a.yieldYearG)[0];
+  const lowestCapex = [...metricsList].sort((a, b) => a.capex - b.capex)[0];
+  const lowestCostPerG = [...metricsList].sort((a, b) => a.costPerGramOpex - b.costPerGramOpex)[0];
+  const topEfficiency = [...metricsList].sort((a, b) => b.gPerW - a.gPerW)[0];
+  const validPaybackList = metricsList.filter((m) => m.paybackMonths && m.paybackMonths > 0);
+  const lowestPayback = validPaybackList.length > 0 ? [...validPaybackList].sort((a, b) => a.paybackMonths - b.paybackMonths)[0] : null;
+
+  const maxYieldG = Math.max(...metricsList.map((m) => m.yieldYearG), 1);
+  const maxCapex = Math.max(...metricsList.map((m) => m.capex), 1);
+  const maxOpex = Math.max(...metricsList.map((m) => m.opexMonth), 1);
+  const maxRatioHarvest = Math.max(...metricsList.map((m) => m.ratioHarvest), 1);
+  const maxRatioYear = Math.max(...metricsList.map((m) => m.ratioYear), 1);
+  const maxCostPerG = Math.max(...metricsList.map((m) => m.costPerGramOpex), 1);
+
+  const singlePresetMetrics = allMetrics.find((m) => m.id === singleId) || allMetrics[0];
+  const otherMetrics = allMetrics.filter((m) => m.id !== singlePresetMetrics.id);
+  const otherPresetsAverage = otherMetrics.length > 0
+    ? {
+        yieldYearG: otherMetrics.reduce((acc, m) => acc + m.yieldYearG, 0) / otherMetrics.length,
+        capex: otherMetrics.reduce((acc, m) => acc + m.capex, 0) / otherMetrics.length,
+        opexMonth: otherMetrics.reduce((acc, m) => acc + m.opexMonth, 0) / otherMetrics.length,
+        costPerGramOpex: otherMetrics.reduce((acc, m) => acc + m.costPerGramOpex, 0) / otherMetrics.length,
+      }
+    : null;
+
+  // Soft Pastel Palette (Theme-aware for maximum legibility and elegance)
+  const pastelMintText = dark ? "#a3e635" : "#15803d";
+  const pastelMintBar = dark ? "#a3e635" : "#86efac";
+  const pastelMintBg = dark ? "rgba(163, 230, 53, 0.1)" : "rgba(21, 128, 61, 0.08)";
+
+  const pastelPeachText = dark ? "#fde047" : "#b45309";
+  const pastelPeachBar = dark ? "#fef08a" : "#fde047";
+
+  const pastelSkyText = dark ? "#7dd3fc" : "#0284c7";
+  const pastelSkyBar = dark ? "#bae6fd" : "#7dd3fc";
+
+  const pastelLavenderText = dark ? "#c7d2fe" : "#4338ca";
+  const pastelLavenderBar = dark ? "#c7d2fe" : "#a5b4fc";
+
+  return (
+    <div className="space-y-6 my-4">
+      {/* Top Header Toolbar & Mode Switcher */}
+      <div className="p-5 rounded-2xl space-y-4" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2" style={{ color: T.text }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              <span>Painel Comparativo de Setups</span>
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full"
+                style={{ background: T.surface, border: `1px solid ${T.accentBorder}`, color: T.text }}>
+                {metricsList.length} de {allPresets.length} setup(s) em análise
+              </span>
+            </h2>
+            <p className="text-xs mt-1" style={{ color: T.muted }}>
+              Visualização gráfica e tabular das métricas resultantes de cada chip de cultivo.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button onClick={addCurrentAsPreset} className="px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+              style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <span>Salvar setup atual</span>
+            </button>
+            <button onClick={restoreDefaultPresets} className="px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+              style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              <span>Restaurar padrões</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Mode Selector Buttons */}
+        <div className="flex items-center gap-2 pt-2 border-t flex-wrap" style={{ borderColor: T.borderSoft }}>
+          <span className="text-xs font-bold mr-1" style={{ color: T.muted }}>Modo de análise:</span>
+          <button onClick={() => { setCompMode("all"); setSelectedIds(allPresets.map(p => p.id || p.name)); }}
+            className="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+            style={compMode === "all"
+              ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
+              : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            <span>Em Conjunto (Todos os {allPresets.length})</span>
+          </button>
+
+          <button onClick={() => setCompMode("custom")}
+            className="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+            style={compMode === "custom"
+              ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
+              : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            <span>Customizado (Seleção)</span>
+          </button>
+
+          <button onClick={() => { setCompMode("individual"); if (!singleId && allPresets.length > 0) setSingleId(allPresets[0].id || allPresets[0].name); }}
+            className="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+            style={compMode === "individual"
+              ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
+              : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span>Individual (Diagnóstico)</span>
+          </button>
+        </div>
+
+        {/* Custom Mode: Checkbox Selectors */}
+        {compMode === "custom" && (
+          <div className="p-3 rounded-xl border flex items-center gap-2 flex-wrap" style={{ background: T.surface, borderColor: T.accentBorder }}>
+            <span className="text-xs font-bold mr-1" style={{ color: T.muted }}>Marque para incluir no comparativo:</span>
+            {allPresets.map((p) => {
+              const id = p.id || p.name;
+              const isChecked = selectedIds.includes(id);
+              return (
+                <button key={id} onClick={() => toggleSelectId(id)}
+                  className="px-3 py-1 rounded-full text-xs font-semibold border transition-all flex items-center gap-1.5"
+                  style={isChecked
+                    ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text, fontWeight: 700 }
+                    : { background: T.surface2, border: `1px solid ${T.border}`, color: T.faint }}>
+                  <span>{isChecked ? "✓" : "○"}</span>
+                  <span>{p.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Individual Mode: Chip Selector */}
+        {compMode === "individual" && (
+          <div className="p-3.5 rounded-xl border space-y-3" style={{ background: T.surface, borderColor: T.accentBorder }}>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <span className="text-xs font-bold" style={{ color: T.muted }}>Selecione o setup para diagnóstico individual:</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                {allPresets.map((p) => {
+                  const id = p.id || p.name;
+                  const isSelected = singleId === id;
+                  return (
+                    <button key={id} onClick={() => setSingleId(id)}
+                      className="px-3 py-1 rounded-lg text-xs font-bold border transition-all"
+                      style={isSelected
+                        ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
+                        : { background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
+                      {p.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Individual Diagnostic Card */}
+            {singlePresetMetrics && (
+              <div className="p-4 rounded-xl border space-y-3" style={{ background: T.surface2, borderColor: T.borderSoft }}>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider block" style={{ color: pastelPeachText }}>Análise Individual</span>
+                    <h3 className="text-base font-extrabold" style={{ color: T.text }}>{singlePresetMetrics.name}</h3>
+                  </div>
+                  <button onClick={() => loadPreset(allPresets.find((p) => (p.id || p.name) === singlePresetMetrics.id))}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5"
+                    style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <span>Carregar no Configurador</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="p-3 rounded-lg border" style={{ background: T.surface, borderColor: T.borderSoft }}>
+                    <div className="text-[10px] font-bold uppercase" style={{ color: T.muted }}>Produção Anual</div>
+                    <div className="text-lg font-extrabold mt-0.5" style={{ color: pastelMintText }}>{fmtG(singlePresetMetrics.yieldYearG)}</div>
+                    <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>{singlePresetMetrics.hYear.toFixed(1)} safras/ano</div>
+                  </div>
+                  <div className="p-3 rounded-lg border" style={{ background: T.surface, borderColor: T.borderSoft }}>
+                    <div className="text-[10px] font-bold uppercase" style={{ color: T.muted }}>Custo OPEX por Grama</div>
+                    <div className="text-lg font-extrabold mt-0.5" style={{ color: pastelMintText }}>{fmtBRL(singlePresetMetrics.costPerGramOpex)}/g</div>
+                    <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>Custo produtivo direto</div>
+                  </div>
+                  <div className="p-3 rounded-lg border" style={{ background: T.surface, borderColor: T.borderSoft }}>
+                    <div className="text-[10px] font-bold uppercase" style={{ color: T.muted }}>Investimento CAPEX</div>
+                    <div className="text-lg font-extrabold mt-0.5" style={{ color: pastelPeachText }}>{fmtBRL(singlePresetMetrics.capex)}</div>
+                    <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>{fmtBRL(singlePresetMetrics.capexPerPlant)}/vaso</div>
+                  </div>
+                  <div className="p-3 rounded-lg border" style={{ background: T.surface, borderColor: T.borderSoft }}>
+                    <div className="text-[10px] font-bold uppercase" style={{ color: T.muted }}>OPEX Mensal</div>
+                    <div className="text-lg font-extrabold mt-0.5" style={{ color: pastelSkyText }}>{fmtBRL(singlePresetMetrics.opexMonth)}</div>
+                    <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>{singlePresetMetrics.kwhMonth.toFixed(0)} kWh/mês</div>
+                  </div>
+                </div>
+
+                {/* Comparison vs Average */}
+                {otherPresetsAverage && (
+                  <div className="pt-2 border-t" style={{ borderColor: T.borderSoft }}>
+                    <div className="text-[11px] font-bold mb-2" style={{ color: T.muted }}>
+                      Comparação do <span style={{ color: T.text }}>{singlePresetMetrics.name}</span> em relação à média dos outros {otherMetrics.length} setup(s):
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                      <div className="flex items-center justify-between p-2 rounded border" style={{ background: T.surface, borderColor: T.borderSoft }}>
+                        <span style={{ color: T.muted }}>Produção Anual:</span>
+                        <span className="font-extrabold" style={{ color: singlePresetMetrics.yieldYearG >= otherPresetsAverage.yieldYearG ? pastelMintText : pastelPeachText }}>
+                          {singlePresetMetrics.yieldYearG >= otherPresetsAverage.yieldYearG ? "+" : ""}
+                          {(((singlePresetMetrics.yieldYearG - otherPresetsAverage.yieldYearG) / (otherPresetsAverage.yieldYearG || 1)) * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded border" style={{ background: T.surface, borderColor: T.borderSoft }}>
+                        <span style={{ color: T.muted }}>Custo/g (OPEX):</span>
+                        <span className="font-extrabold" style={{ color: singlePresetMetrics.costPerGramOpex <= otherPresetsAverage.costPerGramOpex ? pastelMintText : pastelPeachText }}>
+                          {singlePresetMetrics.costPerGramOpex <= otherPresetsAverage.costPerGramOpex ? "-" : "+"}
+                          {Math.abs(((singlePresetMetrics.costPerGramOpex - otherPresetsAverage.costPerGramOpex) / (otherPresetsAverage.costPerGramOpex || 1)) * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded border" style={{ background: T.surface, borderColor: T.borderSoft }}>
+                        <span style={{ color: T.muted }}>CAPEX (Investimento):</span>
+                        <span className="font-extrabold" style={{ color: singlePresetMetrics.capex <= otherPresetsAverage.capex ? pastelMintText : pastelPeachText }}>
+                          {singlePresetMetrics.capex <= otherPresetsAverage.capex ? "-" : "+"}
+                          {Math.abs(((singlePresetMetrics.capex - otherPresetsAverage.capex) / (otherPresetsAverage.capex || 1)) * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Hero Champions Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {topYield && (
+          <div className="p-4 rounded-2xl relative overflow-hidden" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
+            <div className="text-[10px] font-extrabold uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ color: T.muted }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>
+              <span>Maior Produção Anual</span>
+            </div>
+            <div className="text-2xl font-extrabold tracking-tight" style={{ color: T.text }}>{fmtG(topYield.yieldYearG)}</div>
+            <div className="text-xs font-bold mt-1 truncate" style={{ color: pastelMintText }}>{topYield.name}</div>
+            <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>{topYield.hYear.toFixed(1)} safras/ano ({fmtG(topYield.yieldHarvestG)}/safra)</div>
+          </div>
+        )}
+
+        {lowestCostPerG && (
+          <div className="p-4 rounded-2xl relative overflow-hidden" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
+            <div className="text-[10px] font-extrabold uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ color: T.muted }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              <span>Menor Custo por Grama</span>
+            </div>
+            <div className="text-2xl font-extrabold tracking-tight" style={{ color: T.text }}>{fmtBRL(lowestCostPerG.costPerGramOpex)} / g</div>
+            <div className="text-xs font-bold mt-1 truncate" style={{ color: pastelMintText }}>{lowestCostPerG.name}</div>
+            <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>Custo produtivo direto (OPEX/g)</div>
+          </div>
+        )}
+
+        {topEfficiency && (
+          <div className="p-4 rounded-2xl relative overflow-hidden" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
+            <div className="text-[10px] font-extrabold uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ color: T.muted }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span>Eficiência por Watt</span>
+            </div>
+            <div className="text-2xl font-extrabold tracking-tight" style={{ color: T.text }}>{topEfficiency.gPerW.toFixed(2)} g/W</div>
+            <div className="text-xs font-bold mt-1 truncate" style={{ color: pastelMintText }}>{topEfficiency.name}</div>
+            <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>Potência total: {topEfficiency.totalW}W</div>
+          </div>
+        )}
+
+        {lowestPayback ? (
+          <div className="p-4 rounded-2xl relative overflow-hidden" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
+            <div className="text-[10px] font-extrabold uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ color: T.muted }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.71 1.26-1.5 1.74-2.3L4.5 16.5z"/><path d="M12 15l-3-3 7.5-7.5c1.4-1.4 3.7-1.4 5.1 0s1.4 3.7 0 5.1L12 15z"/></svg>
+              <span>Retorno Mais Rápido</span>
+            </div>
+            <div className="text-2xl font-extrabold tracking-tight" style={{ color: T.text }}>{lowestPayback.paybackMonths.toFixed(1)} meses</div>
+            <div className="text-xs font-bold mt-1 truncate" style={{ color: pastelSkyText }}>{lowestPayback.name}</div>
+            <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>Payback em ~{(lowestPayback.paybackMonths / (lowestPayback.cDays / 30)).toFixed(1)} safras</div>
+          </div>
+        ) : (
+          <div className="p-4 rounded-2xl relative overflow-hidden" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
+            <div className="text-[10px] font-extrabold uppercase tracking-wider mb-1 flex items-center gap-1.5" style={{ color: T.muted }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              <span>Receita Anual Máxima</span>
+            </div>
+            <div className="text-2xl font-extrabold tracking-tight" style={{ color: T.text }}>{fmtBRL(topYield.revYear)}</div>
+            <div className="text-xs font-bold mt-1 truncate" style={{ color: pastelPeachText }}>{topYield.name}</div>
+            <div className="text-[10px] mt-0.5" style={{ color: T.faint }}>Estimativa baseada em R$/g</div>
+          </div>
+        )}
+      </div>
+
+      {/* Graphical Comparisons Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Chart 1: Produção Anual (kg/ano) */}
+        <div className="p-5 rounded-2xl" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
+          <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center justify-between" style={{ color: T.muted }}>
+            <span className="flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+              <span>Produção Anual Comparada</span>
+            </span>
+            <span className="text-[10px] font-semibold" style={{ color: pastelMintText }}>kg / ano</span>
+          </h3>
+          <div className="space-y-3">
+            {metricsList.map((m) => {
+              const pct = Math.max(8, Math.min(100, (m.yieldYearG / maxYieldG) * 100));
+              const isTop = m.id === topYield.id;
+              return (
+                <div key={m.id} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs font-semibold">
+                    <span className="truncate max-w-[200px]" style={{ color: T.text }}>{m.name}</span>
+                    <span className="font-bold" style={{ color: isTop ? pastelMintText : T.text }}>{fmtG(m.yieldYearG)}</span>
+                  </div>
+                  <div className="w-full h-3 rounded-full overflow-hidden" style={{ background: T.surface, border: `1px solid ${T.borderSoft}` }}>
+                    <div className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${pct}%`,
+                        background: isTop ? pastelMintBar : pastelPeachBar
+                      }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Chart 2: Investimento (CAPEX) vs OPEX Mensal */}
+        <div className="p-5 rounded-2xl" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
+          <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center justify-between" style={{ color: T.muted }}>
+            <span className="flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              <span>Investimento (CAPEX) & OPEX Mensal</span>
+            </span>
+            <span className="text-[10px] font-semibold" style={{ color: T.faint }}>R$</span>
+          </h3>
+          <div className="space-y-3">
+            {metricsList.map((m) => {
+              const capexPct = Math.max(6, Math.min(100, (m.capex / maxCapex) * 100));
+              const opexPct = Math.max(6, Math.min(100, (m.opexMonth / maxOpex) * 100));
+              return (
+                <div key={m.id} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-semibold">
+                    <span className="truncate max-w-[180px]" style={{ color: T.text }}>{m.name}</span>
+                    <div className="flex items-center gap-3 text-[11px]">
+                      <span style={{ color: pastelPeachText }}>CAPEX: {fmtBRL(m.capex)}</span>
+                      <span style={{ color: pastelSkyText }}>OPEX: {fmtBRL(m.opexMonth)}/mês</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="w-full h-2.5 rounded-full overflow-hidden" style={{ background: T.surface, border: `1px solid ${T.borderSoft}` }}>
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${capexPct}%`, background: pastelPeachBar }} />
+                    </div>
+                    <div className="w-full h-2.5 rounded-full overflow-hidden" style={{ background: T.surface, border: `1px solid ${T.borderSoft}` }}>
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${opexPct}%`, background: pastelSkyBar }} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Chart 3: Comparativo Por Safra (Peso, Receita, Produtividade, Custo/g & Custo/Retorno) */}
+        <div className="p-5 rounded-2xl lg:col-span-2" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
+          <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center justify-between" style={{ color: T.muted }}>
+            <span className="flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              <span>Métricas & Custo por Grama Por Safra</span>
+            </span>
+            <span className="text-[10px] font-semibold" style={{ color: T.faint }}>Desempenho por ciclo de cultivo</span>
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {metricsList.map((m) => {
+              const maxHarvestG = Math.max(...metricsList.map(x => x.yieldHarvestG), 1);
+              const maxRevHarvest = Math.max(...metricsList.map(x => x.revHarvest), 1);
+              const maxM2 = Math.max(...metricsList.map(x => x.yieldM2), 1);
+
+              const pctWeight = Math.max(8, Math.min(100, (m.yieldHarvestG / maxHarvestG) * 100));
+              const pctRev = Math.max(8, Math.min(100, (m.revHarvest / maxRevHarvest) * 100));
+              const pctM2 = Math.max(8, Math.min(100, (m.yieldM2 / maxM2) * 100));
+              const pctRatioH = Math.max(8, Math.min(100, (m.ratioHarvest / maxRatioHarvest) * 100));
+              const pctCostG = Math.max(8, Math.min(100, (m.costPerGramOpex / maxCostPerG) * 100));
+
+              return (
+                <div key={m.id} className="p-4 rounded-xl space-y-3" style={{ background: T.surface, border: `1px solid ${T.borderSoft}` }}>
+                  <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: T.borderSoft }}>
+                    <span className="font-extrabold text-sm truncate" style={{ color: T.text }}>{m.name}</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
+                      {m.cDays} dias / ciclo
+                    </span>
+                  </div>
+
+                  {/* Peso por safra */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[11px] font-medium" style={{ color: T.muted }}>Peso por safra</span>
+                      <span className="font-extrabold text-xs" style={{ color: pastelMintText }}>{fmtG(m.yieldHarvestG)}</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: T.surface2 }}>
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctWeight}%`, background: pastelMintBar }} />
+                    </div>
+                  </div>
+
+                  {/* Custo por Grama (OPEX) */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[11px] font-medium" style={{ color: T.muted }}>Custo / grama (OPEX)</span>
+                      <span className="font-extrabold text-xs" style={{ color: pastelMintText }}>{fmtBRL(m.costPerGramOpex)}/g</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: T.surface2 }}>
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctCostG}%`, background: pastelMintBar }} />
+                    </div>
+                  </div>
+
+                  {/* Receita por safra */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[11px] font-medium" style={{ color: T.muted }}>Receita por safra</span>
+                      <span className="font-extrabold text-xs" style={{ color: pastelPeachText }}>{m.priceG > 0 ? fmtBRL(m.revHarvest) : "—"}</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: T.surface2 }}>
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctRev}%`, background: pastelPeachBar }} />
+                    </div>
+                  </div>
+
+                  {/* Produtividade por m² */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[11px] font-medium" style={{ color: T.muted }}>Produtividade / m²</span>
+                      <span className="font-extrabold text-xs" style={{ color: pastelLavenderText }}>{m.yieldM2.toFixed(0)} g/m²</span>
+                    </div>
+                    <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: T.surface2 }}>
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctM2}%`, background: pastelLavenderBar }} />
+                    </div>
+                  </div>
+
+                  {/* Relação Custo / Retorno por safra */}
+                  <div className="space-y-1 pt-1 border-t" style={{ borderColor: T.borderSoft }}>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[11px] font-bold" style={{ color: T.text }}>Custo/Retorno Safra</span>
+                      <span className="font-extrabold text-xs" style={{ color: pastelSkyText }}>
+                        {m.ratioHarvest > 0 ? `${m.ratioHarvest.toFixed(1)}× retorno` : "—"}
+                      </span>
+                    </div>
+                    <div className="text-[9.5px] truncate" style={{ color: T.faint }}>
+                      {m.priceG > 0 ? `OPEX ${fmtBRL(m.opexCycle)} → Receita ${fmtBRL(m.revHarvest)}` : "defina R$/g"}
+                    </div>
+                    <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: T.surface2 }}>
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctRatioH}%`, background: pastelSkyBar }} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Chart 4: Relação Custo / Retorno Anual (OPEX & CAPEX vs Receita Anual) */}
+        <div className="p-5 rounded-2xl lg:col-span-2" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
+          <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center justify-between" style={{ color: T.muted }}>
+            <span className="flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+              <span>Relação Custo / Retorno Anual (OPEX & CAPEX vs Receita Anual)</span>
+            </span>
+            <span className="text-[10px] font-semibold" style={{ color: T.faint }}>Retorno financeiro por ano</span>
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {metricsList.map((m) => {
+              const pctRatioY = Math.max(8, Math.min(100, (m.ratioYear / maxRatioYear) * 100));
+
+              return (
+                <div key={m.id} className="p-4 rounded-xl space-y-3" style={{ background: T.surface, border: `1px solid ${T.borderSoft}` }}>
+                  <div className="flex items-center justify-between border-b pb-2" style={{ borderColor: T.borderSoft }}>
+                    <span className="font-extrabold text-sm truncate" style={{ color: T.text }}>{m.name}</span>
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full"
+                      style={{ background: pastelMintBg, border: `1px solid ${T.border}`, color: pastelMintText }}>
+                      {m.ratioYear > 0 ? `${m.ratioYear.toFixed(1)}× retorno s/ OPEX` : "—"}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400" style={{ color: T.muted }}>Custo OPEX por grama:</span>
+                      <span className="font-extrabold" style={{ color: pastelMintText }}>{fmtBRL(m.costPerGramOpex)} / g</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400" style={{ color: T.muted }}>Custo Total 1º ano / grama:</span>
+                      <span className="font-bold" style={{ color: T.text }}>{fmtBRL(m.costPerGramTotal)} / g</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t" style={{ borderColor: T.borderSoft }}>
+                      <span className="text-slate-400" style={{ color: T.muted }}>OPEX Anual Total:</span>
+                      <span className="font-bold" style={{ color: pastelSkyText }}>{fmtBRL(m.opexYear)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400" style={{ color: T.muted }}>Receita Anual Estimada:</span>
+                      <span className="font-bold" style={{ color: pastelPeachText }}>{m.priceG > 0 ? fmtBRL(m.revYear) : "—"}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400" style={{ color: T.muted }}>Lucro Líquido Anual:</span>
+                      <span className="font-extrabold" style={{ color: pastelMintText }}>{m.priceG > 0 ? fmtBRL(m.netProfitYear) : "—"}</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t" style={{ borderColor: T.borderSoft }}>
+                      <span className="text-slate-400 font-medium" style={{ color: T.muted }}>ROI s/ CAPEX Anual:</span>
+                      <span className="font-extrabold" style={{ color: pastelMintText }}>
+                        {m.capexRoiYear > 0 ? `+${m.capexRoiYear.toFixed(0)}% / ano` : "—"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: T.surface2 }}>
+                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pctRatioY}%`, background: pastelMintBar }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Comparison Matrix Table */}
+      <div className="p-5 rounded-2xl overflow-hidden" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
+        <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: T.muted }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+          <span>Tabela Comparativa Detalhada ({metricsList.length} setup(s))</span>
+        </h3>
+
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-xs text-left min-w-[650px]">
+            <thead>
+              <tr style={{ borderBottom: `2px solid ${T.border}` }}>
+                <th className="py-3 px-4 font-bold uppercase tracking-wider w-56" style={{ color: T.muted }}>Métrica / Leitura</th>
+                {metricsList.map((m) => (
+                  <th key={m.id} className="py-3 px-4 text-center font-bold" style={{ borderLeft: `1px solid ${T.borderSoft}` }}>
+                    <div className="font-extrabold text-sm mb-1" style={{ color: T.text }}>{m.name}</div>
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button onClick={() => loadPreset(allPresets.find((p) => (p.id || p.name) === m.id))}
+                        className="px-2 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1"
+                        style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                        <span>Carregar</span>
+                      </button>
+                      <button onClick={() => removePreset(allPresets.find((p) => (p.id || p.name) === m.id)?.id, m.name)}
+                        className="px-2 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1"
+                        style={{ background: dark ? "rgba(239, 68, 68, 0.15)" : "rgba(220, 38, 38, 0.08)", border: `1px solid ${dark ? "rgba(239, 68, 68, 0.3)" : "rgba(220, 38, 38, 0.2)"}`, color: dark ? "#f87171" : "#dc2626" }}>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        <span>Remover</span>
+                      </button>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y" style={{ borderColor: T.borderSoft }}>
+              {/* Group 1: Estrutura */}
+              <tr style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
+                <td colSpan={metricsList.length + 1} className="py-2.5 px-4 font-extrabold text-[11px] uppercase tracking-wider" style={{ color: T.text }}>
+                  Estrutura & Área de Cultivo
+                </td>
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Dimensões (L × P × A)</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-medium" style={{ color: T.text, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {m.width} × {m.depth} × {m.height} cm
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Área Útil de Cultivo</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center font-bold text-xs" style={{ color: T.text, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {m.areaM2.toFixed(2)} m²
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Volume Total da Estufa</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-medium" style={{ color: T.text, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {m.volM3.toFixed(2)} m³
+                  </td>
+                ))}
+              </tr>
+
+              {/* Group 2: Vasos */}
+              <tr style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
+                <td colSpan={metricsList.length + 1} className="py-2.5 px-4 font-extrabold text-[11px] uppercase tracking-wider" style={{ color: T.text }}>
+                  Vasos & Densidade
+                </td>
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Quantidade de Vasos</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center font-bold text-xs" style={{ color: T.text, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {m.potCount} vaso(s)
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Tipo de Vaso</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-medium" style={{ color: T.muted, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {m.potLabel}
+                  </td>
+                ))}
+              </tr>
+
+              {/* Group 3: Produção */}
+              <tr style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
+                <td colSpan={metricsList.length + 1} className="py-2.5 px-4 font-extrabold text-[11px] uppercase tracking-wider" style={{ color: T.text }}>
+                  Produção & Rendimento Por Safra e Por Ano
+                </td>
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Safras por Ano</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-medium" style={{ color: T.text, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {m.hYear.toFixed(1)} safras/ano ({m.cDays}d/ciclo)
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Produção por Safra (Peso)</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center font-bold text-xs" style={{ color: pastelMintText, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {fmtG(m.yieldHarvestG)}
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Produção por Ano</td>
+                {metricsList.map((m) => {
+                  const isTop = m.id === topYield.id;
+                  return (
+                    <td key={m.id} className="py-2.5 px-4 text-center font-extrabold text-xs"
+                      style={{
+                        color: isTop ? pastelMintText : T.text,
+                        background: isTop ? pastelMintBg : "transparent",
+                        borderLeft: `1px solid ${T.borderSoft}`
+                      }}>
+                      {fmtG(m.yieldYearG)} {isTop && "★"}
+                    </td>
+                  );
+                })}
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Produtividade por m²</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-semibold" style={{ color: pastelLavenderText, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {m.yieldM2.toFixed(0)} g/m²
+                  </td>
+                ))}
+              </tr>
+
+              {/* Group 4: Financeiro */}
+              <tr style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
+                <td colSpan={metricsList.length + 1} className="py-2.5 px-4 font-extrabold text-[11px] uppercase tracking-wider" style={{ color: T.text }}>
+                  Financeiro, Custos & Custo por Grama
+                </td>
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Custo Operacional por Grama (OPEX/g)</td>
+                {metricsList.map((m) => {
+                  const isLowG = m.id === lowestCostPerG.id;
+                  return (
+                    <td key={m.id} className="py-2.5 px-4 text-center font-extrabold text-xs"
+                      style={{
+                        color: isLowG ? pastelMintText : T.text,
+                        background: isLowG ? pastelMintBg : "transparent",
+                        borderLeft: `1px solid ${T.borderSoft}`
+                      }}>
+                      {fmtBRL(m.costPerGramOpex)} / g {isLowG && "★"}
+                    </td>
+                  );
+                })}
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Custo Total no 1º Ano (CAPEX+OPEX / g)</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-semibold" style={{ color: T.text, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {fmtBRL(m.costPerGramTotal)} / g
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Investimento Total (CAPEX)</td>
+                {metricsList.map((m) => {
+                  const isLow = m.id === lowestCapex.id;
+                  return (
+                    <td key={m.id} className="py-2.5 px-4 text-center font-bold text-xs"
+                      style={{
+                        color: isLow ? pastelMintText : pastelPeachText,
+                        background: isLow ? pastelMintBg : "transparent",
+                        borderLeft: `1px solid ${T.borderSoft}`
+                      }}>
+                      {fmtBRL(m.capex)} {isLow && "★"}
+                    </td>
+                  );
+                })}
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Custo Operacional por Safra (OPEX Safra)</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-medium" style={{ color: T.muted, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {fmtBRL(m.opexCycle)}
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>OPEX Mensal (Energia + Insumos)</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-semibold" style={{ color: pastelSkyText, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {fmtBRL(m.opexMonth)} / mês
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Consumo Elétrico Mensal</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center text-xs font-medium" style={{ color: T.muted, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {m.kwhMonth.toFixed(0)} kWh/mês
+                  </td>
+                ))}
+              </tr>
+
+              {/* Group 5: Retorno & Relações Custo/Retorno */}
+              <tr style={{ background: T.surface, borderBottom: `1px solid ${T.border}` }}>
+                <td colSpan={metricsList.length + 1} className="py-2.5 px-4 font-extrabold text-[11px] uppercase tracking-wider" style={{ color: T.text }}>
+                  Relações Custo/Retorno, Receita & Lucro
+                </td>
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Receita por Safra</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center font-bold text-xs" style={{ color: pastelPeachText, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {m.priceG > 0 ? fmtBRL(m.revHarvest) : "—"}
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Relação Custo/Retorno por Safra</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center font-extrabold text-xs" style={{ color: pastelSkyText, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {m.ratioHarvest > 0 ? `${m.ratioHarvest.toFixed(1)}× retorno` : "—"}
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Receita Anual Estimada</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center font-extrabold text-xs" style={{ color: pastelPeachText, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {m.priceG > 0 ? fmtBRL(m.revYear) : "—"}
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Relação Custo/Retorno Anual (Receita/OPEX)</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center font-extrabold text-xs" style={{ color: pastelMintText, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {m.ratioYear > 0 ? `${m.ratioYear.toFixed(1)}× retorno` : "—"}
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Lucro Líquido Anual (Receita - OPEX)</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center font-bold text-xs" style={{ color: pastelMintText, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {m.priceG > 0 ? fmtBRL(m.netProfitYear) : "—"}
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>ROI do CAPEX Inicial (% / ano)</td>
+                {metricsList.map((m) => (
+                  <td key={m.id} className="py-2.5 px-4 text-center font-extrabold text-xs" style={{ color: pastelMintText, borderLeft: `1px solid ${T.borderSoft}` }}>
+                    {m.capexRoiYear > 0 ? `+${m.capexRoiYear.toFixed(0)}% / ano` : "—"}
+                  </td>
+                ))}
+              </tr>
+              <tr style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                <td className="py-2.5 px-4 font-semibold text-xs" style={{ color: T.muted }}>Payback Estimado</td>
+                {metricsList.map((m) => {
+                  const isBestPayback = lowestPayback && m.id === lowestPayback.id;
+                  return (
+                    <td key={m.id} className="py-2.5 px-4 text-center font-bold text-xs"
+                      style={{
+                        color: isBestPayback ? pastelMintText : T.text,
+                        background: isBestPayback ? pastelMintBg : "transparent",
+                        borderLeft: `1px solid ${T.borderSoft}`
+                      }}>
+                      {m.paybackMonths ? `${m.paybackMonths.toFixed(1)} m (${(m.paybackMonths / (m.cDays / 30)).toFixed(1)} safras)` : "—"} {isBestPayback && "★"}
+                    </td>
+                  );
+                })}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function GrowinStones() {
   const [dark, setDark] = useState(false);
   const [showReport, setShowReport] = useState(false);
