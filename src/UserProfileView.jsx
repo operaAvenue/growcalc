@@ -268,7 +268,7 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
     : posts;
 
   return (
-    <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 py-6 pb-24">
+    <div className="max-w-4xl mx-auto w-full px-3 sm:px-6 py-4 sm:py-6 pb-24 overflow-x-hidden">
       {/* HIDDEN INPUTS FOR MEDIA */}
       <input type="file" ref={avatarInputRef} accept="image/*" onChange={handleAvatarFile} className="hidden" />
       <input type="file" ref={bannerInputRef} accept="image/*" onChange={handleBannerFile} className="hidden" />
@@ -276,16 +276,16 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
       <input type="file" ref={videoAttachRef} accept="video/*" onChange={handleAttachVideo} className="hidden" />
 
       {/* ————————————————— PROFILE HEADER (TWITTER / X STYLE) ————————————————— */}
-      <div className="rounded-3xl overflow-hidden shadow-lg border mb-6" style={{ background: T.surface, borderColor: T.border }}>
+      <div className="rounded-2xl sm:rounded-3xl overflow-hidden shadow-lg border mb-5 w-full max-w-full" style={{ background: T.surface, borderColor: T.border }}>
         {/* BANNER */}
-        <div className="relative h-44 sm:h-56 w-full" style={bannerStyle}>
+        <div className="relative h-36 sm:h-56 w-full" style={bannerStyle}>
           <button
             onClick={() => bannerInputRef.current?.click()}
-            className="absolute top-4 right-4 px-3.5 py-1.5 rounded-full text-xs font-bold backdrop-blur-md transition-all hover:scale-105 flex items-center gap-1.5 shadow"
-            style={{ background: "rgba(0, 0, 0, 0.6)", color: "#ffffff", border: "1px solid rgba(255, 255, 255, 0.2)" }}
+            className="absolute top-3 right-3 px-3 py-1.5 rounded-full text-[11px] font-bold backdrop-blur-md transition-all hover:scale-105 flex items-center gap-1.5 shadow"
+            style={{ background: "rgba(0, 0, 0, 0.65)", color: "#ffffff", border: "1px solid rgba(255, 255, 255, 0.25)" }}
             title="Trocar Foto de Capa"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
               <circle cx="12" cy="13" r="4"/>
             </svg>
@@ -294,12 +294,12 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
         </div>
 
         {/* PROFILE INFO BAR */}
-        <div className="px-6 pb-6 pt-0 relative">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-16 sm:-mt-20 mb-4">
+        <div className="px-4 sm:px-6 pb-5 pt-0 relative w-full max-w-full">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 -mt-12 sm:-mt-20 mb-3">
             {/* AVATAR OVERLAY */}
-            <div className="relative group shrink-0">
+            <div className="relative group shrink-0 self-start">
               <div
-                className="w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden border-4 shadow-xl flex items-center justify-center font-extrabold text-3xl"
+                className="w-20 h-20 sm:w-32 sm:h-32 rounded-full overflow-hidden border-4 shadow-xl flex items-center justify-center font-extrabold text-2xl sm:text-3xl"
                 style={{
                   background: T.surface2,
                   borderColor: T.surface,
@@ -314,10 +314,10 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
 
               <button
                 onClick={() => avatarInputRef.current?.click()}
-                className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[11px] font-bold"
+                className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[10px] sm:text-[11px] font-bold"
                 title="Alterar Avatar"
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
                   <circle cx="12" cy="13" r="4"/>
                 </svg>
@@ -326,58 +326,58 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
             </div>
 
             {/* ACTION BUTTONS */}
-            <div className="flex items-center gap-2 self-start sm:self-auto">
+            <div className="flex items-center gap-2 flex-wrap">
               <a
                 href={`https://${currentUser?.username || "grow"}.thegrowinstones.com`}
                 target="_blank"
                 rel="noreferrer"
-                className="px-4 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-90 flex items-center gap-1.5"
+                className="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all hover:opacity-90 flex items-center gap-1.5"
                 style={{ background: dark ? "rgba(2, 132, 199, 0.15)" : "#e0f2fe", border: `1px solid ${dark ? "#0284c7" : "#38bdf8"}`, color: dark ? "#38bdf8" : "#0284c7" }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                 <span>Subdomínio Público</span>
               </a>
 
               <button
                 onClick={() => setIsEditingProfile(true)}
-                className="px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+                className="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
                 style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 <span>Editar Perfil</span>
               </button>
             </div>
           </div>
 
           {/* USER BIO & DETAILS */}
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: T.text }}>
+          <div className="w-full max-w-full">
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight" style={{ color: T.text }}>
               {currentUser?.name || "Cultivador GrowinStones"}
             </h1>
             <div className="text-xs font-mono font-semibold mt-0.5" style={{ color: T.brand }}>
               @{currentUser?.username || "grower"}
             </div>
 
-            <p className="text-sm mt-3 leading-relaxed max-w-2xl" style={{ color: T.text }}>
+            <p className="text-xs sm:text-sm mt-2.5 leading-relaxed max-w-2xl" style={{ color: T.text }}>
               {currentUser?.bio || editBio}
             </p>
 
-            <div className="flex flex-wrap items-center gap-4 mt-4 text-xs" style={{ color: T.muted }}>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-3.5 text-[11px] sm:text-xs" style={{ color: T.muted }}>
               <div className="flex items-center gap-1.5">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                 <span>{currentUser?.location || editLocation}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                 <span>Especialidade: <b>{currentUser?.strainFocus || editStrainFocus}</b></span>
               </div>
               <div className="flex items-center gap-1.5">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                 <span>Membro desde 2026</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-6 mt-4 pt-4 border-t text-xs" style={{ borderColor: T.borderSoft }}>
+            <div className="flex items-center gap-4 sm:gap-6 mt-3.5 pt-3.5 border-t text-[11px] sm:text-xs flex-wrap" style={{ borderColor: T.borderSoft }}>
               <div><b style={{ color: T.text }}>{posts.length}</b> <span style={{ color: T.muted }}>Publicações</span></div>
               <div><b style={{ color: T.text }}>100%</b> <span style={{ color: T.muted }}>Automação IoT</span></div>
               <div><b style={{ color: T.text }}>1</b> <span style={{ color: T.muted }}>Subdomínio Ativo</span></div>
@@ -387,7 +387,7 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
       </div>
 
       {/* ————————————————— TABS DE NAVEGAÇÃO DO PERFIL ————————————————— */}
-      <div className="flex items-center gap-2 border-b pb-3 mb-6" style={{ borderColor: T.border }}>
+      <div className="flex items-center gap-2 border-b pb-3 mb-5 overflow-x-auto no-scrollbar" style={{ borderColor: T.border }}>
         <button
           onClick={() => setActiveTab("posts")}
           className="px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2"

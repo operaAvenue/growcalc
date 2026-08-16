@@ -4442,15 +4442,91 @@ function GrowinStones() {
     );
   }
 
-// ————————————————————————— LAYOUT COM SIDEBAR LATERAL —————————————————————————
+// ————————————————————————— LAYOUT COM SIDEBAR LATERAL & TOPBAR MOBILE —————————————————————————
   return (
-    <div className="min-h-screen flex" style={{ background: T.bg, color: T.text, fontFamily: "'Inter', system-ui, sans-serif", transition: "background 0.3s, color 0.3s" }}>
+    <div className="min-h-screen flex flex-col md:flex-row w-full max-w-full overflow-x-hidden" style={{ background: T.bg, color: T.text, fontFamily: "'Inter', system-ui, sans-serif", transition: "background 0.3s, color 0.3s" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Berkshire+Swash&display=swap');
-        input[type=number]::-webkit-inner-spin-button{ -webkit-appearance:none; }`}</style>
+        input[type=number]::-webkit-inner-spin-button{ -webkit-appearance:none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
 
-      {/* SIDEBAR LATERAL ESQUERDO */}
+      {/* BARRA SUPERIOR EXCLUSIVA PARA MOBILE (< md) */}
+      <header
+        className="md:hidden sticky top-0 z-50 w-full backdrop-blur-md px-3.5 py-2.5 border-b flex flex-col gap-2 shadow-sm"
+        style={{ background: T.surface, borderColor: T.border }}
+      >
+        {/* Linha Superior: Logo, Subdomínio & Avatar */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Logo height={24} color={T.brand} />
+          </div>
+
+          <div className="flex items-center gap-2">
+            {currentUser?.username && (
+              <a
+                href={`https://${currentUser.username}.thegrowinstones.com`}
+                target="_blank"
+                rel="noreferrer"
+                className="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold flex items-center gap-1.5 transition-opacity hover:opacity-85"
+                style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.brand }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="truncate max-w-[120px]">@{currentUser.username}</span>
+              </a>
+            )}
+
+            <button
+              onClick={() => setActiveTab("profile")}
+              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden border shadow-sm"
+              style={{
+                background: T.surface2,
+                borderColor: T.border,
+                color: T.text,
+                backgroundImage: currentUser?.avatarUrl ? `url(${currentUser.avatarUrl})` : "none",
+                backgroundSize: "cover",
+                backgroundPosition: "center"
+              }}
+              title="Meu Perfil"
+            >
+              {!currentUser?.avatarUrl && (currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : "G")}
+            </button>
+          </div>
+        </div>
+
+        {/* Linha Inferior: Abas de Navegação em Carrossel Horizontal */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+          {[
+            { id: "profile", label: "Perfil", icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
+            { id: "configurator", label: "Configurador", icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg> },
+            { id: "my_grows", label: "Meus Grows", icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22v-9"/><path d="M12 13a6 6 0 0 1 6-6c0 6-6 6-6 6z"/><path d="M12 13a6 6 0 0 0-6-6c0 6 6 6 6 6z"/></svg> },
+            { id: "comparison", label: "Comparar", icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
+            { id: "mqtt", label: "ESP32", icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/></svg> },
+            { id: "settings", label: "Ajustes", icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> }
+          ].map((item) => {
+            const active = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold shrink-0 transition-all ${active ? "shadow-sm" : "opacity-80"}`}
+                style={{
+                  background: active ? T.sidebarActiveBg : T.surface2,
+                  color: active ? T.text : T.muted,
+                  border: active ? `1px solid ${T.border}` : `1px solid ${T.borderSoft}`
+                }}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </header>
+
+      {/* SIDEBAR LATERAL DESKTOP (hidden on mobile, flex on md+) */}
       <aside
-        className={`sticky top-0 h-screen flex flex-col justify-between transition-all duration-300 z-40 shrink-0 ${sidebarCollapsed ? "w-16 px-2 py-4" : "w-64 px-4 py-4"}`}
+        className={`hidden md:flex sticky top-0 h-screen flex-col justify-between transition-all duration-300 z-40 shrink-0 ${sidebarCollapsed ? "w-16 px-2 py-4" : "w-64 px-4 py-4"}`}
         style={{ background: T.surface, borderRight: `1px solid ${T.border}` }}
       >
         {/* Top Header Sidebar */}
@@ -4606,7 +4682,7 @@ function GrowinStones() {
       </aside>
 
       {/* ÁREA PRINCIPAL DA APLICAÇÃO */}
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 w-full max-w-full overflow-x-hidden flex flex-col">
         {/* Render Tab Content */}
         {activeTab === "profile" && (
           <UserProfileView currentUser={currentUser} setCurrentUser={setCurrentUser} T={T} dark={dark} showToast={showToast} />
@@ -4733,29 +4809,29 @@ function GrowinStones() {
 
         {/* CONFIGURADOR & COMPARADOR VIEWS */}
         {(activeTab === "configurator" || activeTab === "comparison") && (
-          <div className="max-w-6xl mx-auto px-6 py-6 w-full flex-1 flex flex-col">
+          <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3.5 sm:py-6 w-full max-w-full overflow-x-hidden flex-1 flex flex-col">
             {/* Cabeçalho Principal com Título e Botões de Ação em Ícones */}
-            <div className="flex items-center justify-between flex-wrap gap-4 pb-5 mb-6" style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight" style={{ color: T.text }}>
+            <div className="flex items-center justify-between flex-wrap gap-3 pb-4 mb-4 sm:mb-6" style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl sm:text-3xl font-bold tracking-tight leading-tight" style={{ color: T.text }}>
                   Projete seu grow <span style={{ color: T.muted, fontStyle: "italic", fontWeight: 500 }}>em segundos</span>
                 </h1>
-                <p className="text-xs sm:text-sm mt-1" style={{ color: T.muted }}>
+                <p className="text-[11px] sm:text-xs mt-1" style={{ color: T.muted }}>
                   Estrutura, ligações, custos, produção e retorno — com planta baixa em tempo real e relatório completo em PDF.
                 </p>
               </div>
 
               {/* Botões de Ação Apenas em ÍCONES */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                 <input type="file" ref={fileInputRef} accept=".json,application/json" onChange={handleImportJson} className="hidden" />
                 
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   title="Importar Configuração JSON"
-                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-85 shadow-sm"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-85 shadow-sm"
                   style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="7 10 12 15 17 10" />
                     <line x1="12" y1="15" x2="12" y2="3" />
@@ -4765,10 +4841,10 @@ function GrowinStones() {
                 <button
                   onClick={exportSetupJson}
                   title="Exportar Configuração JSON"
-                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-85 shadow-sm"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-85 shadow-sm"
                   style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="17 8 12 3 7 8" />
                     <line x1="12" y1="3" x2="12" y2="15" />
@@ -4778,10 +4854,10 @@ function GrowinStones() {
                 <button
                   onClick={openStaticDashboardHtml}
                   title="Abrir Web Dashboard HTML Interativo (Nova Aba)"
-                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-85 shadow-sm"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-85 shadow-sm"
                   style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.brand }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                     <line x1="3" y1="9" x2="21" y2="9" />
                     <line x1="9" y1="21" x2="9" y2="9" />
@@ -4794,10 +4870,10 @@ function GrowinStones() {
                     setPublishModalOpen(true);
                   }}
                   title="Publicar Grow no Subdomínio Exclusivo (*Publicar Grow)"
-                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-90 shadow-sm"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-90 shadow-sm"
                   style={{ background: dark ? "#0284c7" : "#0369a1", color: "#ffffff" }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.71 1.26-1.5 1.74-2.3L4.5 16.5z"/>
                     <path d="M12 15l-3-3 7.5-7.5c1.4-1.4 3.7-1.4 5.1 0s1.4 3.7 0 5.1L12 15z"/>
                   </svg>
@@ -4806,10 +4882,10 @@ function GrowinStones() {
                 <button
                   onClick={openReportHtml}
                   title="Exportar Relatório em PDF (Impressão)"
-                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-85 shadow-sm"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-all hover:opacity-85 shadow-sm"
                   style={{ background: T.text, color: T.bg }}
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                     <polyline points="14 2 14 8 20 8" />
                     <line x1="16" y1="13" x2="8" y2="13" />
