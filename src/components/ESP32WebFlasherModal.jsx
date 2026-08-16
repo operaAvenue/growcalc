@@ -114,6 +114,11 @@ export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, 
       if (!partitionsRes.ok) throw new Error("Falha ao baixar partitions.bin");
       const partitionsBuf = await partitionsRes.arrayBuffer();
 
+      appendLog("[FIRMWARE] Baixando boot_app0.bin (0xe000)...");
+      const bootApp0Res = await fetch("/firmware/boot_app0.bin");
+      if (!bootApp0Res.ok) throw new Error("Falha ao baixar boot_app0.bin");
+      const bootApp0Buf = await bootApp0Res.arrayBuffer();
+
       appendLog("[FIRMWARE] Baixando firmware.bin (0x10000)...");
       const firmwareRes = await fetch("/firmware/firmware.bin");
       if (!firmwareRes.ok) throw new Error("Falha ao baixar firmware.bin");
@@ -127,6 +132,7 @@ export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, 
       const fileArray = [
         { data: bufferToBinaryString(bootloaderBuf), address: 0x1000, name: "bootloader.bin" },
         { data: bufferToBinaryString(partitionsBuf), address: 0x8000, name: "partitions.bin" },
+        { data: bufferToBinaryString(bootApp0Buf), address: 0xe000, name: "boot_app0.bin (OTADATA)" },
         { data: bufferToBinaryString(firmwareBuf), address: 0x10000, name: "firmware.bin (openAgro core)" },
         { data: bufferToBinaryString(littlefsBuf), address: 0x2D0000, name: "littlefs.bin (Web App UI)" }
       ];
@@ -134,7 +140,7 @@ export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, 
       // Etapa 3: Gravação da Flash
       setCurrentStep(3);
       setStatusText("Gravando partições no ESP32...");
-      appendLog("[ESPTOOL] Iniciando gravação de flash em 4 partições...");
+      appendLog("[ESPTOOL] Iniciando gravação de flash em 5 partições...");
 
       await esploader.writeFlash({
         fileArray,
