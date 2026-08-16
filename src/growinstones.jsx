@@ -2387,7 +2387,7 @@ export default function GrowinStones() {
 
   // ————— Download do relatório como HTML autocontido (abre pronto p/ salvar em PDF) —————
   const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const downloadReport = () => {
+  const generateReportHtmlString = (isStandalonePage = false) => {
     const kv = (a, b, st = false) => `<div class="kv${st ? " st" : ""}"><span>${a}</span><b>${b}</b></div>`;
     const rowsHtml = materialRows
       .map((r) => `<div class="mr"><span class="ml">${esc(r.label)}</span><span class="mq">${r.qty}</span><span class="mu">${fmtBRL(r.unitCost)}</span><span class="ms">${fmtBRL(r.subtotal)}</span></div>`)
@@ -2621,14 +2621,14 @@ export default function GrowinStones() {
   ${shoppingListHtml}
   <p class="ft">Documento gerado pelo GrowinStones em ${today}. Valores estimados para planejamento — produtividade, preços e consumo variam com genética, manejo, fase do cultivo e tarifas locais. Não constitui aconselhamento financeiro.</p>
 </div>
-<script>window.addEventListener("load", () => setTimeout(() => { try { window.print(); } catch (e) {} }, 500));</script>
+<script>${isStandalonePage ? "" : 'window.addEventListener("load", () => setTimeout(() => { try { window.print(); } catch (e) {} }, 500));'}</script>
 </body></html>`;
 
     return html;
   };
 
   const openReportHtml = () => {
-    const html = generateReportHtmlString();
+    const html = generateReportHtmlString(false);
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -2641,7 +2641,7 @@ export default function GrowinStones() {
   };
 
   const openStaticDashboardHtml = () => {
-    const htmlContent = generateReportHtmlString();
+    const htmlContent = generateReportHtmlString(false);
     const win = window.open("", "_blank");
     if (win) {
       win.document.open();
@@ -2666,7 +2666,7 @@ export default function GrowinStones() {
     let setupData = null;
 
     try {
-      html = generateReportHtmlString();
+      html = generateReportHtmlString(true);
       setupData = getSetupData();
     } catch (e) {
       console.error("Erro ao gerar relatório HTML:", e);
