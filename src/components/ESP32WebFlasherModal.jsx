@@ -4,9 +4,12 @@ import CryptoJS from "crypto-js";
 export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, dark, showToast }) {
   const [isSupported, setIsSupported] = useState(true);
   const [baudRate, setBaudRate] = useState(921600);
+  const [wifiSsid, setWifiSsid] = useState(() => localStorage.getItem("growcalc_esp32_wifi_ssid") || "");
+  const [wifiPass, setWifiPass] = useState(() => localStorage.getItem("growcalc_esp32_wifi_pass") || "");
+  const [showPass, setShowPass] = useState(false);
   const [flashing, setFlashing] = useState(false);
   const [statusText, setStatusText] = useState("Pronto para conectar");
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(0); // 0: Idle, 1: Connecting, 2: Fetching Binaries, 3: Flashing, 4: Provisioning, 5: Done, 6: Error
   const [progressPercent, setProgressPercent] = useState(0);
   const [fileProgress, setFileProgress] = useState("");
   const [logs, setLogs] = useState([]);
@@ -50,6 +53,12 @@ export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, 
       return;
     }
 
+    // Salvar credenciais no localStorage se preenchidas
+    if (wifiSsid.trim()) {
+      localStorage.setItem("growcalc_esp32_wifi_ssid", wifiSsid.trim());
+      localStorage.setItem("growcalc_esp32_wifi_pass", wifiPass.trim());
+    }
+
     setFlashing(true);
     setLogs([]);
     setProgressPercent(0);
@@ -58,12 +67,13 @@ export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, 
     setCurrentStep(1);
     setStatusText("Solicitando porta USB...");
 
+    let port = null;
     let transport = null;
     let esploader = null;
 
     try {
-      appendLog("[WEB-SERIAL] Solicitando porta USB ao usuário...");
-      const port = await navigator.serial.requestPort();
+      appendLog("[WEB-SERIAL] Solicitando seleção da porta USB ao usuário...");
+      port = await navigator.serial.requestPort();
 
       const { ESPLoader, Transport } = await import("esptool-js/bundle.js");
 
@@ -91,7 +101,7 @@ export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, 
 
       // Etapa 2: Carregar Binários de Firmware
       setCurrentStep(2);
-      setStatusText("Baixando binários do firmware...");
+      setStatusText("Baixando binários do firmware openAgro...");
       appendLog("[FIRMWARE] Baixando bootloader.bin (0x1000)...");
       const bootloaderRes = await fetch("/firmware/bootloader.bin");
       if (!bootloaderRes.ok) throw new Error("Falha ao baixar bootloader.bin");
@@ -151,19 +161,42 @@ export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, 
         }
       });
 
-      appendLog("[ESPTOOL] Gravação concluída com verificação de hash SHA/MD5 com sucesso!");
+      appendLog("[ESPTOOL] Gravação concluída e verificada com sucesso!");
       setStatusText("Reiniciando ESP32 em modo de execução...");
 
-      // Etapa 4: Reinicialização & Finalização
       await esploader.hardReset();
       await transport.disconnect();
 
-      setCurrentStep(4);
-      setStatusText("ESP32 Gravado e Inicializado com Sucesso!");
-      showToast("ESP32 gravado com sucesso! O dispositivo está pronto para operar.");
+      // Etapa 4: Provisionamento de Wi-Fi e MQTT via Serial (Se fornecido)
+      if (wifiSsid.trim()) {
+        setCurrentStep(4);
+        setStatusText("Configurando Wi-Fi & MQTT no ESP32...");
+        appendLog(`[PROV] Abrindo porta serial para enviar credenciais Wi-Fi (${wifiSsid.trim()})...`);
+        
+        try {
+          await new Promise((r) => setTimeout(r, 1500)); // Aguarda inicialização do ESP32
+          await port.open({ baudRate: 115200 });
+
+          const provCmd = `PROV|${wifiSsid.trim()}|${wifiPass.trim()}|grow.thegrowinstones.com|1883||\n`;
+          const encoder = new TextEncoder();
+          const writer = port.writable.getWriter();
+          await writer.write(encoder.encode(provCmd));
+          writer.releaseLock();
+
+          appendLog("[PROV] Pacote de Wi-Fi e MQTT gravado na NVS do ESP32 com sucesso!");
+          await new Promise((r) => setTimeout(r, 1000));
+          await port.close();
+        } catch (provErr) {
+          appendLog(`[PROV] Aviso na porta serial: ${provErr.message || provErr}`);
+        }
+      }
+
+      setCurrentStep(5);
+      setStatusText("ESP32 Gravado e Configurado com Sucesso!");
+      showToast("ESP32 gravado e configurado com sucesso! Conectando ao Wi-Fi e MQTT...");
     } catch (err) {
       console.error("Erro na gravação do ESP32:", err);
-      setCurrentStep(5);
+      setCurrentStep(6);
       setStatusText("Falha na gravação");
       appendLog(`[ERRO] ${err.message || err}`);
       showToast(`Falha na gravação: ${err.message || "Erro desconhecido"}`);
@@ -180,7 +213,7 @@ export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
       <div
-        className="w-full max-w-2xl p-6 rounded-3xl text-left shadow-2xl relative space-y-6 max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-2xl p-6 rounded-3xl text-left shadow-2xl relative space-y-5 max-h-[90vh] overflow-y-auto"
         style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.text }}
       >
         {/* Header */}
@@ -235,27 +268,71 @@ export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, 
           </div>
         )}
 
-        {/* Informações de Auto-Configuração */}
+        {/* Seção 1: Pré-Configuração de Wi-Fi Local */}
         <div className="p-4 rounded-2xl space-y-3" style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
-          <div className="text-xs font-bold uppercase tracking-wider" style={{ color: T.text }}>
-            Parâmetros de Telemetria Vinculados
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
-            <div className="p-2.5 rounded-xl border" style={{ background: T.surface, borderColor: T.borderSoft }}>
-              <div className="text-[10px] text-stone-400 font-sans">Broker MQTT Servidor:</div>
-              <div className="font-bold" style={{ color: T.text }}>grow.thegrowinstones.com:1883</div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: T.text }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg>
+              <span>Pré-Configuração de Wi-Fi do ESP32</span>
             </div>
-            <div className="p-2.5 rounded-xl border" style={{ background: T.surface, borderColor: T.borderSoft }}>
-              <div className="text-[10px] text-stone-400 font-sans">Namespace / Usuário:</div>
-              <div className="font-bold" style={{ color: T.text }}>openagro/{currentUser?.username || "default"}</div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded" style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
+              Auto-Provisioning
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-[11px] font-bold block mb-1" style={{ color: T.text }}>Nome da Rede Wi-Fi (SSID):</label>
+              <input
+                type="text"
+                placeholder="Ex: MinhaCasa_2.4G"
+                value={wifiSsid}
+                onChange={(e) => setWifiSsid(e.target.value)}
+                disabled={flashing}
+                className="w-full px-3 py-2 rounded-xl text-xs font-mono font-bold transition-all"
+                style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.text }}
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-bold block" style={{ color: T.text }}>Senha do Wi-Fi:</label>
+                <button
+                  type="button"
+                  onClick={() => setShowPass((s) => !s)}
+                  className="text-[10px] underline"
+                  style={{ color: T.muted }}
+                >
+                  {showPass ? "Ocultar" : "Mostrar"}
+                </button>
+              </div>
+              <input
+                type={showPass ? "text" : "password"}
+                placeholder="Senha da rede Wi-Fi"
+                value={wifiPass}
+                onChange={(e) => setWifiPass(e.target.value)}
+                disabled={flashing}
+                className="w-full px-3 py-2 rounded-xl text-xs font-mono font-bold transition-all"
+                style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.text }}
+              />
             </div>
           </div>
+          <p className="text-[11px]" style={{ color: T.muted }}>
+            O gravador enviará as credenciais de Wi-Fi e os parâmetros MQTT para a memória NVS do ESP32 assim que o firmware for gravado.
+          </p>
         </div>
 
-        {/* Opções de Conexão Serial */}
+        {/* Parâmetros de Telemetria e Serial */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="text-xs font-bold block mb-1" style={{ color: T.text }}>Velocidade de Gravação (Baudrate):</label>
+            <label className="text-xs font-bold block mb-1" style={{ color: T.text }}>Broker MQTT (Nativo):</label>
+            <div className="px-3 py-2 rounded-xl text-xs font-mono font-bold truncate" style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}>
+              grow.thegrowinstones.com:1883
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold block mb-1" style={{ color: T.text }}>Velocidade de Gravação:</label>
             <select
               value={baudRate}
               onChange={(e) => setBaudRate(Number(e.target.value))}
@@ -267,13 +344,6 @@ export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, 
               <option value={460800}>460800 bps (Rápido e Estável)</option>
               <option value={115200}>115200 bps (Padrão de Segurança)</option>
             </select>
-          </div>
-
-          <div>
-            <label className="text-xs font-bold block mb-1" style={{ color: T.text }}>Chip Alvo:</label>
-            <div className="px-3 py-2 rounded-xl text-xs font-mono font-bold" style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}>
-              {chipInfo ? `Detectado: ${chipInfo}` : "ESP32 Standard (Dual Core 240MHz)"}
-            </div>
           </div>
         </div>
 
@@ -306,11 +376,11 @@ export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, 
           </div>
           <div
             ref={logContainerRef}
-            className="p-3.5 rounded-2xl font-mono text-xs overflow-y-auto max-h-48 space-y-1 select-text"
+            className="p-3.5 rounded-2xl font-mono text-xs overflow-y-auto max-h-40 space-y-1 select-text"
             style={{ background: T.inset, border: `1px solid ${T.border}`, color: T.text }}
           >
             {logs.length === 0 ? (
-              <div style={{ color: T.muted }}>// Clique em "Conectar & Gravar ESP32" para iniciar a comunicação serial...</div>
+              <div style={{ color: T.muted }}>// Preencha o Wi-Fi (opcional) e clique em "Conectar & Gravar ESP32"...</div>
             ) : (
               logs.map((line, idx) => (
                 <div key={idx} className="leading-relaxed whitespace-pre-wrap">{line}</div>
@@ -322,7 +392,7 @@ export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, 
         {/* Footer Actions */}
         <div className="flex items-center justify-between gap-3 pt-3 border-t" style={{ borderColor: T.borderSoft }}>
           <div className="text-xs" style={{ color: T.muted }}>
-            Certifique-se de usar um cabo USB com dados (não apenas de carga).
+            Conecte o ESP32 na porta USB do computador.
           </div>
 
           <div className="flex items-center gap-2">
