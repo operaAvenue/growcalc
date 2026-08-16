@@ -5442,15 +5442,18 @@ function GrowinStones() {
                   onChange={(e) => {
                     const idx = Number(e.target.value);
                     setPotIdx(idx);
-                    if (POTS[idx].shape) setPotShape(POTS[idx].shape);
+                    if (POT_SIZES[idx] && POT_SIZES[idx].shape) setPotShape(POT_SIZES[idx].shape);
                   }}
                   className="w-full h-8 px-2.5 rounded-lg text-xs font-semibold focus:outline-none cursor-pointer transition-all truncate"
                   style={{ background: T.surface, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-                  {POTS.map((p, idx) => (
+                  {POT_SIZES.map((p, idx) => (
                     <option key={p.label + idx} value={idx}>
                       {p.label} · {p.desc}
                     </option>
                   ))}
+                  <option value={POT_SIZES.length}>
+                    Vaso Customizado / Sob Medida
+                  </option>
                 </select>
               </div>
 
