@@ -3,7 +3,7 @@ import CryptoJS from "crypto-js";
 
 export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, dark, showToast }) {
   const [isSupported, setIsSupported] = useState(true);
-  const [baudRate, setBaudRate] = useState(921600);
+  const [baudRate, setBaudRate] = useState(460800);
   const [wifiSsid, setWifiSsid] = useState(() => localStorage.getItem("growcalc_esp32_wifi_ssid") || "");
   const [wifiPass, setWifiPass] = useState(() => localStorage.getItem("growcalc_esp32_wifi_pass") || "");
   const [showPass, setShowPass] = useState(false);
@@ -91,6 +91,8 @@ export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, 
         terminal: customTerminal,
         romBaudrate: 115200
       });
+      esploader.WRITE_BLOCK_ATTEMPTS = 5;
+      esploader.WRITE_BLOCK_RETRY_DELAY_MS = 100;
 
       appendLog(`[ESPTOOL] Conectando ao bootloader ROM com baudrate ${baudRate}...`);
       setStatusText("Conectando ao ESP32...");
@@ -328,9 +330,10 @@ export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, 
               className="w-full px-3 py-2 rounded-xl text-xs font-mono font-bold transition-all"
               style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
             >
-              <option value={921600}>921600 bps (Ultra-Rápido ~40s)</option>
-              <option value={460800}>460800 bps (Rápido e Estável)</option>
+              <option value={460800}>460800 bps (Recomendado - Rápido e Estável)</option>
+              <option value={230400}>230400 bps (Alta Estabilidade)</option>
               <option value={115200}>115200 bps (Padrão de Segurança)</option>
+              <option value={921600}>921600 bps (Turbo)</option>
             </select>
           </div>
         </div>
