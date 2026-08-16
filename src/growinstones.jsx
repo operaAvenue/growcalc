@@ -3823,11 +3823,11 @@ function GrowinStones() {
 
     const logoSvg = getLogoSvgString(30, isDark ? "#f59e0b" : "#1f1b16");
 
-    // Posts HTML generator
+    // Posts HTML generator (Obedecendo sempre ao último nome configurado)
     const postsFeedHtml = userPosts.map((p) => {
-      const pAuthor = p.author?.name || userDisplayName;
-      const pUser = p.author?.username || userHandle;
-      const pAvatar = p.author?.avatarUrl || userAvatarUrl;
+      const pAuthor = userDisplayName;
+      const pUser = userHandle;
+      const pAvatar = userAvatarUrl;
       const pDate = p.createdAt ? new Date(p.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }) : today;
       const pStage = p.stage || "";
 
@@ -3853,7 +3853,7 @@ function GrowinStones() {
 
           ${p.images && p.images.length > 0 ? `
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:8px; border-radius:14px; overflow:hidden; margin-bottom:12px;">
-              ${p.images.map((img) => `<img src="${img}" alt="Mídia de Cultivo" style="width:100%; max-height:340px; object-fit:cover; border-radius:12px; border:1px solid ${isDark ? '#292524' : '#e2dccc'};" />`).join("")}
+              ${p.images.map((img) => `<img src="${img}" alt="Mídia de Cultivo" onclick="openLightbox('${img}')" style="width:100%; max-height:340px; object-fit:cover; border-radius:12px; border:1px solid ${isDark ? '#292524' : '#e2dccc'}; cursor:zoom-in;" title="Clique para ver a foto em tamanho real 100%" />`).join("")}
             </div>
           ` : ""}
 
@@ -4265,7 +4265,7 @@ function GrowinStones() {
         if (Array.isArray(p.images) && p.images.length > 0) {
           html += '  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:8px; border-radius:14px; overflow:hidden; margin-bottom:12px;">';
           for (var j = 0; j < p.images.length; j++) {
-            html += '    <img src="' + escapeHtml(p.images[j]) + '" alt="Foto do cultivo" style="width:100%; max-height:360px; object-fit:cover; border-radius:12px; border:1px solid ${isDark ? '#292524' : '#e2dccc'}; display:block;" />';
+            html += '    <img src="' + escapeHtml(p.images[j]) + '" alt="Foto do cultivo" onclick="openLightbox(\'' + escapeHtml(p.images[j]) + '\')" style="width:100%; max-height:360px; object-fit:cover; border-radius:12px; border:1px solid ${isDark ? '#292524' : '#e2dccc'}; display:block; cursor:zoom-in;" title="Clique para ver a foto em tamanho real 100%" />';
           }
           html += '  </div>';
         }
@@ -4320,7 +4320,43 @@ function GrowinStones() {
     fetchLiveFeed();
     setInterval(fetchLiveFeed, 5000);
   })();
+
+  function openLightbox(url) {
+    var modal = document.getElementById("lightbox-modal");
+    var img = document.getElementById("lightbox-modal-img");
+    var link = document.getElementById("lightbox-modal-link");
+    if (modal && img) {
+      img.src = url;
+      if (link) link.href = url;
+      modal.style.display = "flex";
+      document.body.style.overflow = "hidden";
+    }
+  }
+
+  function closeLightbox() {
+    var modal = document.getElementById("lightbox-modal");
+    if (modal) {
+      modal.style.display = "none";
+      document.body.style.overflow = "auto";
+    }
+  }
+
+  window.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") closeLightbox();
+  });
 </script>
+
+{/* LIGHTBOX MODAL EM TELA CHEIA 100% */}
+<div id="lightbox-modal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.92); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); align-items:center; justify-content:center; padding:16px; cursor:zoom-out;" onclick="closeLightbox()">
+  <div style="position:relative; max-width:96vw; max-height:92vh; display:flex; align-items:center; justify-content:center;" onclick="event.stopPropagation()">
+    <img id="lightbox-modal-img" src="" alt="Tamanho Real" style="max-width:96vw; max-height:92vh; object-fit:contain; border-radius:12px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.7);" />
+    <button onclick="closeLightbox()" style="position:absolute; top:12px; right:12px; width:40px; height:40px; border-radius:50%; background:rgba(0,0,0,0.75); color:#ffffff; border:1px solid rgba(255,255,255,0.25); font-size:20px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(0,0,0,0.4);" title="Fechar (Esc)">✕</button>
+    <a id="lightbox-modal-link" href="" target="_blank" rel="noopener noreferrer" style="position:absolute; bottom:12px; right:12px; padding:7px 16px; border-radius:20px; background:rgba(0,0,0,0.75); color:#ffffff; border:1px solid rgba(255,255,255,0.25); font-size:12px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:6px; box-shadow:0 4px 12px rgba(0,0,0,0.4);" title="Abrir imagem original em nova aba">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      <span>Ver Original 100%</span>
+    </a>
+  </div>
+</div>
 </body>
 </html>`;
   };

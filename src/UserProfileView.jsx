@@ -18,6 +18,16 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
   const [attachedImages, setAttachedImages] = useState([]);
   const [attachedVideos, setAttachedVideos] = useState([]);
   const [isPosting, setIsPosting] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState(null);
+
+  // Close lightbox on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setLightboxImage(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   // File Inputs
   const avatarInputRef = useRef(null);
@@ -675,6 +685,7 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
               onToggleLike={() => handleToggleLike(post.id)}
               onDelete={() => handleDeletePost(post.id)}
               onAddComment={(text) => handleAddComment(post.id, text)}
+              onImageClick={(url) => setLightboxImage(url)}
               showToast={showToast}
             />
           ))
@@ -787,14 +798,53 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
           </div>
         </div>
       )}
+
+      {/* ————————————————— LIGHTBOX MODAL (IMAGEM 100% TAMANHO REAL) ————————————————— */}
+      {lightboxImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/90 backdrop-blur-md cursor-zoom-out animate-fadeIn"
+          onClick={() => setLightboxImage(null)}
+        >
+          <div className="relative max-w-full max-h-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={lightboxImage}
+              alt="Mídia em tamanho real"
+              className="max-w-[96vw] max-h-[92vh] object-contain rounded-xl shadow-2xl transition-all"
+            />
+            <button
+              onClick={() => setLightboxImage(null)}
+              className="absolute top-3 right-3 w-10 h-10 rounded-full bg-black/75 hover:bg-black text-white flex items-center justify-center font-extrabold text-xl shadow-2xl border border-white/20 transition-all hover:scale-105"
+              title="Fechar (Esc)"
+            >
+              ✕
+            </button>
+            <a
+              href={lightboxImage}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="absolute bottom-3 right-3 px-3.5 py-2 rounded-full bg-black/75 hover:bg-black text-white text-xs font-bold shadow-2xl border border-white/20 flex items-center gap-1.5 transition-all hover:scale-105"
+              title="Abrir imagem original em nova aba"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              <span>Ver Original 100%</span>
+            </a>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ————————————————— POST CARD COMPONENT —————————————————
-function PostCard({ post, currentUser, T, dark, onToggleLike, onDelete, onAddComment, showToast }) {
+function PostCard({ post, currentUser, T, dark, onToggleLike, onDelete, onAddComment, onImageClick, showToast }) {
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
+
+  // Obedecer sempre ao nome e avatar mais recentes configurados pelo usuário
+  const isOwnPost = !post.author?.username || post.author.username === currentUser?.username;
+  const authorName = isOwnPost ? (currentUser?.name || post.author?.name || "Cultivador") : (post.author?.name || "Cultivador");
+  const authorUsername = isOwnPost ? (currentUser?.username || post.author?.username || "grower") : (post.author?.username || "grower");
+  const authorAvatar = isOwnPost ? (currentUser?.avatarUrl || post.author?.avatarUrl || "") : (post.author?.avatarUrl || "");
 
   const timeAgo = (isoDate) => {
     try {
@@ -823,23 +873,23 @@ function PostCard({ post, currentUser, T, dark, onToggleLike, onDelete, onAddCom
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-center gap-3">
           <div
-            className="w-10 h-10 rounded-full overflow-hidden font-bold flex items-center justify-center text-xs shrink-0 border"
+            className="w-10 h-10 min-w-[40px] min-h-[40px] aspect-square rounded-full overflow-hidden font-bold flex items-center justify-center text-xs shrink-0 border"
             style={{
               background: T.surface2,
               borderColor: T.border,
               color: T.brand,
-              backgroundImage: post.author.avatarUrl ? `url(${post.author.avatarUrl})` : "none",
+              backgroundImage: authorAvatar ? `url(${authorAvatar})` : "none",
               backgroundSize: "cover",
               backgroundPosition: "center"
             }}
           >
-            {!post.author.avatarUrl && (post.author.name ? post.author.name.charAt(0).toUpperCase() : "G")}
+            {!authorAvatar && (authorName ? authorName.charAt(0).toUpperCase() : "G")}
           </div>
 
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-extrabold text-sm" style={{ color: T.text }}>{post.author.name}</span>
-              <span className="text-xs font-mono" style={{ color: T.muted }}>@{post.author.username}</span>
+              <span className="font-extrabold text-sm" style={{ color: T.text }}>{authorName}</span>
+              <span className="text-xs font-mono" style={{ color: T.muted }}>@{authorUsername}</span>
               <span className="text-xs" style={{ color: T.faint }}>· {timeAgo(post.createdAt)}</span>
             </div>
             {post.stage && (
@@ -851,7 +901,7 @@ function PostCard({ post, currentUser, T, dark, onToggleLike, onDelete, onAddCom
         </div>
 
         {/* DELETE BUTTON IF AUTHOR */}
-        {post.author.username === currentUser?.username && (
+        {isOwnPost && (
           <button
             onClick={onDelete}
             title="Excluir post"
@@ -870,12 +920,21 @@ function PostCard({ post, currentUser, T, dark, onToggleLike, onDelete, onAddCom
         </div>
       )}
 
-      {/* MEDIA ATTACHMENTS */}
+      {/* MEDIA ATTACHMENTS WITH LIGHTBOX CLICK */}
       {post.images && post.images.length > 0 && (
         <div className={`grid gap-2 mb-3.5 rounded-xl overflow-hidden ${post.images.length === 1 ? "grid-cols-1" : "grid-cols-2"}`}>
           {post.images.map((img, idx) => (
-            <div key={idx} className="relative max-h-96 overflow-hidden rounded-xl bg-black/10">
-              <img src={img} alt="Post media" className="w-full h-full object-cover max-h-96" />
+            <div
+              key={idx}
+              onClick={() => onImageClick?.(img)}
+              className="relative max-h-96 overflow-hidden rounded-xl bg-black/10 cursor-zoom-in group transition-transform hover:scale-[1.005]"
+              title="Clique para ver a foto em tamanho real 100%"
+            >
+              <img src={img} alt="Post media" className="w-full h-full object-cover max-h-96 block" />
+              <div className="absolute bottom-2.5 right-2.5 px-2.5 py-1 rounded-lg bg-black/70 text-white text-[11px] font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 backdrop-blur-md shadow-md">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                <span>Ver 100%</span>
+              </div>
             </div>
           ))}
         </div>
