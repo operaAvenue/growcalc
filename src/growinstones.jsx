@@ -1477,7 +1477,7 @@ export default function GrowinStones() {
 
   // Google OAuth 2.0 & Identity Services
   const [googleClientId, setGoogleClientId] = useState(() => {
-    return localStorage.getItem("growcalc_google_client_id") || "717208226500-1k3u639v7p665p1b90u29k0989069v.apps.googleusercontent.com";
+    return localStorage.getItem("growcalc_google_client_id") || "447903804008-2115e4lrguv78nphj7tv58bvmaqv0560.apps.googleusercontent.com";
   });
   const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
   const [googleClientIdModalOpen, setGoogleClientIdModalOpen] = useState(false);
