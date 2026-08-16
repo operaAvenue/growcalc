@@ -2078,6 +2078,7 @@ function GrowinStones() {
               localStorage.setItem("growcalc_user", JSON.stringify(restoredUser));
               setCurrentUser(restoredUser);
               setSubdomainInput(restoredUser.username);
+              setActiveTab("profile");
               setAuthModalOpen(false);
               showToast(`Sessão sincronizada! Bem-vindo de volta, ${restoredUser.name} (@${restoredUser.username}).`);
               return;
@@ -2099,6 +2100,7 @@ function GrowinStones() {
             localStorage.setItem("growcalc_user", JSON.stringify(autoUser));
             setCurrentUser(autoUser);
             setSubdomainInput(defaultSlug);
+            setActiveTab("profile");
             setAuthModalOpen(false);
 
             // Salvar imediatamente na nuvem para persistência em todos os dispositivos
@@ -2124,7 +2126,7 @@ function GrowinStones() {
   };
 
 
-  const [activeTab, setActiveTab] = useState("configurator"); // "configurator" | "my_grows" | "comparison" | "settings"
+  const [activeTab, setActiveTab] = useState(() => (currentUser?.username ? "profile" : "configurator")); // "profile" | "configurator" | "my_grows" | "comparison" | "settings"
  // "configurator" | "comparison"
 
   const [publishModalOpen, setPublishModalOpen] = useState(false);
@@ -4928,19 +4930,10 @@ function GrowinStones() {
         {/* CONFIGURADOR & COMPARADOR VIEWS */}
         {(activeTab === "configurator" || activeTab === "comparison") && (
           <div className="max-w-6xl mx-auto px-3 sm:px-6 py-3.5 sm:py-6 w-full max-w-full overflow-x-hidden flex-1 flex flex-col">
-            {/* Cabeçalho Principal com Título e Botões de Ação em Ícones */}
-            <div className="flex items-center justify-between flex-wrap gap-3 pb-4 mb-4 sm:mb-6" style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-              <div className="min-w-0 flex-1">
-                <h1 className="text-xl sm:text-3xl font-bold tracking-tight leading-tight" style={{ color: T.text }}>
-                  Projete seu grow <span style={{ color: T.muted, fontStyle: "italic", fontWeight: 500 }}>em segundos</span>
-                </h1>
-                <p className="text-[11px] sm:text-xs mt-1" style={{ color: T.muted }}>
-                  Estrutura, ligações, custos, produção e retorno — com planta baixa em tempo real e relatório completo em PDF.
-                </p>
-              </div>
-
-              {/* Botões de Ação Apenas em ÍCONES */}
-              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Cabeçalho Principal com Barra de Ações ACIMA do Título */}
+            <div className="pb-4 mb-4 sm:mb-6" style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+              {/* Linha ACIMA: Botões de Ação em Ícones */}
+              <div className="flex items-center justify-end gap-1.5 sm:gap-2 mb-3">
                 <input type="file" ref={fileInputRef} accept=".json,application/json" onChange={handleImportJson} className="hidden" />
                 
                 <button
@@ -5014,7 +5007,7 @@ function GrowinStones() {
                 <button
                   onClick={() => setDark((d) => !d)}
                   title={dark ? "Alternar para Tema Claro" : "Alternar para Tema Escuro"}
-                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors shrink-0"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center transition-colors shrink-0"
                   style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
                 >
                   {dark ? (
@@ -5035,6 +5028,16 @@ function GrowinStones() {
                     </svg>
                   )}
                 </button>
+              </div>
+
+              {/* Linha Principal com Título e Subtítulo */}
+              <div>
+                <h1 className="text-xl sm:text-3xl font-bold tracking-tight leading-tight" style={{ color: T.text }}>
+                  Projete seu grow <span style={{ color: T.muted, fontStyle: "italic", fontWeight: 500 }}>em segundos</span>
+                </h1>
+                <p className="text-[11px] sm:text-xs mt-1" style={{ color: T.muted }}>
+                  Estrutura, ligações, custos, produção e retorno — com planta baixa em tempo real e relatório completo em PDF.
+                </p>
               </div>
             </div>
 
