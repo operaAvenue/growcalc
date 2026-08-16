@@ -703,26 +703,93 @@ function IsometricPotSVG({ potW, potD, potH, potLiters, isRect, isSquare, dark, 
   const cx = svgW / 2;
   const cy = svgH / 2 + drawH / 4;
 
+  const makeRoundedIsoPath = (pts, cr = 0.12) => {
+    const n = pts.length;
+    let d = "";
+    for (let i = 0; i < n; i++) {
+      const prev = pts[(i - 1 + n) % n];
+      const curr = pts[i];
+      const next = pts[(i + 1) % n];
+
+      const startX = curr.x + (prev.x - curr.x) * cr;
+      const startY = curr.y + (prev.y - curr.y) * cr;
+      const endX = curr.x + (next.x - curr.x) * cr;
+      const endY = curr.y + (next.y - curr.y) * cr;
+
+      if (i === 0) {
+        d += `M ${startX} ${startY} Q ${curr.x} ${curr.y} ${endX} ${endY} `;
+      } else {
+        d += `L ${startX} ${startY} Q ${curr.x} ${curr.y} ${endX} ${endY} `;
+      }
+    }
+    d += "Z";
+    return d;
+  };
+
   if (isBox) {
     const rx = drawW * 0.5;
     const ry = drawD * 0.28;
     const topY = cy - drawH;
+
+    // Tapering: base é ligeiramente menor que o topo (efeito de vaso afunilado)
+    const taper = 0.78;
+    const botRx = rx * taper;
+    const botRy = ry * taper;
 
     const topP1 = { x: cx, y: topY - ry };
     const topP2 = { x: cx + rx, y: topY };
     const topP3 = { x: cx, y: topY + ry };
     const topP4 = { x: cx - rx, y: topY };
 
-    const botP2 = { x: topP2.x, y: topP2.y + drawH };
-    const botP3 = { x: topP3.x, y: topP3.y + drawH };
-    const botP4 = { x: topP4.x, y: topP4.y + drawH };
+    const botP1 = { x: cx, y: topY + drawH - botRy };
+    const botP2 = { x: cx + botRx, y: topY + drawH };
+    const botP3 = { x: cx, y: topY + drawH + botRy };
+    const botP4 = { x: cx - botRx, y: topY + drawH };
+
+    // Substrato / interior
+    const innerTop = [
+      { x: cx, y: topY - ry * 0.85 },
+      { x: cx + rx * 0.85, y: topY },
+      { x: cx, y: topY + ry * 0.85 },
+      { x: cx - rx * 0.85, y: topY }
+    ];
+
+    const topPath = makeRoundedIsoPath([topP1, topP2, topP3, topP4], 0.12);
+    const innerPath = makeRoundedIsoPath(innerTop, 0.12);
+    const botPath = makeRoundedIsoPath([botP1, botP2, botP3, botP4], 0.12);
 
     return (
       <svg width="100%" height="200" viewBox={`0 0 ${svgW} ${svgH}`} fill="none">
-        <path d={`M ${topP1.x} ${topP1.y} L ${topP2.x} ${topP2.y} L ${topP3.x} ${topP3.y} L ${topP4.x} ${topP4.y} Z`} fill={T.surface2} stroke={T.border} strokeWidth="1.5" />
-        <path d={`M ${topP4.x} ${topP4.y} L ${topP3.x} ${topP3.y} L ${botP3.x} ${botP3.y} L ${botP4.x} ${botP4.y} Z`} fill={T.surface} stroke={T.border} strokeWidth="1.5" />
-        <path d={`M ${topP3.x} ${topP3.y} L ${topP2.x} ${topP2.y} L ${botP2.x} ${botP2.y} L ${botP3.x} ${botP3.y} Z`} fill={T.bg} stroke={T.border} strokeWidth="1.5" />
-        <text x={cx} y={cy - drawH / 2} fill={T.text} fontSize="12" fontWeight="bold" textAnchor="middle">{potLiters} L</text>
+        {/* Base e Sombra Inferior */}
+        <path d={botPath} fill={T.surface2} stroke={T.borderSoft} strokeWidth="1" opacity="0.6" strokeLinejoin="round" />
+        
+        {/* Face Lateral Esquerda (Frontal-Esquerda com cantos suavizados e taper) */}
+        <path
+          d={`M ${topP4.x} ${topP4.y} L ${topP3.x} ${topP3.y} L ${botP3.x} ${botP3.y} L ${botP4.x} ${botP4.y} Z`}
+          fill={T.surface}
+          stroke={T.border}
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+
+        {/* Face Lateral Direita (Frontal-Direita com cantos suavizados e taper) */}
+        <path
+          d={`M ${topP3.x} ${topP3.y} L ${topP2.x} ${topP2.y} L ${botP2.x} ${botP2.y} L ${botP3.x} ${botP3.y} Z`}
+          fill={T.bg}
+          stroke={T.border}
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+
+        {/* Borda Superior / Boca do Vaso Arredondada */}
+        <path d={topPath} fill={T.surface2} stroke={T.border} strokeWidth="1.5" strokeLinejoin="round" />
+
+        {/* Interior / Substrato Rebaixado com Cantos Arredondados */}
+        <path d={innerPath} fill={T.inset} stroke={T.borderSoft} strokeWidth="1" strokeLinejoin="round" />
+
+        <text x={cx} y={topY + ry * 0.4} fill={T.text} fontSize="12" fontWeight="bold" textAnchor="middle">{potLiters} L</text>
       </svg>
     );
   }
@@ -731,12 +798,22 @@ function IsometricPotSVG({ potW, potD, potH, potLiters, isRect, isSquare, dark, 
   const rx = drawW * 0.45;
   const ry = drawD * 0.22;
   const topY = cy - drawH;
+  const taper = 0.82;
+  const botRx = rx * taper;
+  const botRy = ry * taper;
 
   return (
     <svg width="100%" height="200" viewBox={`0 0 ${svgW} ${svgH}`} fill="none">
-      <ellipse cx={cx} cy={cy} rx={rx * 0.85} ry={ry * 0.85} fill={T.surface2} stroke={T.border} strokeWidth="1.2" />
-      <path d={`M ${cx - rx} ${topY} A ${rx} ${ry} 0 0 0 ${cx + rx} ${topY} L ${cx + rx * 0.85} ${cy} A ${rx * 0.85} ${ry * 0.85} 0 0 1 ${cx - rx * 0.85} ${cy} Z`} fill={T.surface} stroke={T.border} strokeWidth="1.5" />
+      <ellipse cx={cx} cy={cy} rx={botRx} ry={botRy} fill={T.surface2} stroke={T.border} strokeWidth="1.2" />
+      <path
+        d={`M ${cx - rx} ${topY} A ${rx} ${ry} 0 0 0 ${cx + rx} ${topY} L ${cx + botRx} ${cy} A ${botRx} ${botRy} 0 0 1 ${cx - botRx} ${cy} Z`}
+        fill={T.surface}
+        stroke={T.border}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
       <ellipse cx={cx} cy={topY} rx={rx} ry={ry} fill={T.surface2} stroke={T.border} strokeWidth="1.5" />
+      <ellipse cx={cx} cy={topY} rx={rx * 0.85} ry={ry * 0.85} fill={T.inset} stroke={T.borderSoft} strokeWidth="1" />
       <text x={cx} y={topY + 4} fill={T.text} fontSize="12" fontWeight="bold" textAnchor="middle">{potLiters} L</text>
     </svg>
   );
