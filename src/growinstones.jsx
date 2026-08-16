@@ -1463,6 +1463,11 @@ export default function GrowinStones() {
 
   const [activeTab, setActiveTab] = useState("configurator"); // "configurator" | "comparison"
 
+  const [publishModalOpen, setPublishModalOpen] = useState(false);
+  const [subdomainInput, setSubdomainInput] = useState("");
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishResult, setPublishResult] = useState(null);
+
   // Presets unificados e todos removíveis (padrão + customizados)
   const [allPresets, setAllPresets] = useState(() => {
     try {
@@ -2619,6 +2624,11 @@ export default function GrowinStones() {
 <script>window.addEventListener("load", () => setTimeout(() => { try { window.print(); } catch (e) {} }, 500));</script>
 </body></html>`;
 
+    return html;
+  };
+
+  const openReportHtml = () => {
+    const html = generateReportHtmlString();
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -2630,664 +2640,51 @@ export default function GrowinStones() {
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   };
 
-  // ————— Exportar e Abrir Dashboard Estático HTML em Nova Aba —————
   const openStaticDashboardHtml = () => {
-    const pipeWReport = Math.max(2, gauge.mm * topScale * 0.1 + 1.2);
-    const segsSvg = plumbing.segs
-      .map((s) => {
-        const x1 = px(s.a[0]), y1 = py(s.a[1]), x2 = px(s.b[0]), y2 = py(s.b[1]);
-        const isRet = s.kind === "return";
-        const isBr = s.kind === "branch";
-        const stroke = isRet ? "#94a3b8" : "#3b82f6";
-        const dash = isRet ? 'stroke-dasharray="6 4"' : "";
-        const sw = isBr ? Math.max(1.5, pipeWReport * 0.65) : pipeWReport;
-        const op = isBr ? 'opacity="0.75"' : "";
-        return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${sw}" stroke-linecap="round" ${dash} ${op}/>`;
-      })
-      .join("");
-
-    const cotaListReport = getCotaElements(topScale, OX, OY, layout, potW, potD, spacing, width, depth);
-    const cotasSvg = cotaListReport
-      .map((c) => {
-        const anchor = c.dir === "horizontal" ? 'text-anchor="middle"' : 'text-anchor="start"';
-        const rx = c.tx - (c.dir === "horizontal" ? 18 : 2);
-        return `<g>
-          <line x1="${c.x1}" y1="${c.y1}" x2="${c.x2}" y2="${c.y2}" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="3 2"/>
-          <line x1="${c.tick1[0]}" y1="${c.tick1[1]}" x2="${c.tick2[0]}" y2="${c.tick2[1]}" stroke="#f59e0b" stroke-width="1.2"/>
-          <line x1="${c.tick2[0]}" y1="${c.tick2[1]}" x2="${c.tick2[2]}" y2="${c.tick2[3]}" stroke="#f59e0b" stroke-width="1.2"/>
-          <rect x="${rx}" y="${c.ty - 9}" width="36" height="12" rx="3" fill="#1e293b" opacity="0.85"/>
-          <text x="${c.tx}" y="${c.ty}" ${anchor} font-size="8.5" font-weight="700" fill="#fbbf24">${c.label}</text>
-        </g>`;
-      })
-      .join("");
-
-    const potsSvgReport = layout.grid
-      .map((p, i) => {
-        let potShapeSvg = "";
-        const potFillColor = dark ? "#3b422f" : "#dde3d0";
-        const potStrokeColor = dark ? "#76856a" : "#7e8c6d";
-        const potNumColor = dark ? "#cdd6bd" : "#3f4a33";
-        if (isRect) {
-          potShapeSvg = `<rect x="${px(p.x - potW / 2)}" y="${py(p.y - potD / 2)}" width="${potW * topScale}" height="${potD * topScale}" rx="5" fill="${potFillColor}" stroke="${potStrokeColor}" stroke-width="1.5" />`;
-        } else if (isSquare) {
-          potShapeSvg = `<rect x="${px(p.x - potW / 2)}" y="${py(p.y - potD / 2)}" width="${potW * topScale}" height="${potD * topScale}" rx="4" fill="${potFillColor}" stroke="${potStrokeColor}" stroke-width="1.5" />`;
-        } else {
-          potShapeSvg = `<circle cx="${px(p.x)}" cy="${py(p.y)}" r="${(potW / 2) * topScale}" fill="${potFillColor}" stroke="${potStrokeColor}" stroke-width="1.5" />`;
-        }
-        return `<g>${potShapeSvg}<text x="${px(p.x)}" y="${py(p.y) + 3.5}" text-anchor="middle" font-size="10" font-weight="600" fill="${potNumColor}">${i + 1}</text></g>`;
-      })
-      .join("");
-
-    const dropLineSvgReport = plumbing.dropLine
-      ? `<line x1="${px(plumbing.dropLine.a[0])}" y1="${py(plumbing.dropLine.a[1])}" x2="${px(plumbing.dropLine.b[0])}" y2="${py(plumbing.dropLine.b[1])}" stroke="#3b82f6" stroke-width="${pipeWReport * 1.2}" stroke-linecap="round"/>`
-      : "";
-
-    const totalSvgH = showRes ? svgH : topH + OY * 2;
-    const resSvgReport = showRes
-      ? `<g>
-          <text x="${OX}" y="${resY - 6}" font-size="9" fill="#94a3b8" letter-spacing="0.1em">ZONA TÉCNICA</text>
-          ${resItems
-            .map(
-              (it) => `
-            <g>
-              <rect x="${it.x}" y="${resY + (34 - it.h) / 2}" width="${it.w}" height="${it.h}" rx="6" fill="#334155" stroke="#64748b" stroke-width="1.4"/>
-              <text x="${it.x + it.w / 2}" y="${resY + 19}" text-anchor="middle" font-size="8.5" font-weight="600" fill="#f8fafc">${esc(it.label)}</text>
-            </g>`
-            )
-            .join("")}
-        </g>`
-      : "";
-
-    const materialTableRows = materialRows
-      .map(
-        (r) => `
-          <tr>
-            <td><b style="color:#f8fafc;">${esc(r.label)}</b></td>
-            <td style="text-align:center;">${r.qty} ${r.unitLabel}</td>
-            <td style="text-align:right;">${fmtBRL(r.unitCost)}</td>
-            <td style="text-align:right;"><b style="color:#f8fafc;">${fmtBRL(r.subtotal)}</b></td>
-          </tr>
-        `
-      )
-      .join("");
-
-    const alertItemsHtml = alerts
-      .map(
-        (a) => `
-          <div style="padding:10px 14px; border-radius:10px; background:#334155; border-left:4px solid ${
-            a.level === "hi" ? "#f87171" : a.level === "mid" ? "#fbbf24" : "#94a3b8"
-          }; font-size:12.5px; margin-bottom:8px; color:#f8fafc;">
-            ${esc(a.text)}
-          </div>
-        `
-      )
-      .join("");
-
-    const shoppingGridHtml = shoppingListItems.length > 0
-      ? `
-        <div style="margin-top:24px;">
-          <h3 style="font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:#94a3b8; margin-bottom:12px;">Lista de Compras & QR Codes</h3>
-          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px;">
-            ${shoppingListItems.map((item) => `
-              <div style="background:#334155; border:1px solid #475569; border-radius:14px; padding:14px; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-                <div>
-                  <b style="font-size:13px; color:#f8fafc; display:block; margin-bottom:4px;">${esc(item.name)}</b>
-                  <div style="font-size:11px; color:#94a3b8;">Qtd: <b style="color:#f8fafc;">${item.qty} un</b></div>
-                  <div style="font-size:11px; color:#94a3b8;">Unit.: <b>${fmtBRL(item.unitCost)}</b></div>
-                  <div style="font-size:12px; font-weight:700; color:#f8fafc; margin-top:4px;">Total: ${fmtBRL(item.subtotal)}</div>
-                </div>
-                <div>
-                  ${item.url.trim()
-                    ? `<img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(item.url.trim())}&size=200x200" alt="QR Code" style="width:84px; height:84px; border-radius:8px; border:1px solid #475569; background:#ffffff; padding:4px;" />`
-                    : `<div style="width:84px; height:84px; border-radius:8px; background:#1e293b; border:1px solid #475569; display:flex; align-items:center; justify-content:center; font-size:10px; color:#94a3b8; text-align:center;">Sem link</div>`
-                  }
-                </div>
-              </div>
-            `).join("")}
-          </div>
-        </div>
-      `
-      : "";
-
-    const html = `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard Estático — ${esc(growName || "GrowinStones")}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Berkshire+Swash&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #0f172a;
-      --card: #1e293b;
-      --card2: #334155;
-      --border: #475569;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --accent: #f59e0b;
+    const htmlContent = generateReportHtmlString();
+    const win = window.open("", "_blank");
+    if (win) {
+      win.document.open();
+      win.document.write(htmlContent);
+      win.document.close();
+    } else {
+      const blob = new Blob([htmlContent], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 24px 16px; line-height: 1.5; }
-    .max-w { max-width: 1200px; margin: 0 auto; }
-    header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
-    .brand-title { display: flex; align-items: center; gap: 14px; }
-    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 28px; }
-    .kpi-card { background: var(--card); border: 1px solid var(--border); padding: 18px; border-radius: 16px; }
-    .kpi-val { font-size: 24px; font-weight: 800; color: var(--text); margin-top: 4px; }
-    .kpi-lbl { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
-    .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
-    .main-grid { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: start; }
-    @media (min-width: 900px) { .main-grid { grid-template-columns: 1fr 340px; align-items: start; } }
-    .section-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 20px; margin-bottom: 24px; }
-    .section-card:last-child { margin-bottom: 0; }
-    .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 16px; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
-    th { text-align: left; padding: 10px 12px; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; }
-    td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--muted); }
-    tr:last-child td { border-bottom: none; }
-    .btn-action { background: var(--accent); color: #000; border: none; padding: 10px 18px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; transition: opacity 0.2s; }
-    .btn-action:hover { opacity: 0.85; }
-    .specs-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .spec-item { background: var(--card2); border: 1px solid var(--border); padding: 10px 12px; border-radius: 12px; min-width: 0; }
-    .spec-lbl { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
-    .spec-val { font-size: 12.5px; font-weight: 700; color: var(--text); margin-top: 3px; word-break: break-word; overflow-wrap: anywhere; }
-    @media print { .no-print { display: none !important; } body { background: #fff; color: #000; } .kpi-card, .section-card { border-color: #ddd; background: #fff; } }
-  </style>
-</head>
-<body>
-  <div class="max-w">
-    <header>
-      <div class="brand-title">
-        ${getLogoSvgString(36, "#f59e0b")}
-        <div style="border-left: 1px solid var(--border); padding-left: 14px;">
-          <h1 style="font-size:18px; font-weight:800; margin:0; line-height:1.2;">${esc(growName || "Dashboard de Cultivo")}</h1>
-          <div style="font-size:11.5px; color:var(--muted); margin-top:2px;">
-            ${owner ? `Responsável: <b style="color:var(--text);">${esc(owner)}</b> · ` : ""}${strain ? `Genética: <b style="color:var(--text);">${esc(strain)}</b> · ` : ""}Gerado em: ${today}
-          </div>
-        </div>
-      </div>
-      <div class="no-print" style="display:flex; gap:10px; align-items:center;">
-        <button class="btn-action" onclick="window.print()">Imprimir / Salvar PDF</button>
-      </div>
-    </header>
-
-    <!-- Hero KPIs -->
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-lbl">Investimento (CAPEX)</div>
-        <div class="kpi-val">${fmtBRL(capex)}</div>
-        <div class="kpi-sub">${fmtBRL(capexPerPlant)} por planta</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-lbl">OPEX Mensal</div>
-        <div class="kpi-val">${fmtBRL(opexMonth)}</div>
-        <div class="kpi-sub">${kwhMonth.toFixed(0)} kWh/mês + insumos</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-lbl">Produção Anual</div>
-        <div class="kpi-val">${fmtG(yieldYear)}</div>
-        <div class="kpi-sub">${harvestsYear.toFixed(1)} safras/ano (${fmtG(yieldHarvest)}/safra)</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-lbl">Receita Estimada</div>
-        <div class="kpi-val">${priceG > 0 ? fmtBRL(revenueYear) : "—"}</div>
-        <div class="kpi-sub">${paybackMonths ? `Payback: ${paybackMonths.toFixed(1)} meses` : "preencha R$/g"}</div>
-      </div>
-    </div>
-
-    <!-- Main Content -->
-    <div class="main-grid">
-      <div>
-        <!-- Planta Baixa Visual -->
-        <div class="section-card">
-          <div class="section-title">📐 Layout & Planta Baixa em Tempo Real</div>
-          <div style="background:#020617; border-radius:14px; padding:16px; text-align:center;">
-            <svg width="${svgW}" height="${totalSvgH}" viewBox="0 0 ${svgW} ${totalSvgH}" style="width:100%; max-width:${svgW}px; height:auto; display:block; margin:0 auto;">
-              <rect x="${OX}" y="${OY}" width="${topW}" height="${topH}" rx="10" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
-              <text x="${OX + topW / 2}" y="${OY - 8}" text-anchor="middle" font-size="11" fill="#94a3b8">${width} cm</text>
-              <text x="${OX - 10}" y="${OY + topH / 2}" text-anchor="middle" font-size="11" fill="#94a3b8" transform="rotate(-90, ${OX - 10}, ${OY + topH / 2})">${depth} cm</text>
-              ${segsSvg}
-              ${dropLineSvgReport}
-              ${potsSvgReport}
-              ${cotasSvg}
-              ${resSvgReport}
-            </svg>
-          </div>
-          <div style="font-size:11.5px; color:var(--muted); margin-top:12px; text-align:center;">
-            <b style="color:var(--text);">${plants} vasos</b> em ${layout.nRows} linha(s) × ${Math.min(layout.useCols, layout.placed)} coluna(s) · Espaçamento entre vasos: <b style="color:var(--text);">${spacing} cm</b> · Conexão: <b style="color:var(--text);">${connInfo.name}</b>
-          </div>
-        </div>
-
-        <!-- Lista de Materiais & Custos -->
-        <div class="section-card">
-          <div class="section-title">📋 Lista de Materiais & Orçamento Completo</div>
-          <table>
-            <thead>
-              <tr>
-                <th>Material / Equipamento</th>
-                <th style="text-align:center;">Quantidade</th>
-                <th style="text-align:right;">Valor Unit.</th>
-                <th style="text-align:right;">Subtotal</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${materialTableRows}
-              <tr>
-                <td colSpan="3"><b>Custos extras (frete, estrutura...)</b></td>
-                <td style="text-align:right;"><b style="color:var(--text);">${fmtBRL(extraCost)}</b></td>
-              </tr>
-              <tr style="font-size:14px; background:var(--card2);">
-                <td colSpan="3"><b style="color:var(--text);">INVESTIMENTO TOTAL (CAPEX)</b></td>
-                <td style="text-align:right;"><b style="color:#f59e0b; font-size:16px;">${fmtBRL(capex)}</b></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        ${shoppingGridHtml}
-      </div>
-
-      <!-- Sidebar Especificações e Diagnóstico -->
-      <div style="display:flex; flex-direction:column; gap:24px;">
-        <div class="section-card">
-          <div class="section-title">⚙ Specs do Cultivo</div>
-          <div class="specs-list">
-            <div class="spec-item">
-              <div class="spec-lbl">Estufa</div>
-              <div class="spec-val">${width}×${depth}×${height} cm</div>
-            </div>
-            <div class="spec-item">
-              <div class="spec-lbl">Área / Volume</div>
-              <div class="spec-val">${areaM2.toFixed(2)} m² / ${volumeM3.toFixed(2)} m³</div>
-            </div>
-            <div class="spec-item">
-              <div class="spec-lbl">Modelo Vaso</div>
-              <div class="spec-val">${esc(pot.label)}</div>
-            </div>
-            <div class="spec-item">
-              <div class="spec-lbl">Reservatório</div>
-              <div class="spec-val">≥ ${reservoir} L</div>
-            </div>
-            <div class="spec-item">
-              <div class="spec-lbl">Bitola Tubo</div>
-              <div class="spec-val">${gauge.label}</div>
-            </div>
-            <div class="spec-item">
-              <div class="spec-lbl">Luz LED</div>
-              <div class="spec-val">${totalWatts} W (${ledPerM2} W/m²)</div>
-            </div>
-            <div class="spec-item">
-              <div class="spec-lbl">Ciclo Total</div>
-              <div class="spec-val">${cycleDays} dias (${vegaDays}d V / ${floraDays}d F)</div>
-            </div>
-            <div class="spec-item">
-              <div class="spec-lbl">Eficiência Luz</div>
-              <div class="spec-val">${ledWatts > 0 ? `${gPerW.toFixed(2)} g/W` : "—"}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Diagnóstico Card -->
-        <div class="section-card">
-          <div class="section-title">🔍 Diagnóstico & Alertas Técnicos</div>
-          ${alertItemsHtml}
-        </div>
-      </div>
-    </div>
-  </div>
-</body>
-</html>`;
-
-    try {
-      const win = window.open("", "_blank");
-      if (win) {
-        win.document.open();
-        win.document.write(html);
-        win.document.close();
-        showToast("✓ Dashboard HTML aberto em nova aba!");
-        return;
-      }
-    } catch (err) {
-      console.warn("Popup blocked or failed, downloading static HTML instead:", err);
-    }
-
-    // Fallback: Baixar como arquivo .html se popups estiverem bloqueados
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `dashboard-${(growName || "growinstones").toLowerCase().replace(/[^a-z0-9]+/gi, "-")}.html`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-    showToast("✓ Dashboard HTML baixado (popups bloqueados no navegador)");
   };
 
-  // ————————————————————————— RELATÓRIO —————————————————————————
-  if (showReport) {
-    const R = { text: "#1f1b16", muted: "#6b6354", faint: "#a39a87", line: "#e2dccc", bg: "#ffffff", soft: "#f5f1e7" };
-    const Sec = ({ title, children }) => (
-      <section style={{ marginBottom: 26 }}>
-        <h2 style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.16em", color: R.faint, borderBottom: `1px solid ${R.line}`, paddingBottom: 6, marginBottom: 12, fontWeight: 600 }}>{title}</h2>
-        {children}
-      </section>
-    );
-    const Tr = ({ a, b, strong }) => (
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 16, padding: "5px 0", borderBottom: `1px dotted ${R.line}`, fontSize: 13 }}>
-        <span style={{ color: R.muted }}>{a}</span>
-        <span style={{ fontWeight: strong ? 700 : 600, color: R.text, textAlign: "right" }}>{b}</span>
-      </div>
-    );
-    return (
-      <div style={{ background: R.bg, color: R.text, minHeight: "100vh", fontFamily: "'Inter', system-ui, sans-serif" }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Berkshire+Swash&display=swap');
-          @media print { .no-print { display: none !important; } .report-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; max-width: none !important; padding: 0 !important; } @page { size: 108mm 192mm; margin: 9mm; } }`}</style>
+  const handlePublishSubdomain = async () => {
+    if (!subdomainInput.trim()) return;
+    setIsPublishing(true);
+    setPublishResult(null);
 
-        <div className="no-print" style={{ position: "sticky", top: 0, background: R.soft, borderBottom: `1px solid ${R.line}`, padding: "10px 20px", zIndex: 10 }}>
-          <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-            <button onClick={() => setShowReport(false)}
-              style={{ padding: "8px 18px", borderRadius: 10, border: `1px solid ${R.line}`, background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: R.text, display: "flex", alignItems: "center", gap: 6 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="19" y1="12" x2="5" y2="12" />
-                <polyline points="12 19 5 12 12 5" />
-              </svg>
-              <span>Voltar ao configurador</span>
-            </button>
-            <button onClick={downloadReport}
-              style={{ padding: "8px 18px", borderRadius: 10, border: "none", background: R.text, color: "#f7f3ea", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              <span>Baixar relatório PDF (9:16)</span>
-            </button>
-            <button onClick={() => { try { window.print(); } catch (e) {} }}
-              style={{ padding: "8px 18px", borderRadius: 10, border: `1px solid ${R.line}`, background: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", color: R.muted, display: "flex", alignItems: "center", gap: 6 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="6 9 6 2 18 2 18 9" />
-                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                <rect x="6" y="14" width="12" height="8" />
-              </svg>
-              <span>Imprimir nesta aba</span>
-            </button>
-          </div>
-          <p style={{ textAlign: "center", fontSize: 11, color: R.muted, margin: "8px 0 0" }}>
-            O download baixa o relatório e, ao abri-lo, o diálogo de impressão aparece sozinho — escolha “Salvar como PDF”.
-          </p>
-        </div>
+    const cleanSlug = subdomainInput.toLowerCase().trim().replace(/[^a-z0-9-]/g, "");
+    const html = generateReportHtmlString();
+    const setupData = getSetupData();
 
-        <div className="report-page" style={{ maxWidth: 430, margin: "24px auto", padding: "26px 24px", background: "#fff", minHeight: 764 }}>
-          {/* Cabeçalho */}
-          <div style={{ borderBottom: `2px solid ${R.text}`, paddingBottom: 14, marginBottom: 18 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <Logo height={34} color={R.text} />
-              <div style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.18em", color: R.faint, borderLeft: `1px solid ${R.faint}`, paddingLeft: 10 }}>Relatório de projeto hidropônico</div>
-            </div>
-            <div style={{ marginTop: 10, fontSize: 11.5, color: R.muted }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: R.text, display: "block" }}>{growName || "Projeto sem nome"}</span>
-              {owner ? `Responsável: ${owner} · ` : ""}{today}
-            </div>
-          </div>
+    try {
+      const res = await fetch("/api/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: cleanSlug, html, setupData }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPublishResult({ success: true, url: data.url, slug: data.slug });
+      } else {
+        setPublishResult({ success: false, error: data.error || "Erro ao publicar subdomínio." });
+      }
+    } catch (err) {
+      console.error("Erro na publicação:", err);
+      setPublishResult({ success: false, error: "Falha na conexão com o servidor de publicação." });
+    } finally {
+      setIsPublishing(false);
+    }
+  };
 
-          {/* Destaques */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8, marginBottom: 22 }}>
-            {[
-              ["Investimento", fmtBRL(capex)],
-              ["Produção / ano", fmtG(yieldYear)],
-              ["Receita / ano", priceG > 0 ? fmtBRL(revenueYear) : "—"],
-              ["Payback", paybackMonths ? `${paybackMonths.toFixed(1)} meses` : "—"],
-            ].map(([l, v]) => (
-              <div key={l} style={{ background: R.soft, borderRadius: 12, padding: "12px 14px" }}>
-                <div style={{ fontSize: 17, fontWeight: 800 }}>{v}</div>
-                <div style={{ fontSize: 10.5, color: R.muted, marginTop: 2 }}>{l}</div>
-              </div>
-            ))}
-          </div>
-
-          <Sec title="1 · Estrutura do grow">
-            <Tr a="Variedade / Genética da planta" b={strain || "Não informada"} />
-            <Tr a="Dimensões (L × P × A)" b={`${width} × ${depth} × ${height} cm`} />
-            <Tr a="Área de cultivo / volume" b={`${areaM2.toFixed(2)} m² · ${volumeM3.toFixed(2)} m³`} />
-            <Tr a="Vasos" b={`${plants} × ${pot.label} (${potDesc})`} />
-            <Tr a="Disposição" b={`${layout.nRows} linha(s) × ${Math.min(layout.useCols, plants)} coluna(s)`} />
-            <Tr a="Afastamento das paredes" b={`E/D ${layout.wallLeft} / ${layout.wallRight} cm · Sup/Inf ${layout.wallTop} / ${layout.wallBottom} cm`} />
-            <Tr a="Espaçamento entre vasos" b={`${spacing} cm`} />
-            <Tr a="Ligação hidráulica" b={connInfo.name} />
-            <Tr a="Bitola / tubulação" b={`${gauge.label} · ${pipeMeters} m (com folga de 15%)`} />
-            <Tr a="Reservatório recomendado" b={`≥ ${reservoir} L`} />
-            <Tr a="Renovação de ar necessária" b={`≥ ${airFlowNeeded} m³/h`} />
-            <Tr a="Densidade de luz" b={ledWatts > 0 ? `${ledPerM2} W/m² (${ledWatts} W de LED)` : "sem LED no projeto"} />
-          </Sec>
-
-          <Sec title="2 · Planta baixa & disposição dos vasos">
-            <div style={{ background: R.soft, borderRadius: 12, padding: "14px 10px", display: "flex", flexDirection: "column", alignItems: "center" }}>
-              <svg width={svgW} height={showRes ? svgH : topH + OY * 2} style={{ maxWidth: "100%", height: "auto" }}>
-                <rect x={OX} y={OY} width={topW} height={topH} rx={10}
-                  fill="#ffffff" stroke="#1f1b16" strokeWidth={1.5} />
-                <text x={OX + topW / 2} y={OY - 8} textAnchor="middle" fontSize="11" fill={R.muted}>{width} cm</text>
-                <text x={OX - 10} y={OY + topH / 2} textAnchor="middle" fontSize="11" fill={R.muted}
-                  transform={`rotate(-90, ${OX - 10}, ${OY + topH / 2})`}>{depth} cm</text>
-
-                {plumbing.segs.map((s, i) => {
-                  const isRet = s.kind === "return";
-                  const isBr = s.kind === "branch";
-                  const stroke = isRet ? "#6b7280" : "#2563eb";
-                  const dash = isRet ? "6 4" : undefined;
-                  const sw = isBr ? Math.max(1.5, pipeW * 0.65) : pipeW;
-                  return (
-                    <line key={i} x1={px(s.a[0])} y1={py(s.a[1])} x2={px(s.b[0])} y2={py(s.b[1])}
-                      stroke={stroke} strokeWidth={sw} strokeDasharray={dash} strokeLinecap="round" opacity={isBr ? 0.75 : 1} />
-                  );
-                })}
-
-
-                {layout.grid.map((p, i) => {
-                  const isSquare = potShape === "square";
-                  return (
-                    <g key={i}>
-                      {isRect ? (
-                        <rect x={px(p.x - potW / 2)} y={py(p.y - potD / 2)} width={potW * topScale} height={potD * topScale} rx={5}
-                          fill="#e2e8f0" stroke="#334155" strokeWidth={1.5} />
-                      ) : isSquare ? (
-                        <rect x={px(p.x - pot.diameter / 2)} y={py(p.y - pot.diameter / 2)} width={pot.diameter * topScale} height={pot.diameter * topScale} rx={4}
-                          fill="#e2e8f0" stroke="#334155" strokeWidth={1.5} />
-                      ) : (
-                        <circle cx={px(p.x)} cy={py(p.y)} r={(pot.diameter / 2) * topScale}
-                          fill="#e2e8f0" stroke="#334155" strokeWidth={1.5} />
-                      )}
-                      <text x={px(p.x)} y={py(p.y) + 3.5} textAnchor="middle"
-                        fontSize="10" fontWeight="600" fill="#1e293b">{i + 1}</text>
-                    </g>
-                  );
-                })}
-
-                {getCotaElements(topScale, OX, OY, layout, potW, potD, spacing, width, depth).map((c) => (
-                  <g key={c.id}>
-                    <line x1={c.x1} y1={c.y1} x2={c.x2} y2={c.y2} stroke="#d97706" strokeWidth={1.2} strokeDasharray="3 2" />
-                    <line x1={c.tick1[0]} y1={c.tick1[1]} x2={c.tick1[2]} y2={c.tick1[3]} stroke="#d97706" strokeWidth={1.2} />
-                    <line x1={c.tick2[0]} y1={c.tick2[1]} x2={c.tick2[2]} y2={c.tick2[3]} stroke="#d97706" strokeWidth={1.2} />
-                    <rect x={c.tx - (c.dir === "horizontal" ? 18 : 2)} y={c.ty - 9} width={36} height={12} rx={3} fill="#ffffff" opacity={0.85} />
-                    <text x={c.tx} y={c.ty} textAnchor={c.dir === "horizontal" ? "middle" : "start"} fontSize="8.5" fontWeight="700" fill="#b45309">
-                      {c.label}
-                    </text>
-                  </g>
-                ))}
-
-                {showRes && (
-                  <g>
-                    <text x={OX} y={resY - 6} fontSize="9" fill={R.faint} style={{ letterSpacing: "0.1em" }}>ZONA TÉCNICA</text>
-                    {resItems.map((it) => (
-                      <g key={it.id}>
-                        <rect x={it.x} y={resY + (34 - it.h) / 2} width={it.w} height={it.h} rx={6}
-                          fill="#cbd5e1" stroke="#64748b" strokeWidth={1.4} />
-                        <text x={it.x + it.w / 2} y={resY + 19} textAnchor="middle" fontSize="8.5" fontWeight="600" fill="#0f172a">
-                          {it.label}
-                        </text>
-                      </g>
-                    ))}
-                  </g>
-                )}
-              </svg>
-              <div style={{ fontSize: 10.5, color: R.muted, marginTop: 8, textAlign: "center" }}>
-                Esquema visual da estufa ({width} × {depth} cm) · {plants} vaso(s) de {pot.label} ({potDesc}) · Afastamento paredes: E/D {layout.wallLeft}/{layout.wallRight} cm, Sup/Inf {layout.wallTop}/{layout.wallBottom} cm · Entre vasos: {spacing} cm
-              </div>
-            </div>
-          </Sec>
-
-          <Sec title="3 · Equipamentos e materiais (CAPEX)">
-            <div style={{ display: "flex", fontSize: 10.5, textTransform: "uppercase", letterSpacing: "0.08em", color: R.faint, borderBottom: `1px solid ${R.line}`, paddingBottom: 4, marginBottom: 4 }}>
-              <span style={{ flex: 1 }}>Item</span>
-              <span style={{ width: 40, textAlign: "right" }}>Qtd</span>
-              <span style={{ width: 64, textAlign: "right" }}>Unit.</span>
-              <span style={{ width: 74, textAlign: "right" }}>Subtotal</span>
-            </div>
-            {materialRows.map((r) => (
-              <div key={r.key + r.label} style={{ display: "flex", fontSize: 11, padding: "4px 0", borderBottom: `1px dotted ${R.line}`, alignItems: "baseline", gap: 4 }}>
-                <span style={{ flex: 1, color: R.muted }}>{r.label}</span>
-                <span style={{ width: 40, textAlign: "right" }}>{r.qty}</span>
-                <span style={{ width: 64, textAlign: "right" }}>{fmtBRL(r.unitCost)}</span>
-                <span style={{ width: 74, textAlign: "right", fontWeight: 600 }}>{fmtBRL(r.subtotal)}</span>
-              </div>
-            ))}
-            <div style={{ display: "flex", fontSize: 11, padding: "4px 0", borderBottom: `1px dotted ${R.line}`, alignItems: "baseline" }}>
-              <span style={{ flex: 1, color: R.muted }}>Custos extras (frete, elétrica, estrutura…)</span>
-              <span style={{ width: 74, marginLeft: "auto", textAlign: "right", fontWeight: 600 }}>{fmtBRL(extraCost)}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 15, fontWeight: 800 }}>
-              <span>Investimento total (CAPEX)</span><span>{fmtBRL(capex)}</span>
-            </div>
-            <div style={{ fontSize: 11.5, color: R.muted, marginTop: 2 }}>≈ {fmtBRL(capexPerPlant)} por planta · {areaM2 > 0 ? fmtBRL(capex / areaM2) : "—"} por m²</div>
-          </Sec>
-
-          <Sec title="4 · Energia e custos operacionais (OPEX)">
-            <Tr a="Potência instalada" b={`${totalWatts} W`} />
-            <Tr a="Ciclo de luz (Vega / Flora)" b={`${vegaHours}h/dia (${vegaDays}d) · ${floraHours}h/dia (${floraDays}d)`} />
-            <Tr a="Consumo mensal estimado" b={`${kwhMonth.toFixed(0)} kWh`} />
-            <Tr a={`Tarifa de energia`} b={`${fmtBRL(tariff)} / kWh`} />
-            <Tr a="Custo de energia / mês" b={fmtBRL(energyMonth)} />
-            <Tr a="Insumos mensais (nutrientes, água…)" b={fmtBRL(monthlyCost)} />
-            <Tr a="OPEX mensal total" b={fmtBRL(opexMonth)} strong />
-            <Tr a={`OPEX por ciclo (${cycleDays} dias)`} b={fmtBRL(opexCycle)} />
-            <Tr a="OPEX anual" b={fmtBRL(opexYear)} />
-            <Tr a="Energia por ciclo" b={`${((kwhMonth * cycleDays) / 30).toFixed(0)} kWh · ${fmtBRL(energyCycle)}`} />
-          </Sec>
-
-          <Sec title="5 · Produção e produtividade">
-            <Tr a="Plantas por ciclo" b={`${plants}`} />
-            <Tr a="Fase Vegetativa" b={`${vegaDays} dias (${vegaHours}h luz/dia)`} />
-            <Tr a="Fase de Floração" b={`${floraDays} dias (${floraHours}h luz/dia)`} />
-            <Tr a="Tempo de cultivo (ciclo completo)" b={`${cycleDays} dias`} />
-            <Tr a="Safras por ano" b={`${harvestsYear.toFixed(1)}`} strong />
-            <Tr a="Produtividade por planta" b={`${yieldPerPlant} g`} />
-            <Tr a="Produção por safra" b={fmtG(yieldHarvest)} strong />
-            <Tr a="Produção anual" b={fmtG(yieldYear)} />
-            <Tr a="Produtividade por m² (safra)" b={`${yieldM2.toFixed(0)} g/m²`} />
-            <Tr a="Eficiência de luz" b={ledWatts > 0 ? `${gPerW.toFixed(2)} g/W por safra` : "—"} />
-            <Tr a="Custo operacional por grama" b={yieldYear > 0 ? fmtBRL(costPerG) : "—"} />
-          </Sec>
-
-          <Sec title="6 · Receita, lucro e retorno">
-            {priceG > 0 ? (
-              <>
-                <Tr a="Valor de mercado" b={`${fmtBRL(priceG)} / g`} />
-                <Tr a="Receita por safra" b={fmtBRL(revenueHarvest)} />
-                <Tr a="Receita anual" b={fmtBRL(revenueYear)} strong />
-                <Tr a="Lucro por safra (receita − OPEX do ciclo)" b={fmtBRL(profitHarvest)} />
-                <Tr a="Lucro anual" b={fmtBRL(profitYear)} strong />
-                <Tr a="Margem operacional" b={`${marginPct.toFixed(0)}%`} />
-                <Tr a="Payback do investimento" b={paybackMonths ? `${paybackMonths.toFixed(1)} meses (${(paybackMonths / (cycleDays / 30)).toFixed(1)} safras)` : "não atingido com estes números"} strong />
-                <Tr a="Resultado no 1º ano (lucro − CAPEX)" b={fmtBRL(profitYear - capex)} />
-              </>
-            ) : (
-              <p style={{ fontSize: 12.5, color: R.muted }}>
-                Valor de mercado (R$/g) não informado — preencha no configurador para calcular receita, lucro, margem e payback.
-              </p>
-            )}
-          </Sec>
-
-          <Sec title="7 · Diagnóstico do projeto">
-            {alerts.map((a, i) => (
-              <div key={i} style={{ fontSize: 12.5, color: a.level === "hi" ? "#8c3b3b" : a.level === "mid" ? "#8a6a2a" : R.muted, padding: "3px 0" }}>
-                • {a.text}
-              </div>
-            ))}
-          </Sec>
-
-          {(notes.trim() || instructions.trim() || terms.trim()) && (
-            <Sec title="8 · Observações, instruções e termos">
-              <div style={{ background: R.soft, borderRadius: 12, padding: "14px 16px", fontSize: 12, color: R.text }}>
-                {notes.trim() && (
-                  <div style={{ marginBottom: (instructions.trim() || terms.trim()) ? 12 : 0 }}>
-                    <div style={{ fontWeight: 700, textTransform: "uppercase", fontSize: 10, color: R.faint, marginBottom: 4, letterSpacing: "0.08em" }}>
-                      Observações
-                    </div>
-                    <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.45 }}>{notes}</div>
-                  </div>
-                )}
-                {instructions.trim() && (
-                  <div style={{ marginBottom: terms.trim() ? 12 : 0 }}>
-                    <div style={{ fontWeight: 700, textTransform: "uppercase", fontSize: 10, color: R.faint, marginBottom: 4, letterSpacing: "0.08em" }}>
-                      Instruções de operação
-                    </div>
-                    <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.45 }}>{instructions}</div>
-                  </div>
-                )}
-                {terms.trim() && (
-                  <div>
-                    <div style={{ fontWeight: 700, textTransform: "uppercase", fontSize: 10, color: R.faint, marginBottom: 4, letterSpacing: "0.08em" }}>
-                      Termos & Condições
-                    </div>
-                    <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.45 }}>{terms}</div>
-                  </div>
-                )}
-              </div>
-            </Sec>
-          )}
-
-          {shoppingListItems.length > 0 && (
-            <Sec title="9 · Lista de compras & QR Codes">
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {shoppingListItems.map((item) => (
-                  <div key={item.id} style={{ display: "flex", alignItems: "center", justify: "space-between", gap: 14, background: R.soft, border: `1px solid ${R.line}`, borderRadius: 12, padding: "14px 16px" }}>
-                    <div style={{ width: "50%", minWidth: 0 }}>
-                      <b style={{ fontSize: 13, color: R.text, display: "block", marginBottom: 4, lineHeight: 1.3 }}>{item.name}</b>
-                      <div style={{ fontSize: 11.5, color: R.muted, lineHeight: 1.5 }}>
-                        <div>Qtd: <b style={{ color: R.text }}>{item.qty} un</b></div>
-                        <div>Unit.: <b>{fmtBRL(item.unitCost)}</b></div>
-                        <div style={{ marginTop: 2 }}>Subtotal: <b style={{ fontSize: 12.5, color: R.text }}>{fmtBRL(item.subtotal)}</b></div>
-                      </div>
-                    </div>
-                    <div style={{ width: "50%", display: "flex", justifyContent: "center", alignItems: "center" }}>
-                      {item.url.trim() ? (
-                        <img
-                          src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(item.url.trim())}&size=200x200`}
-                          alt="QR Code"
-                          style={{ width: 108, height: 108, maxWidth: "100%", borderRadius: 8, border: `1px solid ${R.line}`, background: "#ffffff", padding: 4 }}
-                        />
-                      ) : (
-                        <div style={{ width: 108, height: 108, maxWidth: "100%", borderRadius: 8, background: R.bg, border: `1px solid ${R.line}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: R.faint, textAlign: "center" }}>
-                          Sem link
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Sec>
-          )}
-
-          <p style={{ fontSize: 10.5, color: R.faint, borderTop: `1px solid ${R.line}`, paddingTop: 10, marginTop: 8 }}>
-            Documento gerado pelo GrowinStones em {today}. Valores estimados para planejamento — produtividade, preços e
-            consumo variam com genética, manejo, fase do cultivo e tarifas locais. Não constitui aconselhamento financeiro.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // ————————————————————————— CONFIGURADOR —————————————————————————
+// ————————————————————————— CONFIGURADOR —————————————————————————
   return (
     <div className="min-h-screen" style={{ background: T.bg, color: T.text, fontFamily: "'Inter', system-ui, sans-serif", transition: "background 0.3s, color 0.3s" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Berkshire+Swash&display=swap');
@@ -3330,6 +2727,17 @@ export default function GrowinStones() {
                 <line x1="9" y1="21" x2="9" y2="9" />
               </svg>
               <span>Dashboard HTML</span>
+            </button>
+
+            <button onClick={() => setPublishModalOpen(true)}
+              title="Publicar este setup em um subdomínio exclusivo (ex: meu-grow.thegrowinstones.com)"
+              className="px-3.5 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-90 flex items-center gap-1.5 shadow-sm"
+              style={{ background: dark ? "#0284c7" : "#0369a1", color: "#ffffff" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.71 1.26-1.5 1.74-2.3L4.5 16.5z"/>
+                <path d="M12 15l-3-3 7.5-7.5c1.4-1.4 3.7-1.4 5.1 0s1.4 3.7 0 5.1L12 15z"/>
+              </svg>
+              <span>Publicar Subdomínio</span>
             </button>
             <button onClick={() => setShowReport(true)}
               className="px-4 py-2 rounded-xl text-xs font-bold transition-opacity hover:opacity-85 flex items-center gap-1.5"

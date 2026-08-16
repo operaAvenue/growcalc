@@ -5,4 +5,13 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   base: "./",
   plugins: [react(), tailwindcss()],
+  server: {
+    proxy: {
+      "/api": {
+        target: "https://grow.thegrowinstones.com",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
 });
