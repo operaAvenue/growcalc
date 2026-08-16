@@ -146,18 +146,6 @@ export default function ESP32WebFlasherModal({ isOpen, onClose, currentUser, T, 
           setProgressPercent(pct);
           const currentFile = fileArray[fileIndex] ? fileArray[fileIndex].name : `Partição ${fileIndex + 1}`;
           setFileProgress(`${currentFile}: ${pct}% (${(written / 1024).toFixed(0)} / ${(total / 1024).toFixed(0)} KB)`);
-        },
-        calculateMD5Hash: (image) => {
-          if (typeof image === "string") {
-            return CryptoJS.MD5(CryptoJS.enc.Latin1.parse(image)).toString();
-          }
-          let binary = "";
-          const len = image.length;
-          const chunk = 0x8000;
-          for (let i = 0; i < len; i += chunk) {
-            binary += String.fromCharCode.apply(null, image.subarray(i, Math.min(i + chunk, len)));
-          }
-          return CryptoJS.MD5(CryptoJS.enc.Latin1.parse(binary)).toString();
         }
       });
 
