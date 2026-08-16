@@ -820,8 +820,17 @@ function IsometricPotSVG({ potW, potD, potH, potLiters, isRect, isSquare, dark, 
   );
 }
 
-function CollapsibleCard({ title, subtitle, defaultOpen = true, children, action, className = "", T, dark }) {
-  const [open, setOpen] = useState(defaultOpen);
+function CollapsibleCard({ title, subtitle, isOpen, onToggle, defaultOpen = false, children, action, className = "", T, dark }) {
+  const [internalOpen, setInternalOpen] = useState(defaultOpen);
+  const open = isOpen !== undefined ? isOpen : internalOpen;
+  const handleToggle = () => {
+    if (onToggle) {
+      onToggle();
+    } else {
+      setInternalOpen((o) => !o);
+    }
+  };
+
   return (
     <section className={`rounded-2xl transition-all duration-200 w-full max-w-full overflow-hidden min-w-0 ${open ? "p-3.5 sm:p-5" : "px-3.5 sm:px-5 py-3 sm:py-3.5"} ${className}`}
       style={{
@@ -830,7 +839,7 @@ function CollapsibleCard({ title, subtitle, defaultOpen = true, children, action
         boxShadow: dark ? "none" : "0 1px 2px rgba(31,27,22,0.04)"
       }}>
       <div
-        onClick={() => setOpen((o) => !o)}
+        onClick={handleToggle}
         className="flex items-center justify-between cursor-pointer select-none group">
         <div className="flex items-center gap-2.5 min-w-0 pr-2">
           <h2 className="text-[11px] font-semibold uppercase tracking-wider transition-colors group-hover:text-amber-500"
@@ -848,7 +857,7 @@ function CollapsibleCard({ title, subtitle, defaultOpen = true, children, action
           {action}
           <button
             type="button"
-            onClick={() => setOpen((o) => !o)}
+            onClick={handleToggle}
             title={open ? "Recolher card" : "Expandir card"}
             aria-label={open ? "Recolher card" : "Expandir card"}
             className="w-6 h-6 rounded-md flex items-center justify-center transition-transform hover:opacity-80"
@@ -1853,6 +1862,8 @@ function GrowinStones() {
   const [owner, setOwner] = useState("");
   const [strain, setStrain] = useState(""); // Variedade / Genética da planta
   const [isGrowPublic, setIsGrowPublic] = useState(true); // Se o projeto do grow é público no subdomínio
+  const [openConfigCard, setOpenConfigCard] = useState("identificacao"); // Accordion de cards: apenas 1 aberto por vez
+  const toggleConfigCard = (id) => setOpenConfigCard((cur) => (cur === id ? null : id));
 
   // estrutura
   const [width, setWidth] = useState(240);
@@ -5279,6 +5290,8 @@ function GrowinStones() {
             <CollapsibleCard
               title="Identificação"
               subtitle={growName || owner || strain ? `${growName || "Grow"}${strain ? ` · ${strain}` : ""}` : undefined}
+              isOpen={openConfigCard === "identificacao"}
+              onToggle={() => toggleConfigCard("identificacao")}
               T={T} dark={dark}>
               <div className="space-y-3">
                 <div>
@@ -5327,7 +5340,8 @@ function GrowinStones() {
             <CollapsibleCard
               title="Setups & Presets"
               subtitle={`${allPresets.length} setups salvos`}
-              defaultOpen={true}
+              isOpen={openConfigCard === "presets"}
+              onToggle={() => toggleConfigCard("presets")}
               T={T} dark={dark}>
               <div className="space-y-3">
                 <div className="flex flex-wrap gap-2 items-center">
@@ -5376,6 +5390,8 @@ function GrowinStones() {
             <CollapsibleCard
               title="1 · Estufa (cm)"
               subtitle={`${width} × ${depth} × ${height} cm (${areaM2.toFixed(2)} m²)`}
+              isOpen={openConfigCard === "estufa"}
+              onToggle={() => toggleConfigCard("estufa")}
               T={T} dark={dark}>
               <div className="space-y-3">
                 <div className="flex items-center justify-between"><span className="text-sm" style={{ color: T.muted }}>Largura</span>{num(width, setWidth, 60, 1000)}</div>
@@ -5388,6 +5404,8 @@ function GrowinStones() {
             <CollapsibleCard
               title="2 · Vasos & disposição"
               subtitle={`${pot.label} (${potW}×${potD}×${potH} cm)`}
+              isOpen={openConfigCard === "vasos"}
+              onToggle={() => toggleConfigCard("vasos")}
               T={T} dark={dark}>
 
               {/* Representação Isométrica 3D do Vaso Configurado */}
@@ -5413,109 +5431,81 @@ function GrowinStones() {
                 />
               </div>
 
-              {/* Grid de Presets + Card Customizado */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
-                {POT_SIZES.map((p, i) => {
-                  const pIsRect = p.shape === "rect";
-                  const pIsSq = !pIsRect && potShape === "square";
-                  const pW = pIsRect ? (potFlipped ? p.depthCm : p.widthCm) : p.diameter;
-                  const pD = pIsRect ? (potFlipped ? p.widthCm : p.depthCm) : p.diameter;
-                  const pSub = pIsRect ? `${pW}×${pD} cm` : (pIsSq ? `${p.diameter}×${p.diameter} cm` : `⌀ ${p.diameter} cm`);
-                  return (
-                    <button key={p.label} onClick={() => setPotIdx(i)}
-                      className="rounded-xl px-2 py-2 text-sm font-medium transition-all"
-                      style={i === potIdx
-                        ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
-                        : { background: "transparent", border: `1px solid ${T.border}`, color: T.muted }}>
-                      {p.label}
-                      <span className="block text-[10px] font-normal" style={{ color: T.faint }}>{pSub}</span>
-                    </button>
-                  );
-                })}
-                {/* Card de Vaso Customizado */}
-                <button onClick={() => setPotIdx(POT_SIZES.length)}
-                  className="rounded-xl px-2 py-2 text-sm font-semibold transition-all"
-                  style={potIdx === POT_SIZES.length
-                    ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
-                    : { background: "transparent", border: `1px solid ${T.border}`, color: T.muted }}>
-                  <div className="flex items-center justify-center gap-1">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                    </svg>
-                    <span>Custom</span>
-                  </div>
-                  <span className="block text-[10px] font-normal" style={{ color: T.faint }}>
-                    {customLiters} L ({customPotW}×{customPotL}×{customPotH})
-                  </span>
-                </button>
+              {/* Escolha do Vaso em Linha com Select */}
+              <div className="mb-3 p-2.5 rounded-xl space-y-1"
+                style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
+                <label className="text-[11px] font-bold block" style={{ color: T.text }}>
+                  Tipo de vaso
+                </label>
+                <select
+                  value={potIdx}
+                  onChange={(e) => {
+                    const idx = Number(e.target.value);
+                    setPotIdx(idx);
+                    if (POTS[idx].shape) setPotShape(POTS[idx].shape);
+                  }}
+                  className="w-full h-8 px-2.5 rounded-lg text-xs font-semibold focus:outline-none cursor-pointer transition-all truncate"
+                  style={{ background: T.surface, border: `1px solid ${T.accentBorder}`, color: T.text }}>
+                  {POTS.map((p, idx) => (
+                    <option key={p.label + idx} value={idx}>
+                      {p.label} · {p.desc}
+                    </option>
+                  ))}
+                </select>
               </div>
 
-              {/* Campos de Dimensão Customizada do Vaso */}
+              {/* Controles customizados se for vaso sob medida */}
               {isCustomPot && (
-                <div className="mb-4 p-3 rounded-xl space-y-2.5 transition-all"
-                  style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
+                <div className="space-y-3 mb-3 p-3 rounded-xl"
+                  style={{ background: T.surface2, border: `1px dashed ${T.accentBorder}` }}>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold" style={{ color: T.text }}>Dimensões do vaso customizado</span>
-                    <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full"
-                      style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-                      {customLiters} Litros
-                    </span>
+                    <span className="text-xs font-bold" style={{ color: T.text }}>Formato</span>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setPotShape("circle")}
+                        className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-all"
+                        style={potShape === "circle"
+                          ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
+                          : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
+                        Redondo
+                      </button>
+                      <button onClick={() => setPotShape("square")}
+                        className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-all"
+                        style={potShape === "square"
+                          ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
+                          : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
+                        Quadrado/Ret.
+                      </button>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <label className="text-[10px] font-medium block mb-1" style={{ color: T.muted }}>Largura (cm)</label>
-                      {num(customPotW, setCustomPotW, 5, 200, 1)}
+
+                  {potShape === "circle" ? (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium" style={{ color: T.muted }}>Diâmetro (cm)</span>
+                      {num(customPotW, setCustomPotW, 10, 150, 1)}
                     </div>
-                    <div>
-                      <label className="text-[10px] font-medium block mb-1" style={{ color: T.muted }}>Comprimento (cm)</label>
-                      {num(customPotL, setCustomPotL, 5, 200, 1)}
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-medium block mb-1" style={{ color: T.muted }}>Altura (cm)</label>
-                      {num(customPotH, setCustomPotH, 5, 200, 1)}
-                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium" style={{ color: T.muted }}>Largura (cm)</span>
+                        {num(customPotW, setCustomPotW, 10, 150, 1)}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium" style={{ color: T.muted }}>Comprimento (cm)</span>
+                        {num(customPotL, setCustomPotL, 10, 150, 1)}
+                      </div>
+                    </>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium" style={{ color: T.muted }}>Altura (cm)</span>
+                    {num(customPotH, setCustomPotH, 10, 150, 1)}
                   </div>
                 </div>
               )}
 
-              {!isRect && (
-                <div className="mb-4 flex items-center justify-between p-3 rounded-xl transition-all"
-                  style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
-                  <div>
-                    <span className="text-xs font-bold block" style={{ color: T.text }}>
-                      Formato dos vasos
-                    </span>
-                    <span className="text-[11px] block mt-0.5" style={{ color: T.muted }}>
-                      {potShape === "square" ? `Quadrados ${pot.diameter}×${pot.diameter} cm` : `Redondos ⌀ ${pot.diameter} cm`}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => setPotShape("circle")}
-                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
-                      style={potShape === "circle"
-                        ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
-                        : { background: "transparent", border: `1px solid ${T.border}`, color: T.muted }}>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="9" />
-                      </svg>
-                      Redondo
-                    </button>
-                    <button onClick={() => setPotShape("square")}
-                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5"
-                      style={potShape === "square"
-                        ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
-                        : { background: "transparent", border: `1px solid ${T.border}`, color: T.muted }}>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                      </svg>
-                      Quadrado
-                    </button>
-                  </div>
-                </div>
-              )}
-
+              {/* Botão de girar vaso retangular se aplicável */}
               {isRect && (
-                <div className="mb-4 flex items-center justify-between p-3 rounded-xl transition-all"
+                <div className="mt-3 p-2.5 rounded-xl flex items-center justify-between transition-all"
                   style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
                   <div>
                     <span className="text-xs font-bold block" style={{ color: T.text }}>
@@ -5537,6 +5527,8 @@ function GrowinStones() {
             <CollapsibleCard
               title="3 · Iluminação & fotoperíodo"
               subtitle={`${ledWatts}W LED · ${vegaHours}h/${floraHours}h · ${fmtG(yieldHarvest)}/safra`}
+              isOpen={openConfigCard === "iluminacao"}
+              onToggle={() => toggleConfigCard("iluminacao")}
               T={T} dark={dark}>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -5590,6 +5582,8 @@ function GrowinStones() {
             <CollapsibleCard
               title="4 · Equipamentos & custos"
               subtitle={`${EQUIPMENT.filter((e) => equip[e.id] > 0).length} ativos · ${fmtBRL(capex)} CAPEX`}
+              isOpen={openConfigCard === "equipamentos"}
+              onToggle={() => toggleConfigCard("equipamentos")}
               T={T} dark={dark}>
               <div className="space-y-3">
                 {EQUIPMENT.map((e) => {
@@ -5645,6 +5639,8 @@ function GrowinStones() {
             <CollapsibleCard
               title="5 · Observações, instruções e termos"
               subtitle={notes || instructions || terms ? "Preenchido" : undefined}
+              isOpen={openConfigCard === "observacoes"}
+              onToggle={() => toggleConfigCard("observacoes")}
               T={T} dark={dark}>
               <div className="space-y-3">
                 <div>
