@@ -1477,7 +1477,11 @@ export default function GrowinStones() {
 
   // Google OAuth 2.0 & Identity Services
   const [googleClientId, setGoogleClientId] = useState(() => {
-    return localStorage.getItem("growcalc_google_client_id") || "447903804008-2115e4lrguv78nphj7tv58bvmaqv0560.apps.googleusercontent.com";
+    const saved = localStorage.getItem("growcalc_google_client_id");
+    if (saved && saved.includes("447903804008")) {
+      localStorage.removeItem("growcalc_google_client_id");
+    }
+    return localStorage.getItem("growcalc_google_client_id") || "333530452535-ccad7tjf7fm0u9fboabk2uimk43arve6.apps.googleusercontent.com";
   });
   const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
   const [googleClientIdModalOpen, setGoogleClientIdModalOpen] = useState(false);
