@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import ESP32WebFlasherModal from "./components/ESP32WebFlasherModal";
 
 // ————————————————————————— ESP32 TELEMETRY & CONTROLE —————————————————————————
 function MQTTMonitorView({ currentUser, T, dark, showToast }) {
@@ -7,6 +8,7 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
   const [devices, setDevices] = useState([]);
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [codeModalOpen, setCodeModalOpen] = useState(false);
+  const [flasherModalOpen, setFlasherModalOpen] = useState(false);
   const [togglingKeys, setTogglingKeys] = useState({});
   const [loading, setLoading] = useState(true);
 
@@ -122,14 +124,23 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={() => setCodeModalOpen(true)}
             className="px-4 py-2 rounded-xl text-xs font-bold transition-all shadow flex items-center gap-1.5"
             style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            <span>Configuração do ESP32</span>
+            <span>Instruções NVS</span>
+          </button>
+
+          <button
+            onClick={() => setFlasherModalOpen(true)}
+            className="px-4 py-2 rounded-xl text-xs font-bold transition-all shadow flex items-center gap-2"
+            style={{ background: T.text, color: T.bg }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="15" x2="23" y2="15"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="15" x2="4" y2="15"/></svg>
+            <span>Gravar ESP32 via USB</span>
           </button>
         </div>
       </div>
@@ -351,6 +362,16 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
           </div>
         </div>
       )}
+
+      {/* Modal Gravador USB Web (In-Browser Flasher) */}
+      <ESP32WebFlasherModal
+        isOpen={flasherModalOpen}
+        onClose={() => setFlasherModalOpen(false)}
+        currentUser={currentUser}
+        T={T}
+        dark={dark}
+        showToast={showToast}
+      />
     </div>
   );
 }
