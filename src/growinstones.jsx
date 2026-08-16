@@ -3599,6 +3599,8 @@ function GrowinStones() {
     </div>
   </div>
 
+  ${webComparisonHtml}
+
   <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:24px;">
     <div class="sec-card">
       <h2 class="sec-title">Estrutura & Dimensões</h2>
@@ -3666,8 +3668,6 @@ function GrowinStones() {
       </tbody>
     </table>
   </div>
-
-  ${webComparisonHtml}
 
   ${shoppingListHtml}
 
