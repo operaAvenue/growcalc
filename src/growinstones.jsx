@@ -530,6 +530,59 @@ function IsometricPotSVG({ potW, potD, potH, potLiters, isRect, isSquare, dark, 
   );
 }
 
+function CollapsibleCard({ title, subtitle, defaultOpen = true, children, action, className = "", T, dark }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className={`rounded-2xl transition-all duration-200 ${open ? "p-5" : "px-5 py-3.5"} ${className}`}
+      style={{
+        background: T.surface,
+        border: `1px solid ${T.borderSoft}`,
+        boxShadow: dark ? "none" : "0 1px 2px rgba(31,27,22,0.04)"
+      }}>
+      <div
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center justify-between cursor-pointer select-none group">
+        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+          <h2 className="text-[11px] font-semibold uppercase tracking-wider transition-colors group-hover:text-amber-500"
+            style={{ color: T.faint, letterSpacing: "0.14em" }}>
+            {title}
+          </h2>
+          {!open && subtitle && (
+            <span className="text-xs font-medium truncate px-2.5 py-0.5 rounded-md"
+              style={{ background: T.surface2, color: T.text, border: `1px solid ${T.border}` }}>
+              {subtitle}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+          {action}
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            title={open ? "Recolher card" : "Expandir card"}
+            aria-label={open ? "Recolher card" : "Expandir card"}
+            className="w-6 h-6 rounded-md flex items-center justify-center transition-transform hover:opacity-80"
+            style={{ background: T.surface2, color: T.muted, border: `1px solid ${T.border}` }}>
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.2s" }}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {open && <div className="mt-4">{children}</div>}
+    </section>
+  );
+}
 
 function GrowinStones() {
   const [dark, setDark] = useState(false);
