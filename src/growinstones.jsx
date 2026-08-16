@@ -322,6 +322,215 @@ function MQTTMonitorView({ currentUser, T, dark, showToast }) {
 
 
 
+import Logo, { getLogoSvgString } from "./Logo";
+
+// ————— Dados de referência —————
+const POT_SIZES = [
+  { label: "3,5 L", liters: 3.5, diameter: 18, shape: "circle" },
+  { label: "7 L", liters: 7, diameter: 22, shape: "circle" },
+  { label: "11 L", liters: 11, diameter: 26, shape: "circle" },
+  { label: "15 L", liters: 15, diameter: 30, shape: "circle" },
+  { label: "20 L", liters: 20, diameter: 33, shape: "circle" },
+  { label: "30 L", liters: 30, diameter: 38, shape: "circle" },
+  { label: "40 L (60×40)", liters: 40, widthCm: 60, depthCm: 40, shape: "rect" },
+  { label: "50 L", liters: 50, diameter: 45, shape: "circle" },
+  { label: "80 L", liters: 80, diameter: 52, shape: "circle" },
+];
+
+const PIPE_GAUGES = [
+  { label: "10 mm", mm: 10, flow: "microduto · capilar / gotejamento ind." },
+  { label: "16 mm", mm: 16, flow: "baixo fluxo · gotejamento" },
+  { label: "20 mm", mm: 20, flow: "fluxo médio · até 8 vasos" },
+  { label: "25 mm", mm: 25, flow: "fluxo alto · até 16 vasos" },
+  { label: "32 mm", mm: 32, flow: "linha principal · 16+ vasos" },
+  { label: "50 mm", mm: 50, flow: "alta vazão / drenagem · 32+ vasos" },
+  { label: "75 mm", mm: 75, flow: "coletor / drenagem máster" },
+];
+
+const CONNECTIONS = [
+  { id: "espinha", name: "Espinha de peixe (linha central + ramais)", short: "Espinha", desc: "Linha principal central distribuindo para ramais laterais em cada vaso. Ótimo equilíbrio e distribuição de vazão." },
+  { id: "serpentina", name: "Serpentina (série)", short: "Série", desc: "Uma linha única passa vaso a vaso em zigue-zague. Econômica em tubulação, ideal para poucos vasos." },
+  { id: "paralelo", name: "Paralelo (manifold de alimentação)", short: "Paralelo", desc: "Manifold coletor distribuidor na frente alimentando linhas independentes por coluna com 1 saída de retorno ao tanque." },
+  { id: "anel", name: "Anel recirculante (RDWC)", short: "Anel", desc: "Circuito fechado ligando todos os vasos em loop com 1 retorno contínuo ao reservatório — padrão em DWC recirculante." },
+  { id: "gotejo_coletor", name: "Gotejo + Calha Central (drenagem)", short: "Calha", desc: "Irrigação por capilares e calha central de recolhimento que conduz a drenagem em 1 saída de volta ao reservatório." },
+  { id: "malha_grid", name: "Malha em Grid (pressurizada)", short: "Grid", desc: "Anel perimetral fechado equalizando a pressão de irrigação em todos os vasos sem perda de carga." },
+];
+
+const EQUIPMENT = [
+  { id: "led", name: "Board de LED", defW: 240, hours: 18, max: 8, defCost: 600 },
+  { id: "exaustor", name: "Exaustor", defW: 45, hours: 24, max: 4, defCost: 250 },
+  { id: "filtro", name: "Filtro de carvão", defW: 0, hours: 0, max: 4, defCost: 180 },
+  { id: "ventilador", name: "Ventilador de circulação", defW: 25, hours: 24, max: 6, defCost: 90 },
+  { id: "bombaAgua", name: "Bomba de água", defW: 35, hours: 24, max: 4, defCost: 120 },
+  { id: "bombaAr", name: "Bomba de ar", defW: 8, hours: 24, max: 4, defCost: 60 },
+  { id: "tanque", name: "Tanque / reservatório extra", defW: 0, hours: 0, max: 3, defCost: 100 },
+  { id: "umidificador", name: "Umidificador", defW: 30, hours: 12, max: 2, defCost: 250 },
+  { id: "desumidificador", name: "Desumidificador", defW: 200, hours: 8, max: 2, defCost: 900 },
+  { id: "aquecedor", name: "Aquecedor", defW: 500, hours: 6, max: 2, defCost: 150 },
+  { id: "phec", name: "Medidor pH / EC", defW: 2, hours: 24, max: 2, defCost: 200 },
+  { id: "timer", name: "Timer digital", defW: 1, hours: 24, max: 8, defCost: 30 },
+];
+
+const BASE_COSTS = { pot: 15, pipeM: 4, fitting: 3, reservoir: 120 };
+
+const INITIAL_PRESETS = [
+  {
+    id: "preset-micro",
+    name: "Micro · 2 vasos DWC",
+    apply: { width: 80, depth: 80, height: 180, potCount: 2, potIdx: 4, gaugeIdx: 2, spacing: 20, cols: 0, conn: "anel" },
+    equip: { led: 1, exaustor: 1, filtro: 1, ventilador: 1, bombaAgua: 0, bombaAr: 1, tanque: 1, umidificador: 0, desumidificador: 0, aquecedor: 0, phec: 1, timer: 1 },
+    data: {
+      growName: "Micro · 2 vasos DWC",
+      width: 80, depth: 80, height: 180, potCount: 2, potIdx: 4, gaugeIdx: 2, spacing: 20, cols: 0, conn: "anel",
+      equip: { led: 1, exaustor: 1, filtro: 1, ventilador: 1, bombaAgua: 0, bombaAr: 1, tanque: 1, umidificador: 0, desumidificador: 0, aquecedor: 0, phec: 1, timer: 1 },
+      vegaHours: 18, floraHours: 12, vegaDays: 30, floraDays: 60, yieldPerPlant: 80, priceG: 50, tariff: 0.95,
+    }
+  },
+  {
+    id: "preset-padrao",
+    name: "Padrão · 8 vasos gotejo",
+    apply: { width: 240, depth: 120, height: 200, potCount: 8, potIdx: 2, gaugeIdx: 2, spacing: 15, cols: 4, conn: "espinha" },
+    equip: { led: 2, exaustor: 1, filtro: 1, ventilador: 2, bombaAgua: 1, bombaAr: 1, tanque: 1, umidificador: 0, desumidificador: 0, aquecedor: 0, phec: 1, timer: 2 },
+    data: {
+      growName: "Padrão · 8 vasos gotejo",
+      width: 240, depth: 120, height: 200, potCount: 8, potIdx: 2, gaugeIdx: 2, spacing: 15, cols: 4, conn: "espinha",
+      equip: { led: 2, exaustor: 1, filtro: 1, ventilador: 2, bombaAgua: 1, bombaAr: 1, tanque: 1, umidificador: 0, desumidificador: 0, aquecedor: 0, phec: 1, timer: 2 },
+      vegaHours: 18, floraHours: 12, vegaDays: 30, floraDays: 60, yieldPerPlant: 80, priceG: 50, tariff: 0.95,
+    }
+  },
+  {
+    id: "preset-ampla",
+    name: "Ampla · 16 vasos",
+    apply: { width: 300, depth: 150, height: 220, potCount: 16, potIdx: 1, gaugeIdx: 3, spacing: 12, cols: 0, conn: "paralelo" },
+    equip: { led: 4, exaustor: 2, filtro: 2, ventilador: 3, bombaAgua: 2, bombaAr: 2, tanque: 2, umidificador: 1, desumidificador: 0, aquecedor: 0, phec: 1, timer: 4 },
+    data: {
+      growName: "Ampla · 16 vasos",
+      width: 300, depth: 150, height: 220, potCount: 16, potIdx: 1, gaugeIdx: 3, spacing: 12, cols: 0, conn: "paralelo",
+      equip: { led: 4, exaustor: 2, filtro: 2, ventilador: 3, bombaAgua: 2, bombaAr: 2, tanque: 2, umidificador: 1, desumidificador: 0, aquecedor: 0, phec: 1, timer: 4 },
+      vegaHours: 18, floraHours: 12, vegaDays: 30, floraDays: 60, yieldPerPlant: 80, priceG: 50, tariff: 0.95,
+    }
+  },
+];
+const PRESETS = INITIAL_PRESETS;
+
+const fmtBRL = (v) => {
+  if (!isFinite(v)) return "R$ 0";
+  const abs = Math.abs(v);
+  if (abs > 0 && abs < 1) {
+    return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  return Math.round(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 0, maximumFractionDigits: 0 });
+};
+const fmtG = (v) => {
+  if (!isFinite(v)) return "0 g";
+  if (v >= 1000) {
+    const kg = v / 1000;
+    return `${kg.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} kg`;
+  }
+  return `${Math.round(v)} g`;
+};
+
+function NumInput({ value, onCommit, min = 0, max = 999999, className, style }) {
+  const [draft, setDraft] = useState(null);
+  const clamp = (n) => Math.min(max, Math.max(min, n));
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      value={draft !== null ? draft : value}
+      min={min}
+      max={max}
+      className={className}
+      style={style}
+      onFocus={(e) => setDraft(String(value))}
+      onChange={(e) => {
+        const v = e.target.value;
+        setDraft(v);
+        const n = Number(v);
+        if (v !== "" && isFinite(n)) onCommit(clamp(n));
+      }}
+      onBlur={() => {
+        const n = Number(draft);
+        if (draft !== null && draft !== "" && isFinite(n)) onCommit(clamp(n));
+        setDraft(null);
+      }}
+    />
+  );
+}
+
+function MoneyInput({ value, onCommit, className, style }) {
+  const [draft, setDraft] = useState(null);
+  return (
+    <input
+      type="number"
+      inputMode="decimal"
+      step="0.01"
+      min={0}
+      value={draft !== null ? draft : value}
+      className={className}
+      style={style}
+      onFocus={() => setDraft(String(value))}
+      onChange={(e) => {
+        const v = e.target.value;
+        setDraft(v);
+        const n = Number(v);
+        if (v !== "" && isFinite(n) && n >= 0) onCommit(n);
+      }}
+      onBlur={() => {
+        const n = Number(draft);
+        if (draft !== null && draft !== "" && isFinite(n) && n >= 0) onCommit(n);
+        setDraft(null);
+      }}
+    />
+  );
+}
+
+function IsometricPotSVG({ potW, potD, potH, potLiters, isRect, isSquare, dark, T }) {
+  const svgW = 320;
+  const svgH = 180;
+  const isBox = isRect || isSquare;
+  const scaleX = 200 / ((potW + potD) * 0.866);
+  const drawW = potW * scaleX;
+  const drawD = potD * scaleX;
+  const drawH = Math.min(80, potH * 1.5);
+  const cx = svgW / 2;
+  const cy = svgH / 2 + drawH / 3;
+
+  if (isBox) {
+    const topP1 = { x: cx, y: cy - drawH - (drawW + drawD) * 0.25 };
+    const topP2 = { x: cx + drawW * 0.866, y: cy - drawH - (drawW - drawD) * 0.5 * 0.5 };
+    const topP3 = { x: cx + (drawW - drawD) * 0.866, y: cy - drawH + (drawW + drawD) * 0.25 };
+    const topP4 = { x: cx - drawD * 0.866, y: cy - drawH + (drawW - drawD) * 0.5 * 0.5 };
+
+    const botP2 = { x: topP2.x, y: topP2.y + drawH };
+    const botP3 = { x: topP3.x, y: topP3.y + drawH };
+    const botP4 = { x: topP4.x, y: topP4.y + drawH };
+
+    return (
+      <svg width="100%" height="180" viewBox={`0 0 ${svgW} ${svgH}`} fill="none">
+        <path d={`M ${topP1.x} ${topP1.y} L ${topP2.x} ${topP2.y} L ${topP3.x} ${topP3.y} L ${topP4.x} ${topP4.y} Z`} fill={dark ? "#334155" : "#cbd5e1"} stroke={dark ? "#64748b" : "#94a3b8"} strokeWidth="1.5" />
+        <path d={`M ${topP4.x} ${topP4.y} L ${topP3.x} ${topP3.y} L ${botP3.x} ${botP3.y} L ${botP4.x} ${botP4.y} Z`} fill={dark ? "#1e293b" : "#94a3b8"} stroke={dark ? "#475569" : "#64748b"} strokeWidth="1.5" />
+        <path d={`M ${topP3.x} ${topP3.y} L ${topP2.x} ${topP2.y} L ${botP2.x} ${botP2.y} L ${botP3.x} ${botP3.y} Z`} fill={dark ? "#0f172a" : "#64748b"} stroke={dark ? "#334155" : "#475569"} strokeWidth="1.5" />
+        <text x={cx} y={cy - drawH / 2} fill={dark ? "#f8fafc" : "#0f172a"} fontSize="12" fontWeight="bold" textAnchor="middle">{potLiters} L</text>
+      </svg>
+    );
+  }
+
+  const rx = drawW * 0.8;
+  const ry = drawD * 0.4;
+  const topY = cy - drawH;
+
+  return (
+    <svg width="100%" height="180" viewBox={`0 0 ${svgW} ${svgH}`} fill="none">
+      <ellipse cx={cx} cy={cy} rx={rx * 0.85} ry={ry * 0.85} fill={dark ? "#1e293b" : "#94a3b8"} />
+      <path d={`M ${cx - rx} ${topY} A ${rx} ${ry} 0 0 0 ${cx + rx} ${topY} L ${cx + rx * 0.85} ${cy} A ${rx * 0.85} ${ry * 0.85} 0 0 1 ${cx - rx * 0.85} ${cy} Z`} fill={dark ? "#0f172a" : "#64748b"} stroke={dark ? "#334155" : "#475569"} strokeWidth="1.5" />
+      <ellipse cx={cx} cy={topY} rx={rx} ry={ry} fill={dark ? "#334155" : "#cbd5e1"} stroke={dark ? "#64748b" : "#94a3b8"} strokeWidth="1.5" />
+      <text x={cx} y={topY + 5} fill={dark ? "#f8fafc" : "#0f172a"} fontSize="12" fontWeight="bold" textAnchor="middle">{potLiters} L</text>
+    </svg>
+  );
+}
+
+
 function GrowinStones() {
   const [dark, setDark] = useState(false);
   const [showReport, setShowReport] = useState(false);
