@@ -2661,15 +2661,38 @@ export default function GrowinStones() {
     setPublishResult(null);
 
     const cleanSlug = subdomainInput.toLowerCase().trim().replace(/[^a-z0-9-]/g, "");
-    const html = generateReportHtmlString();
-    const setupData = getSetupData();
+
+    let html = "";
+    let setupData = null;
 
     try {
-      const res = await fetch("/api/publish", {
+      html = generateReportHtmlString();
+      setupData = getSetupData();
+    } catch (e) {
+      console.error("Erro ao gerar relatório HTML:", e);
+    }
+
+    const apiUrl = window.location.origin.includes("localhost") 
+      ? "/api/publish" 
+      : "https://grow.thegrowinstones.com/api/publish";
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const res = await fetch(apiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug: cleanSlug, html, setupData }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        throw new Error(`Servidor retornou código HTTP ${res.status}`);
+      }
+
       const data = await res.json();
       if (data.success) {
         setPublishResult({ success: true, url: data.url, slug: data.slug });
@@ -2678,7 +2701,10 @@ export default function GrowinStones() {
       }
     } catch (err) {
       console.error("Erro na publicação:", err);
-      setPublishResult({ success: false, error: "Falha na conexão com o servidor de publicação." });
+      const errMsg = err.name === "AbortError"
+        ? "Tempo limite esgotado (15s) ao conectar com o servidor."
+        : (err.message || "Falha na conexão com o servidor de publicação.");
+      setPublishResult({ success: false, error: errMsg });
     } finally {
       setIsPublishing(false);
     }
