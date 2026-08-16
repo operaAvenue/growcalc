@@ -74,19 +74,38 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
     ];
   });
 
-  // Save posts locally and in cloud
+  // 1. Fetch posts and profile directly from cloud on mount or user switch
+  useEffect(() => {
+    if (!currentUser || (!currentUser.email && !currentUser.username)) return;
+    const email = currentUser.email || "";
+    const username = currentUser.username || "";
+    const syncUrl = `https://grow.thegrowinstones.com/api/user/sync?email=${encodeURIComponent(email)}&username=${encodeURIComponent(username)}&t=${Date.now()}`;
+
+    fetch(syncUrl)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data && data.exists) {
+          if (Array.isArray(data.posts) && data.posts.length > 0) {
+            setPosts(data.posts);
+            try {
+              localStorage.setItem(storageKey, JSON.stringify(data.posts));
+            } catch (e) {}
+          }
+          if (data.user) {
+            if (data.user.avatarUrl && !avatarPreview) setAvatarPreview(data.user.avatarUrl);
+            if (data.user.bannerUrl && !bannerPreview) setBannerPreview(data.user.bannerUrl);
+          }
+        }
+      })
+      .catch((err) => console.warn("Erro ao carregar posts da nuvem:", err));
+  }, [currentUser?.email, currentUser?.username, storageKey]);
+
+  // 2. Save posts locally
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(posts));
-      if (currentUser && (currentUser.email || currentUser.username)) {
-        fetch("https://grow.thegrowinstones.com/api/user/sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user: currentUser, posts })
-        }).catch(() => {});
-      }
     } catch (e) {}
-  }, [posts, storageKey, currentUser]);
+  }, [posts, storageKey]);
 
   // Função para comprimir e fazer upload permanente de mídia
   const uploadMediaFile = async (file, type = "media", maxW = 1600, maxH = 1600, quality = 0.82) => {
@@ -275,38 +294,54 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
   };
 
   // Create Post
-  const handleCreatePost = () => {
+  const handleCreatePost = async () => {
     if (!postText.trim() && attachedImages.length === 0 && attachedVideos.length === 0) {
       showToast("Escreva algo ou anexe uma mídia para publicar.");
       return;
     }
 
     setIsPosting(true);
-    setTimeout(() => {
-      const newPost = {
-        id: `post_${Date.now()}`,
-        author: {
-          name: currentUser?.name || "Cultivador",
-          username: currentUser?.username || "grower",
-          avatarUrl: currentUser?.avatarUrl || avatarPreview || ""
-        },
-        createdAt: new Date().toISOString(),
-        text: postText.trim(),
-        stage: postStage,
-        images: [...attachedImages],
-        videos: [...attachedVideos],
-        likes: 0,
-        liked: false,
-        comments: []
-      };
+    const newPost = {
+      id: `post_${Date.now()}`,
+      author: {
+        name: currentUser?.name || "Cultivador",
+        username: currentUser?.username || "grower",
+        avatarUrl: currentUser?.avatarUrl || avatarPreview || ""
+      },
+      createdAt: new Date().toISOString(),
+      text: postText.trim(),
+      stage: postStage,
+      images: [...attachedImages],
+      videos: [...attachedVideos],
+      likes: 0,
+      liked: false,
+      comments: []
+    };
 
-      setPosts([newPost, ...posts]);
-      setPostText("");
-      setAttachedImages([]);
-      setAttachedVideos([]);
-      setIsPosting(false);
-      showToast("Publicação compartilhada no seu diário!");
-    }, 400);
+    const updatedPosts = [newPost, ...posts];
+    setPosts(updatedPosts);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(updatedPosts));
+    } catch (e) {}
+
+    setPostText("");
+    setAttachedImages([]);
+    setAttachedVideos([]);
+    setIsPosting(false);
+    showToast("Publicação compartilhada e sincronizada na nuvem!");
+
+    // Sincronização direta e instantânea com a nuvem
+    if (currentUser && (currentUser.email || currentUser.username)) {
+      try {
+        await fetch("https://grow.thegrowinstones.com/api/user/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user: currentUser, posts: updatedPosts })
+        });
+      } catch (err) {
+        console.warn("Erro ao sincronizar post na nuvem:", err);
+      }
+    }
   };
 
   // Toggle Like
