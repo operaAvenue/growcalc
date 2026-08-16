@@ -3995,19 +3995,64 @@ function GrowinStones() {
 <div class="container">
   <!-- TOP SUBDOMAIN TABS -->
   <div class="tab-nav">
-    <button id="btn-tab-grow" class="tab-btn active" onclick="switchSubTab('grow')">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-9"/><path d="M12 13a6 6 0 0 1 6-6c0 6-6 6-6 6z"/><path d="M12 13a6 6 0 0 0-6-6c0 6 6 6 6 6z"/></svg>
-      <span>PROJETO DO GROW</span>
-    </button>
-    <button id="btn-tab-posts" class="tab-btn" onclick="switchSubTab('posts')">
+    <button id="btn-tab-posts" class="tab-btn active" onclick="switchSubTab('posts')">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
       <span>POSTS & DIÁRIO</span>
       <span class="tab-badge">${userPosts.length}</span>
     </button>
+    <button id="btn-tab-grow" class="tab-btn" onclick="switchSubTab('grow')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-9"/><path d="M12 13a6 6 0 0 1 6-6c0 6-6 6-6 6z"/><path d="M12 13a6 6 0 0 0-6-6c0 6 6 6 6 6z"/></svg>
+      <span>PROJETO DO GROW</span>
+    </button>
   </div>
 
-  <!-- ————————————————— ABA 1: GROW & COMPARATIVOS ————————————————— -->
-  <div id="tab-content-grow">
+  <!-- ————————————————— ABA 1: POSTS & PERFIL DO CULTIVADOR (PADRÃO) ————————————————— -->
+  <div id="tab-content-posts" style="display:block;">
+    <!-- PERFIL DO CULTIVADOR (TWITTER STYLE) -->
+    <div class="sec-card" style="padding:0; overflow:hidden; margin-bottom:24px;">
+      <div style="height:160px; width:100%; ${bannerBg}"></div>
+      <div style="padding:0 24px 24px; position:relative;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-top:-50px; margin-bottom:16px;">
+          <div style="width:100px; height:100px; border-radius:50%; overflow:hidden; border:4px solid ${isDark ? '#1c1917' : '#ffffff'}; background:${isDark ? '#292524' : '#e2dccc'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:32px; color:${isDark ? '#f59e0b' : '#b45309'}; box-shadow:0 10px 25px rgba(0,0,0,0.15); shrink:0;">
+            ${userAvatarUrl ? `<img src="${userAvatarUrl}" style="width:100%; height:100%; object-fit:cover;" />` : userDisplayName.charAt(0).toUpperCase()}
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span class="badge-live" style="background:${isDark ? 'rgba(16,185,129,0.15)' : 'rgba(5,150,105,0.1)'}; color:${isDark ? '#34d399' : '#047857'}; border:1px solid ${isDark ? '#10b981' : '#059669'};">Cultivador Pro</span>
+            <button onclick="switchSubTab('grow')" style="background:${isDark ? '#292524' : '#f5f1e7'}; border:1px solid ${isDark ? '#f59e0b' : '#b45309'}; color:${isDark ? '#f59e0b' : '#b45309'}; border-radius:20px; padding:5px 13px; font:700 11.5px Inter; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s ease; box-shadow:0 2px 6px rgba(0,0,0,0.06);" title="Acessar Projeto do Grow e Planta Baixa">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-9"/><path d="M12 13a6 6 0 0 1 6-6c0 6-6 6-6 6z"/><path d="M12 13a6 6 0 0 0-6-6c0 6 6 6 6 6z"/></svg>
+              <span>Projeto do Grow</span>
+            </button>
+          </div>
+        </div>
+
+        <h2 style="font-size:22px; font-weight:800; margin:0 0 2px; color:${isDark ? '#ffffff' : '#1f1b16'};">${esc(userDisplayName)}</h2>
+        <div style="font-size:12px; font-family:monospace; font-weight:600; color:${isDark ? '#f59e0b' : '#b45309'}; margin-bottom:12px;">@${esc(userHandle)}</div>
+        <p style="font-size:13.5px; line-height:1.6; margin:0 0 16px; color:${isDark ? '#f5f5f4' : '#1f1b16'}; max-width:700px;">${esc(userBio)}</p>
+
+        <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:12px; color:${isDark ? '#a8a29e' : '#6b6354'}; padding-top:12px; border-top:1px solid ${isDark ? '#292524' : '#e2dccc'};">
+          <div>Localização: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(userLocation)}</b></div>
+          <div>Foco: <b style="color:${isDark ? '#f59e0b' : '#b45309'};">${esc(userStrainFocus)}</b></div>
+          <div>Publicações: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${userPosts.length}</b></div>
+          <div>Automação: <b style="color:#10b981;">Online 24/7</b></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LISTA DE POSTAGENS -->
+    <div style="margin-bottom:20px;">
+      <h2 class="sec-title">Linha do Tempo & Diário de Cultivo</h2>
+      ${postsFeedHtml}
+    </div>
+  </div>
+
+  <!-- ————————————————— ABA 2: GROW & COMPARATIVOS ————————————————— -->
+  <div id="tab-content-grow" style="display:none;">
+    <div style="margin-bottom:14px;">
+      <button onclick="switchSubTab('posts')" style="background:${isDark ? '#1c1917' : '#ffffff'}; border:1px solid ${isDark ? '#292524' : '#e2dccc'}; color:${isDark ? '#a8a29e' : '#6b6354'}; border-radius:12px; padding:7px 14px; font:700 12px Inter; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s ease;">
+        <span>← Voltar aos Posts Diários</span>
+      </button>
+    </div>
+
     <div class="hero-card">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
         <div>
@@ -4127,41 +4172,6 @@ function GrowinStones() {
     </div>` : ""}
   </div>
 
-  <!-- ————————————————— ABA 2: POSTS & PERFIL DO CULTIVADOR ————————————————— -->
-  <div id="tab-content-posts" style="display:none;">
-    <!-- PERFIL DO CULTIVADOR (TWITTER STYLE) -->
-    <div class="sec-card" style="padding:0; overflow:hidden; margin-bottom:24px;">
-      <div style="height:160px; width:100%; ${bannerBg}"></div>
-      <div style="padding:0 24px 24px; position:relative;">
-        <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-top:-50px; margin-bottom:16px;">
-          <div style="width:100px; height:100px; border-radius:50%; overflow:hidden; border:4px solid ${isDark ? '#1c1917' : '#ffffff'}; background:${isDark ? '#292524' : '#e2dccc'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:32px; color:${isDark ? '#f59e0b' : '#b45309'}; box-shadow:0 10px 25px rgba(0,0,0,0.15); shrink:0;">
-            ${userAvatarUrl ? `<img src="${userAvatarUrl}" style="width:100%; height:100%; object-fit:cover;" />` : userDisplayName.charAt(0).toUpperCase()}
-          </div>
-          <div style="display:flex; gap:8px;">
-            <a href="https://${displaySlug}.thegrowinstones.com" class="badge-live">Grower Verificado</a>
-          </div>
-        </div>
-
-        <h2 style="font-size:22px; font-weight:800; margin:0 0 2px; color:${isDark ? '#ffffff' : '#1f1b16'};">${esc(userDisplayName)}</h2>
-        <div style="font-size:12px; font-family:monospace; font-weight:600; color:${isDark ? '#f59e0b' : '#b45309'}; margin-bottom:12px;">@${esc(userHandle)}</div>
-        <p style="font-size:13.5px; line-height:1.6; margin:0 0 16px; color:${isDark ? '#f5f5f4' : '#1f1b16'}; max-width:700px;">${esc(userBio)}</p>
-
-        <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:12px; color:${isDark ? '#a8a29e' : '#6b6354'}; padding-top:12px; border-top:1px solid ${isDark ? '#292524' : '#e2dccc'};">
-          <div>Localização: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(userLocation)}</b></div>
-          <div>Foco: <b style="color:${isDark ? '#f59e0b' : '#b45309'};">${esc(userStrainFocus)}</b></div>
-          <div>Publicações: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${userPosts.length}</b></div>
-          <div>Automação: <b style="color:#10b981;">Online 24/7</b></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- LISTA DE POSTAGENS -->
-    <div style="margin-bottom:20px;">
-      <h2 class="sec-title">Linha do Tempo & Atualizações</h2>
-      ${postsFeedHtml}
-    </div>
-  </div>
-
   <div class="footer">
     Relatório e Dashboard Interativo gerado pelo <b>GrowinStones</b> em ${today}.<br/>
     Hospedado exclusivamente em <b>https://${displaySlug}.thegrowinstones.com</b>
@@ -4175,17 +4185,18 @@ function GrowinStones() {
     var btnGrow = document.getElementById('btn-tab-grow');
     var btnPosts = document.getElementById('btn-tab-posts');
 
-    if (tabName === 'posts') {
-      tabGrow.style.display = 'none';
-      tabPosts.style.display = 'block';
-      btnGrow.classList.remove('active');
-      btnPosts.classList.add('active');
-    } else {
+    if (tabName === 'grow') {
       tabGrow.style.display = 'block';
       tabPosts.style.display = 'none';
-      btnPosts.classList.remove('active');
-      btnGrow.classList.add('active');
+      if (btnPosts) btnPosts.classList.remove('active');
+      if (btnGrow) btnGrow.classList.add('active');
+    } else {
+      tabGrow.style.display = 'none';
+      tabPosts.style.display = 'block';
+      if (btnGrow) btnGrow.classList.remove('active');
+      if (btnPosts) btnPosts.classList.add('active');
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 </script>
 </body>
