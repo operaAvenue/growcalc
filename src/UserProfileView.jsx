@@ -720,7 +720,7 @@ Novo setup configurado no GrowinStones e sincronizado com o controlador via **MQ
         className="rounded-none sm:rounded-3xl overflow-hidden border-0 sm:border border-b sm:border-b shadow-none sm:shadow-sm relative group mb-3 sm:mb-6 min-h-[calc(100dvh-58px)] sm:min-h-0 flex flex-col justify-between"
         style={{ background: T.surface, borderColor: T.border }}
       >
-        <div className="h-[30vh] min-h-[140px] max-h-[220px] sm:h-52 w-full relative overflow-hidden shrink-0" style={{ background: T.surface2 }}>
+        <div className="h-[28vh] min-h-[120px] max-h-[190px] sm:h-44 sm:max-h-48 w-full relative overflow-hidden shrink-0" style={{ background: T.surface2 }}>
           {(bannerPreview || currentUser?.bannerUrl) ? (
             <img
               src={bannerPreview || currentUser?.bannerUrl}
