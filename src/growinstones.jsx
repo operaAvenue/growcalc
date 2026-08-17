@@ -4003,18 +4003,20 @@ function GrowinStones() {
 <html lang="pt-BR" class="dark">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>${esc(userDisplayName)} (@${esc(userHandle)}) — GrowinStones</title>
 <link href="https://fonts.googleapis.com/css2?family=Berkshire+Swash&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; }
-  body { 
-    font-family: 'Inter', system-ui, -apple-system, sans-serif; 
-    background: #0c0a09; 
-    color: #f5f5f4; 
-    margin: 0; 
-    padding: 0; 
-    min-height: 100vh; 
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100vh;
+    min-height: 100dvh;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: #0c0a09;
+    color: #f5f5f4;
   }
   header { 
     background: #1c1917; 
@@ -4048,6 +4050,19 @@ function GrowinStones() {
     overflow: hidden;
     margin-bottom: 20px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+
+  .profile-banner {
+    height: 220px;
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+    background: #292524;
+  }
+
+  .profile-content {
+    padding: 0 24px 22px;
+    position: relative;
   }
 
   .tabs-bar {
@@ -4137,6 +4152,60 @@ function GrowinStones() {
   }
 
   .footer { text-align: center; font-size: 12px; color: #78716c; margin-top: 40px; }
+
+  /* MOBILE FULLHEIGHT RESPONSIVE DISPLAY & CANVAS */
+  @media (max-width: 768px) {
+    html, body {
+      width: 100vw;
+      overflow-x: hidden;
+    }
+    .container {
+      max-width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100vw !important;
+    }
+    .profile-card {
+      border-radius: 0 !important;
+      border-left: none !important;
+      border-right: none !important;
+      border-top: none !important;
+      margin-bottom: 0 !important;
+      min-height: calc(100dvh - 58px) !important;
+      min-height: calc(100vh - 58px) !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: space-between !important;
+      box-shadow: none !important;
+    }
+    .profile-banner {
+      height: 38vh !important;
+      min-height: 190px !important;
+      max-height: 340px !important;
+    }
+    .profile-content {
+      padding: 0 18px 24px !important;
+      flex: 1 !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: space-between !important;
+    }
+    .tabs-bar {
+      padding: 4px 12px !important;
+      margin-bottom: 0 !important;
+      position: sticky !important;
+      top: 57px !important;
+      background: #1c1917 !important;
+      z-index: 40 !important;
+    }
+    .tab-content {
+      padding: 16px 12px 60px !important;
+    }
+    .sec-card, .post-card, .hero-card {
+      border-radius: 16px !important;
+      padding: 16px !important;
+    }
+  }
 </style>
 </head>
 <body>
@@ -4152,15 +4221,15 @@ function GrowinStones() {
 </header>
 
 <div class="container">
-  <!-- CARD PRINCIPAL: PERFIL DO CULTIVADOR -->
+  <!-- CARD PRINCIPAL: PERFIL DO CULTIVADOR (FULLHEIGHT CANVAS NO MOBILE) -->
   <div class="profile-card">
     <!-- FOTO DE CAPA -->
-    <div style="height:220px; width:100%; position:relative; overflow:hidden; background:#292524;">
+    <div class="profile-banner">
       <img id="user-banner-img" src="${userBannerUrl || ''}" alt="Capa do Perfil" style="width:100%; height:100%; object-fit:cover; display:${userBannerUrl ? 'block' : 'none'};" onerror="this.style.display='none'; document.getElementById('user-banner-placeholder').style.display='block';" />
       <div id="user-banner-placeholder" style="display:${userBannerUrl ? 'none' : 'block'}; width:100%; height:100%; background:linear-gradient(135deg, #1c1917 0%, #292524 50%, #44403c 100%);"></div>
     </div>
 
-    <div style="padding:0 24px 22px; position:relative;">
+    <div class="profile-content">
       <!-- AVATAR & BADGES -->
       <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-top:-50px; margin-bottom:14px;">
         <div style="width:100px; height:100px; min-width:100px; min-height:100px; max-width:100px; max-height:100px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; border:4px solid #1c1917; background:#292524; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:32px; color:#f59e0b; box-shadow:0 10px 25px rgba(0,0,0,0.3); position:relative;">
@@ -4177,18 +4246,20 @@ function GrowinStones() {
             </span>
           ` : `
             <span style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:20px; font-size:11.5px; font-weight:700; background:rgba(255,255,255,0.06); color:#a8a29e; border:1px solid #44403c;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
               <span>Projeto Privado</span>
             </span>
           `}
         </div>
       </div>
 
-      <h1 id="user-name-title" style="font-size:22px; font-weight:800; margin:0 0 2px; color:#ffffff;">${esc(userDisplayName)}</h1>
-      <div id="user-handle-subtitle" style="font-size:12.5px; font-family:monospace; font-weight:600; color:#f59e0b; margin-bottom:12px;">@${esc(userHandle)}</div>
-      <p id="user-bio-text" style="font-size:13.5px; line-height:1.6; margin:0 0 16px; color:#f5f5f4; max-width:700px;">${esc(userBio)}</p>
+      <div style="flex:1;">
+        <h1 id="user-name-title" style="font-size:22px; font-weight:800; margin:0 0 2px; color:#ffffff;">${esc(userDisplayName)}</h1>
+        <div id="user-handle-subtitle" style="font-size:12.5px; font-family:monospace; font-weight:600; color:#f59e0b; margin-bottom:12px;">@${esc(userHandle)}</div>
+        <p id="user-bio-text" style="font-size:13.5px; line-height:1.6; margin:0 0 16px; color:#f5f5f4; max-width:700px;">${esc(userBio)}</p>
+      </div>
 
-      <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:12px; color:#a8a29e; padding-top:12px; border-top:1px solid #292524;">
+      <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:12px; color:#a8a29e; padding-top:14px; border-top:1px solid #292524; margin-top:auto;">
         <div>Localização: <b id="user-location-text" style="color:#f5f5f4;">${esc(userLocation)}</b></div>
         <div>Foco: <b id="user-strain-text" style="color:#f59e0b;">${esc(userStrainFocus)}</b></div>
         <div>Publicações: <b id="user-posts-count" style="color:#f5f5f4;">${userPosts.length}</b></div>
@@ -4536,9 +4607,26 @@ function GrowinStones() {
     }
   }
 
-  window.addEventListener("keydown", function(e) {
-    if (e.key === "Escape") closeLightbox();
-  });
+  function autoFitDisplayCanvas() {
+    if (window.innerWidth <= 768) {
+      var vh = window.innerHeight;
+      var headerEl = document.querySelector("header");
+      var headerH = headerEl ? headerEl.offsetHeight : 56;
+      var profileCard = document.querySelector(".profile-card");
+      if (profileCard) {
+        profileCard.style.minHeight = (vh - headerH) + "px";
+      }
+    } else {
+      var profileCard = document.querySelector(".profile-card");
+      if (profileCard) {
+        profileCard.style.minHeight = "";
+      }
+    }
+  }
+  window.addEventListener("resize", autoFitDisplayCanvas);
+  window.addEventListener("orientationchange", autoFitDisplayCanvas);
+  document.addEventListener("DOMContentLoaded", autoFitDisplayCanvas);
+  autoFitDisplayCanvas();
 </script>
 
 <!-- LIGHTBOX MODAL EM TELA CHEIA 100% -->

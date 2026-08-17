@@ -506,16 +506,19 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
     : posts;
 
   return (
-    <div className="max-w-4xl mx-auto w-full px-3 sm:px-6 py-4 sm:py-6 pb-24 overflow-x-hidden">
+    <div className="max-w-4xl mx-auto w-full px-0 sm:px-6 py-0 sm:py-6 pb-24 overflow-x-hidden">
       {/* HIDDEN INPUTS FOR MEDIA */}
       <input type="file" ref={avatarInputRef} accept="image/*" onChange={handleAvatarFile} className="hidden" />
       <input type="file" ref={bannerInputRef} accept="image/*" onChange={handleBannerFile} className="hidden" />
       <input type="file" ref={imageAttachRef} accept="image/*" multiple onChange={handleAttachImages} className="hidden" />
       <input type="file" ref={videoAttachRef} accept="video/*" onChange={handleAttachVideo} className="hidden" />
 
-      {/* ————————————————— PROFILE HEADER (TWITTER / X STYLE) ————————————————— */}
-      <div className="rounded-3xl overflow-hidden border shadow-sm relative group mb-6" style={{ background: T.surface, borderColor: T.border }}>
-        <div className="h-44 sm:h-64 w-full relative overflow-hidden" style={{ background: T.surface2 }}>
+      {/* ————————————————— PROFILE HEADER (FULL CANVAS RESPONSIVE NO MOBILE) ————————————————— */}
+      <div
+        className="rounded-none sm:rounded-3xl overflow-hidden border-0 sm:border border-b sm:border-b shadow-none sm:shadow-sm relative group mb-3 sm:mb-6 min-h-[calc(100dvh-58px)] sm:min-h-0 flex flex-col justify-between"
+        style={{ background: T.surface, borderColor: T.border }}
+      >
+        <div className="h-[36vh] min-h-[180px] max-h-[320px] sm:h-64 w-full relative overflow-hidden shrink-0" style={{ background: T.surface2 }}>
           {(bannerPreview || currentUser?.bannerUrl) ? (
             <img
               src={bannerPreview || currentUser?.bannerUrl}
@@ -539,7 +542,7 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
         </div>
 
         {/* PROFILE INFO BAR */}
-        <div className="px-4 sm:px-6 pb-5 pt-0 relative w-full max-w-full">
+        <div className="px-4 sm:px-6 pb-6 pt-0 relative w-full max-w-full flex-1 flex flex-col justify-between">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 -mt-12 sm:-mt-20 mb-3">
             {/* AVATAR OVERLAY */}
             <div className="relative group shrink-0 self-start">
