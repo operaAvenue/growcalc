@@ -3878,16 +3878,6 @@ function GrowinStones() {
       </tr>`)
       .join("");
 
-    const alertsHtml = alerts
-      .map((a) => `<div style="padding:10px 14px; border-radius:10px; font-size:13px; font-weight:600; margin-bottom:8px; ${
-        a.level === 'hi'
-          ? (isDark ? 'background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3);' : 'background:#fef2f2; color:#991b1b; border:1px solid #fecaca;')
-          : a.level === 'mid'
-          ? (isDark ? 'background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.3);' : 'background:#fffbeb; color:#92400e; border:1px solid #fde68a;')
-          : (isDark ? 'background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.3);' : 'background:#f0fdf4; color:#166534; border:1px solid #bbf7d0;')
-      }">• ${esc(a.text)}</div>`)
-      .join("");
-
     const pipeWReport = Math.max(2, gauge.mm * topScale * 0.1 + 1.2);
     const segsSvg = plumbing.segs
       .map((s) => {
@@ -3955,38 +3945,9 @@ function GrowinStones() {
         </g>`
       : "";
 
-    const shoppingListHtml = (Array.isArray(shoppingListItems) && shoppingListItems.length > 0)
-      ? `<div style="margin-top:28px;">
-          <h2 style="font-size:14px; text-transform:uppercase; letter-spacing:0.12em; color:${isDark ? '#38bdf8' : '#0369a1'}; border-bottom:2px solid ${isDark ? '#0369a1' : '#bae6fd'}; padding-bottom:8px; margin-bottom:16px;">Lista de compras com QR Codes</h2>
-          <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:14px;">
-            ${shoppingListItems.map((item) => {
-              const itemUrl = typeof item?.url === "string" ? item.url.trim() : "";
-              const qrImg = itemUrl
-                ? `<img src="https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(itemUrl)}&size=200x200" alt="QR Code" style="width:90px; height:90px; border-radius:8px; border:1px solid #e2e8f0; background:#ffffff; padding:4px;" />`
-                : `<div style="width:90px; height:90px; border-radius:8px; background:${isDark ? '#292524' : '#f1f5f9'}; border:1px solid ${isDark ? '#44403c' : '#cbd5e1'}; display:flex; align-items:center; justify-content:center; font-size:11px; color:#94a3b8;">Sem link</div>`;
-              return `
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; background:${isDark ? '#1c1917' : '#ffffff'}; border-radius:14px; padding:14px; border:1px solid ${isDark ? '#292524' : '#e2dccc'}; box-shadow:${isDark ? '0 4px 12px rgba(0,0,0,0.2)' : '0 4px 12px rgba(0,0,0,0.03)'};">
-                  <div style="flex:1; min-width:0;">
-                    <b style="font-size:13px; color:${isDark ? '#f5f5f4' : '#1f1b16'}; display:block; margin-bottom:4px; line-height:1.3;">${esc(item.name)}</b>
-                    <div style="font-size:11px; color:${isDark ? '#a8a29e' : '#6b6354'}; line-height:1.5;">
-                      <div>Qtd: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${item.qty} un</b></div>
-                      <div>Unit.: <b>${fmtBRL(item.unitCost)}</b></div>
-                      <div style="margin-top:2px; font-weight:700; color:${isDark ? '#38bdf8' : '#0284c7'};">Subtotal: ${fmtBRL(item.subtotal)}</div>
-                    </div>
-                  </div>
-                  <div style="shrink:0;">
-                    ${qrImg}
-                  </div>
-                </div>
-              `;
-            }).join("")}
-          </div>
-        </div>`
-      : "";
+    const logoSvg = getLogoSvgString(32, "#f59e0b");
 
-    const logoSvg = getLogoSvgString(30, isDark ? "#f59e0b" : "#1f1b16");
-
-    // Posts HTML generator (Obedecendo sempre ao último nome configurado)
+    // Posts Feed HTML
     const postsFeedHtml = userPosts.map((p) => {
       const pAuthor = userDisplayName;
       const pUser = userHandle;
@@ -3997,33 +3958,33 @@ function GrowinStones() {
       return `
         <div class="post-card">
           <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
-            <div style="width:42px; height:42px; min-width:42px; min-height:42px; max-width:42px; max-height:42px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; background:${isDark ? '#292524' : '#e2dccc'}; border:1px solid ${isDark ? '#44403c' : '#d8cfbe'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; color:${isDark ? '#f59e0b' : '#b45309'}; position:relative;">
+            <div style="width:44px; height:44px; min-width:44px; min-height:44px; max-width:44px; max-height:44px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; background:${isDark ? '#292524' : '#e2dccc'}; border:1px solid ${isDark ? '#44403c' : '#d8cfbe'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px; color:${isDark ? '#f59e0b' : '#b45309'}; position:relative;">
               <img src="${pAvatar || ''}" alt="Avatar" style="width:100%; height:100%; aspect-ratio:1/1; object-fit:cover; display:${pAvatar ? 'block' : 'none'}; border-radius:50%;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
               <span style="display:${pAvatar ? 'none' : 'flex'}; align-items:center; justify-content:center; width:100%; height:100%;">${esc(pAuthor ? pAuthor.charAt(0).toUpperCase() : 'G')}</span>
             </div>
             <div>
               <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                <b style="font-size:14px; color:${isDark ? '#ffffff' : '#1f1b16'};">${esc(pAuthor)}</b>
+                <b style="font-size:14.5px; color:${isDark ? '#ffffff' : '#1f1b16'};">${esc(pAuthor)}</b>
                 <span style="font-size:12px; font-family:monospace; color:${isDark ? '#a8a29e' : '#6b6354'};">@${esc(pUser)}</span>
                 <span style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">· ${pDate}</span>
               </div>
-              ${pStage ? `<span style="display:inline-block; margin-top:2px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:12px; background:${isDark ? 'rgba(245,158,11,0.15)' : '#fef3c7'}; color:${isDark ? '#f59e0b' : '#b45309'};">${esc(pStage)}</span>` : ""}
+              ${pStage ? `<span style="display:inline-block; margin-top:3px; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:12px; background:${isDark ? 'rgba(245,158,11,0.15)' : '#fef3c7'}; color:${isDark ? '#f59e0b' : '#b45309'};">${esc(pStage)}</span>` : ""}
             </div>
           </div>
 
-          <div style="font-size:13.5px; line-height:1.6; color:${isDark ? '#f5f5f4' : '#1f1b16'}; white-space:pre-wrap; margin-bottom:12px;">
+          <div style="font-size:14px; line-height:1.6; color:${isDark ? '#f5f5f4' : '#1f1b16'}; white-space:pre-wrap; margin-bottom:14px;">
             ${esc(p.text)}
           </div>
 
           ${p.images && p.images.length > 0 ? `
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:8px; border-radius:14px; overflow:hidden; margin-bottom:12px;">
-              ${p.images.map((img) => `<img src="${img}" alt="Mídia de Cultivo" onclick="openLightbox('${img}')" style="width:100%; max-height:340px; object-fit:cover; border-radius:12px; border:1px solid ${isDark ? '#292524' : '#e2dccc'}; cursor:zoom-in;" onerror="this.parentElement.style.display='none';" title="Clique para ver a foto em tamanho real 100%" />`).join("")}
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:10px; border-radius:14px; overflow:hidden; margin-bottom:14px;">
+              ${p.images.map((img) => `<img src="${img}" alt="Mídia de Cultivo" onclick="openLightbox('${img}')" style="width:100%; max-height:360px; object-fit:cover; border-radius:12px; border:1px solid ${isDark ? '#292524' : '#e2dccc'}; cursor:zoom-in;" onerror="this.parentElement.style.display='none';" title="Clique para ver a foto em tamanho real 100%" />`).join("")}
             </div>
           ` : ""}
 
           ${p.videos && p.videos.length > 0 ? `
-            <div style="border-radius:14px; overflow:hidden; margin-bottom:12px; background:#000;">
-              ${p.videos.map((vid) => `<video src="${vid}" controls playsinline style="width:100%; max-height:340px; border-radius:12px; display:block;"></video>`).join("")}
+            <div style="border-radius:14px; overflow:hidden; margin-bottom:14px; background:#000;">
+              ${p.videos.map((vid) => `<video src="${vid}" controls playsinline style="width:100%; max-height:360px; border-radius:12px; display:block;"></video>`).join("")}
             </div>
           ` : ""}
 
@@ -4039,7 +4000,7 @@ function GrowinStones() {
     }).join("");
 
     return `<!DOCTYPE html>
-<html lang="pt-BR" class="${isDark ? 'dark' : ''}">
+<html lang="pt-BR" class="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -4049,92 +4010,133 @@ function GrowinStones() {
   * { box-sizing: border-box; }
   body { 
     font-family: 'Inter', system-ui, -apple-system, sans-serif; 
-    background: ${isDark ? '#0c0a09' : '#f5f1e7'}; 
-    color: ${isDark ? '#f5f5f4' : '#1f1b16'}; 
+    background: #0c0a09; 
+    color: #f5f5f4; 
     margin: 0; 
     padding: 0; 
     min-height: 100vh; 
   }
   header { 
-    background: ${isDark ? '#1c1917' : '#ffffff'}; 
-    border-bottom: 1px solid ${isDark ? '#292524' : '#e2dccc'}; 
+    background: #1c1917; 
+    border-bottom: 1px solid #292524; 
     position: sticky; 
     top: 0; 
     z-index: 50; 
   }
-  .header-in { max-width: 1100px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .header-in { max-width: 1080px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   .badge-live { 
     display: inline-flex; 
     align-items: center; 
     gap: 6px; 
-    padding: 4px 12px; 
-    background: ${isDark ? 'rgba(16,185,129,0.15)' : 'rgba(5,150,105,0.1)'}; 
-    border: 1px solid ${isDark ? '#10b981' : '#059669'}; 
-    color: ${isDark ? '#34d399' : '#047857'}; 
-    font-size: 11.5px; 
+    padding: 5px 12px; 
+    background: rgba(16,185,129,0.15); 
+    border: 1px solid #10b981; 
+    color: #34d399; 
+    font-size: 12px; 
     font-weight: 700; 
     border-radius: 20px; 
     text-decoration: none; 
   }
-  .badge-live::before { content: ""; width: 7px; height: 7px; background: ${isDark ? '#10b981' : '#059669'}; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px ${isDark ? '#10b981' : '#059669'}; }
+  .badge-live::before { content: ""; width: 7px; height: 7px; background: #10b981; border-radius: 50%; display: inline-block; box-shadow: 0 0 8px #10b981; }
   
-  .container { max-width: 1100px; margin: 20px auto; padding: 0 20px 60px; }
+  .container { max-width: 1080px; margin: 20px auto; padding: 0 20px 60px; }
+
+  .profile-card {
+    background: #1c1917;
+    border: 1px solid #292524;
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  }
+
+  .tabs-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid #292524;
+    margin-bottom: 20px;
+    padding-bottom: 2px;
+    overflow-x: auto;
+  }
+  .tab-btn {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    padding: 10px 18px;
+    font-family: inherit;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #a8a29e;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tab-btn:hover { color: #f5f5f4; }
+  .tab-btn.active {
+    color: #f59e0b;
+    border-bottom-color: #f59e0b;
+  }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
 
   .hero-card { 
-    background: ${isDark ? 'linear-gradient(135deg, #1c1917 0%, #292524 100%)' : 'linear-gradient(135deg, #ffffff 0%, #faf7f0 100%)'}; 
-    border: 1px solid ${isDark ? '#44403c' : '#e2dccc'}; 
-    border-radius: 20px; 
-    padding: 28px; 
-    margin-bottom: 24px; 
-    box-shadow: ${isDark ? '0 20px 40px rgba(0,0,0,0.3)' : '0 10px 30px rgba(0,0,0,0.03)'}; 
-  }
-  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 28px; }
-  .kpi-card { 
-    background: ${isDark ? '#1c1917' : '#ffffff'}; 
-    border: 1px solid ${isDark ? '#292524' : '#e2dccc'}; 
-    border-radius: 16px; 
-    padding: 20px; 
-    box-shadow: ${isDark ? 'none' : '0 4px 14px rgba(0,0,0,0.02)'};
-  }
-  .kpi-val { font-size: 24px; font-weight: 800; margin: 4px 0 2px; }
-  .kpi-lbl { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: ${isDark ? '#a8a29e' : '#6b6354'}; }
-  .sec-card { 
-    background: ${isDark ? '#1c1917' : '#ffffff'}; 
-    border: 1px solid ${isDark ? '#292524' : '#e2dccc'}; 
+    background: linear-gradient(135deg, #1c1917 0%, #292524 100%); 
+    border: 1px solid #44403c; 
     border-radius: 20px; 
     padding: 24px; 
-    margin-bottom: 24px; 
-    box-shadow: ${isDark ? 'none' : '0 4px 14px rgba(0,0,0,0.02)'};
+    margin-bottom: 20px; 
+    box-shadow: 0 10px 25px rgba(0,0,0,0.25); 
+  }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 20px; }
+  .kpi-card { 
+    background: #1c1917; 
+    border: 1px solid #292524; 
+    border-radius: 16px; 
+    padding: 18px; 
+  }
+  .kpi-val { font-size: 22px; font-weight: 800; margin: 4px 0 2px; }
+  .kpi-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #a8a29e; }
+  
+  .sec-card { 
+    background: #1c1917; 
+    border: 1px solid #292524; 
+    border-radius: 18px; 
+    padding: 22px; 
+    margin-bottom: 20px; 
   }
   .sec-title { 
-    font-size: 15px; 
+    font-size: 14px; 
     font-weight: 700; 
     text-transform: uppercase; 
     letter-spacing: 0.1em; 
-    color: ${isDark ? '#f59e0b' : '#b45309'}; 
-    border-bottom: 1px solid ${isDark ? '#292524' : '#e2dccc'}; 
+    color: #f59e0b; 
+    border-bottom: 1px solid #292524; 
     padding-bottom: 10px; 
     margin-top: 0; 
     margin-bottom: 16px; 
   }
-  .kv-row { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid ${isDark ? '#292524' : '#e2dccc'}; font-size: 13px; }
-  .kv-row span { color: ${isDark ? '#a8a29e' : '#6b6354'}; } 
-  .kv-row b { font-weight: 600; color: ${isDark ? '#f5f5f4' : '#1f1b16'}; }
+  .kv-row { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px solid #292524; font-size: 13px; }
+  .kv-row span { color: #a8a29e; } 
+  .kv-row b { font-weight: 600; color: #f5f5f4; }
   table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
-  th { text-align: left; padding: 12px; border-bottom: 2px solid ${isDark ? '#292524' : '#e2dccc'}; color: ${isDark ? '#a8a29e' : '#6b6354'}; font-size: 11px; text-transform: uppercase; }
-  td { padding: 12px; border-bottom: 1px solid ${isDark ? '#292524' : '#e2dccc'}; color: ${isDark ? '#e7e5e4' : '#1f1b16'}; }
+  th { text-align: left; padding: 10px 12px; border-bottom: 2px solid #292524; color: #a8a29e; font-size: 11px; text-transform: uppercase; }
+  td { padding: 10px 12px; border-bottom: 1px solid #292524; color: #e7e5e4; }
   
-  /* POST CARD */
   .post-card {
-    background: ${isDark ? '#1c1917' : '#ffffff'};
-    border: 1px solid ${isDark ? '#292524' : '#e2dccc'};
-    border-radius: 20px;
-    padding: 22px;
-    margin-bottom: 20px;
-    box-shadow: ${isDark ? 'none' : '0 4px 14px rgba(0,0,0,0.02)'};
+    background: #1c1917;
+    border: 1px solid #292524;
+    border-radius: 18px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
   }
 
-  .footer { text-align: center; font-size: 12px; color: ${isDark ? '#78716c' : '#a39a87'}; margin-top: 40px; }
+  .footer { text-align: center; font-size: 12px; color: #78716c; margin-top: 40px; }
 </style>
 </head>
 <body>
@@ -4142,39 +4144,38 @@ function GrowinStones() {
   <div class="header-in">
     <div style="display:flex; align-items:center; gap:12px;">
       ${logoSvg}
-      <span style="font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.14em; color:${isDark ? '#a8a29e' : '#78716c'}; border-left:1px solid ${isDark ? '#44403c' : '#d6d3d1'}; padding-left:10px;">Perfil do Cultivador</span>
+      <span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.14em; color:#a8a29e; border-left:1px solid #44403c; padding-left:10px;">Perfil do Cultivador</span>
     </div>
     <a href="https://${displaySlug}.thegrowinstones.com" target="_blank" class="badge-live">https://${displaySlug}.thegrowinstones.com</a>
   </div>
 </header>
 
 <div class="container">
-  {/* ————————————————— CARD PRINCIPAL: PERFIL DO CULTIVADOR ————————————————— */}
-  <div class="sec-card" style="padding:0; overflow:hidden; margin-bottom:24px;">
-    {/* FOTO DE CAPA (BANNER) */}
-    <div style="height:220px; width:100%; position:relative; overflow:hidden; background:${isDark ? '#292524' : '#e2dccc'};">
+  <!-- CARD PRINCIPAL: PERFIL DO CULTIVADOR -->
+  <div class="profile-card">
+    <!-- FOTO DE CAPA -->
+    <div style="height:220px; width:100%; position:relative; overflow:hidden; background:#292524;">
       <img id="user-banner-img" src="${userBannerUrl || ''}" alt="Capa do Perfil" style="width:100%; height:100%; object-fit:cover; display:${userBannerUrl ? 'block' : 'none'};" onerror="this.style.display='none'; document.getElementById('user-banner-placeholder').style.display='block';" />
-      <div id="user-banner-placeholder" style="display:${userBannerUrl ? 'none' : 'block'}; width:100%; height:100%; background:${isDark ? 'linear-gradient(135deg, #1c1917 0%, #292524 50%, #44403c 100%)' : 'linear-gradient(135deg, #e2dccc 0%, #d8cfbe 50%, #c4b9a3 100%)'};"></div>
+      <div id="user-banner-placeholder" style="display:${userBannerUrl ? 'none' : 'block'}; width:100%; height:100%; background:linear-gradient(135deg, #1c1917 0%, #292524 50%, #44403c 100%);"></div>
     </div>
 
-    <div style="padding:0 24px 24px; position:relative;">
-      {/* AVATAR & BADGES & ÍCONE DO PROJETO */}
-      <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-top:-50px; margin-bottom:16px;">
-        <div style="width:100px; height:100px; min-width:100px; min-height:100px; max-width:100px; max-height:100px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; border:4px solid ${isDark ? '#1c1917' : '#ffffff'}; background:${isDark ? '#292524' : '#e2dccc'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:32px; color:${isDark ? '#f59e0b' : '#b45309'}; box-shadow:0 10px 25px rgba(0,0,0,0.3); position:relative;">
+    <div style="padding:0 24px 22px; position:relative;">
+      <!-- AVATAR & BADGES -->
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-top:-50px; margin-bottom:14px;">
+        <div style="width:100px; height:100px; min-width:100px; min-height:100px; max-width:100px; max-height:100px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; border:4px solid #1c1917; background:#292524; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:32px; color:#f59e0b; box-shadow:0 10px 25px rgba(0,0,0,0.3); position:relative;">
           <img id="user-avatar-img" src="${userAvatarUrl || ''}" alt="Avatar" style="width:100%; height:100%; aspect-ratio:1/1; object-fit:cover; display:${userAvatarUrl ? 'block' : 'none'}; border-radius:50%;" onerror="this.style.display='none'; document.getElementById('user-avatar-text').style.display='flex';" />
           <span id="user-avatar-text" style="display:${userAvatarUrl ? 'none' : 'flex'}; align-items:center; justify-content:center; width:100%; height:100%;">${esc(userDisplayName ? userDisplayName.charAt(0).toUpperCase() : 'G')}</span>
         </div>
 
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <span class="badge-live" style="background:${isDark ? 'rgba(16,185,129,0.15)' : 'rgba(5,150,105,0.1)'}; color:${isDark ? '#34d399' : '#047857'}; border:1px solid ${isDark ? '#10b981' : '#059669'};">Cultivador Pro</span>
-
+          <span class="badge-live">Cultivador Pro</span>
           ${isGrowPublic ? `
-            <button onclick="document.getElementById('grow-project-section')?.scrollIntoView({ behavior: 'smooth' })" style="background:${isDark ? '#292524' : '#f5f1e7'}; border:1px solid ${isDark ? '#f59e0b' : '#b45309'}; color:${isDark ? '#f59e0b' : '#b45309'}; border-radius:20px; padding:6px 14px; font:700 12px Inter; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:all 0.2s ease; box-shadow:0 2px 6px rgba(0,0,0,0.06);" title="Ver Projeto Técnico do Grow e Planta Baixa">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-9"/><path d="M12 13a6 6 0 0 1 6-6c0 6-6 6-6 6z"/><path d="M12 13a6 6 0 0 0-6-6c0 6 6 6 6 6z"/></svg>
-              <span>Projeto do Grow</span>
-            </button>
+            <span style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:20px; font-size:11.5px; font-weight:700; background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid #f59e0b;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-9"/><path d="M12 13a6 6 0 0 1 6-6c0 6-6 6-6 6z"/><path d="M12 13a6 6 0 0 0-6-6c0 6 6 6 6 6z"/></svg>
+              <span>Projeto Público</span>
+            </span>
           ` : `
-            <span style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:20px; font-size:11.5px; font-weight:700; background:${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}; color:${isDark ? '#a8a29e' : '#78716c'}; border:1px solid ${isDark ? '#44403c' : '#d6d3d1'};" title="O cultivador manteve os dados técnicos deste projeto privados">
+            <span style="display:inline-flex; align-items:center; gap:5px; padding:5px 12px; border-radius:20px; font-size:11.5px; font-weight:700; background:rgba(255,255,255,0.06); color:#a8a29e; border:1px solid #44403c;">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
               <span>Projeto Privado</span>
             </span>
@@ -4182,31 +4183,56 @@ function GrowinStones() {
         </div>
       </div>
 
-      <h1 id="user-name-title" style="font-size:22px; font-weight:800; margin:0 0 2px; color:${isDark ? '#ffffff' : '#1f1b16'};">${esc(userDisplayName)}</h1>
-      <div id="user-handle-subtitle" style="font-size:12px; font-family:monospace; font-weight:600; color:${isDark ? '#f59e0b' : '#b45309'}; margin-bottom:12px;">@${esc(userHandle)}</div>
-      <p id="user-bio-text" style="font-size:13.5px; line-height:1.6; margin:0 0 16px; color:${isDark ? '#f5f5f4' : '#1f1b16'}; max-width:700px;">${esc(userBio)}</p>
+      <h1 id="user-name-title" style="font-size:22px; font-weight:800; margin:0 0 2px; color:#ffffff;">${esc(userDisplayName)}</h1>
+      <div id="user-handle-subtitle" style="font-size:12.5px; font-family:monospace; font-weight:600; color:#f59e0b; margin-bottom:12px;">@${esc(userHandle)}</div>
+      <p id="user-bio-text" style="font-size:13.5px; line-height:1.6; margin:0 0 16px; color:#f5f5f4; max-width:700px;">${esc(userBio)}</p>
 
-      <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:12px; color:${isDark ? '#a8a29e' : '#6b6354'}; padding-top:12px; border-top:1px solid ${isDark ? '#292524' : '#e2dccc'};">
-        <div>Localização: <b id="user-location-text" style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(userLocation)}</b></div>
-        <div>Foco: <b id="user-strain-text" style="color:${isDark ? '#f59e0b' : '#b45309'};">${esc(userStrainFocus)}</b></div>
-        <div>Publicações: <b id="user-posts-count" style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${userPosts.length}</b></div>
+      <div style="display:flex; flex-wrap:wrap; gap:16px; font-size:12px; color:#a8a29e; padding-top:12px; border-top:1px solid #292524;">
+        <div>Localização: <b id="user-location-text" style="color:#f5f5f4;">${esc(userLocation)}</b></div>
+        <div>Foco: <b id="user-strain-text" style="color:#f59e0b;">${esc(userStrainFocus)}</b></div>
+        <div>Publicações: <b id="user-posts-count" style="color:#f5f5f4;">${userPosts.length}</b></div>
         <div>Automação: <b style="color:#10b981;">Online 24/7</b></div>
       </div>
     </div>
   </div>
 
+  <!-- NAVEGAÇÃO POR ABAS -->
+  <div class="tabs-bar">
+    <button class="tab-btn active" id="tab-btn-posts" onclick="switchTab('posts')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span>Publicações & Diário</span>
+    </button>
+    ${isGrowPublic ? `
+      <button class="tab-btn" id="tab-btn-grow" onclick="switchTab('grow')">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-9"/><path d="M12 13a6 6 0 0 1 6-6c0 6-6 6-6 6z"/><path d="M12 13a6 6 0 0 0-6-6c0 6 6 6 6 6z"/></svg>
+        <span>Projeto do Grow</span>
+      </button>
+    ` : ""}
+    <button class="tab-btn" id="tab-btn-about" onclick="switchTab('about')">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+      <span>Sobre o Cultivador</span>
+    </button>
+  </div>
+
+  <!-- ABA 1: PUBLICAÇÕES & DIÁRIO DE CULTIVO -->
+  <div id="tab-content-posts" class="tab-content active">
+    <div id="posts-feed-container">
+      ${postsFeedHtml}
+    </div>
+  </div>
+
+  <!-- ABA 2: PROJETO DO GROW (SE PÚBLICO) -->
   ${isGrowPublic ? `
-  {/* ————————————————— SEÇÃO: PROJETO DO GROW (CASO PÚBLICO) ————————————————— */}
-  <div id="grow-project-section" style="margin-top:28px; margin-bottom:28px;">
+  <div id="tab-content-grow" class="tab-content">
     <div class="hero-card">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
         <div>
-          <h2 style="font-size:26px; font-weight:800; margin:0 0 6px; color:${isDark ? '#ffffff' : '#1f1b16'};">${esc(growName || "Projeto do Grow")}</h2>
-          <div style="font-size:13px; color:${isDark ? '#a8a29e' : '#6b6354'};">
-            ${owner ? `Responsável: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(owner)}</b> · ` : ""}Genética: <b style="color:${isDark ? '#f5f5f4' : '#1f1b16'};">${esc(strain || "Não informada")}</b> · Atualizado em ${today}
+          <h2 style="font-size:24px; font-weight:800; margin:0 0 6px; color:#ffffff;">${esc(growName || "Projeto do Grow")}</h2>
+          <div style="font-size:13px; color:#a8a29e;">
+            ${owner ? `Responsável: <b style="color:#f5f5f4;">${esc(owner)}</b> · ` : ""}Genética: <b style="color:#f5f5f4;">${esc(strain || "Não informada")}</b> · Atualizado em ${today}
           </div>
         </div>
-        <button onclick="window.print()" style="background:${isDark ? '#0284c7' : '#1f1b16'}; color:#ffffff; border:none; padding:10px 18px; border-radius:12px; font:700 13px Inter; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+        <button onclick="window.print()" style="background:#0284c7; color:#ffffff; border:none; padding:10px 18px; border-radius:12px; font:700 13px Inter; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
           <span>Exportar PDF</span>
         </button>
@@ -4216,29 +4242,29 @@ function GrowinStones() {
     <div class="kpi-grid">
       <div class="kpi-card">
         <div class="kpi-lbl">Investimento (CAPEX)</div>
-        <div class="kpi-val" style="color:${isDark ? '#38bdf8' : '#0284c7'};">${fmtBRL(capex)}</div>
-        <div style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">≈ ${fmtBRL(capexPerPlant)} / planta</div>
+        <div class="kpi-val" style="color:#38bdf8;">${fmtBRL(capex)}</div>
+        <div style="font-size:11px; color:#78716c;">≈ ${fmtBRL(capexPerPlant)} / planta</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-lbl">Produção Anual Estimada</div>
-        <div class="kpi-val" style="color:${isDark ? '#34d399' : '#059669'};">${fmtG(yieldYear)}</div>
-        <div style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">${harvestsYear.toFixed(1)} safras/ano (${yieldPerPlant}g/planta)</div>
+        <div class="kpi-val" style="color:#34d399;">${fmtG(yieldYear)}</div>
+        <div style="font-size:11px; color:#78716c;">${harvestsYear.toFixed(1)} safras/ano (${yieldPerPlant}g/planta)</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-lbl">Receita Estimada / Ano</div>
-        <div class="kpi-val" style="color:${isDark ? '#f59e0b' : '#b45309'};">${priceG > 0 ? fmtBRL(revenueYear) : "—"}</div>
-        <div style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">${priceG > 0 ? `${fmtBRL(priceG)}/g` : "Preço/g não preenchido"}</div>
+        <div class="kpi-val" style="color:#f59e0b;">${priceG > 0 ? fmtBRL(revenueYear) : "—"}</div>
+        <div style="font-size:11px; color:#78716c;">${priceG > 0 ? `${fmtBRL(priceG)}/g` : "Preço/g não preenchido"}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-lbl">Payback Estimado</div>
-        <div class="kpi-val" style="color:${isDark ? '#a78bfa' : '#7c3aed'};">${paybackMonths ? `${paybackMonths.toFixed(1)} m` : "—"}</div>
-        <div style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">${paybackMonths ? `~${(paybackMonths / (cycleDays / 30)).toFixed(1)} safras` : "Retorno não atingido"}</div>
+        <div class="kpi-val" style="color:#a78bfa;">${paybackMonths ? `${paybackMonths.toFixed(1)} m` : "—"}</div>
+        <div style="font-size:11px; color:#78716c;">${paybackMonths ? `~${(paybackMonths / (cycleDays / 30)).toFixed(1)} safras` : "Retorno não atingido"}</div>
       </div>
     </div>
 
     ${webComparisonHtml}
 
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:24px;">
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px; margin-bottom:20px;">
       <div class="sec-card">
         <h2 class="sec-title">Estrutura & Dimensões</h2>
         <div class="kv-row"><span>Dimensões (L × P × A)</span><b>${width} × ${depth} × ${height} cm</b></div>
@@ -4266,18 +4292,18 @@ function GrowinStones() {
 
     <div class="sec-card">
       <h2 class="sec-title">Planta Baixa Interativa</h2>
-      <div style="background:${isDark ? '#141210' : '#f5f1e7'}; border-radius:14px; padding:16px; text-align:center; border:1px solid ${isDark ? '#292524' : '#e2dccc'};">
+      <div style="background:#141210; border-radius:14px; padding:16px; text-align:center; border:1px solid #292524;">
         <svg width="${svgW}" height="${totalSvgH}" viewBox="0 0 ${svgW} ${totalSvgH}" style="width:100%; max-width:${svgW}px; height:auto; display:block; margin:0 auto;">
-          <rect x="${OX}" y="${OY}" width="${topW}" height="${topH}" rx="10" fill="${isDark ? '#1c1917' : '#ffffff'}" stroke="${isDark ? '#57534e' : '#1f1b16'}" stroke-width="1.5"/>
-          <text x="${OX + topW / 2}" y="${OY - 8}" text-anchor="middle" font-size="11" fill="${isDark ? '#a8a29e' : '#6b6354'}">${width} cm</text>
-          <text x="${OX - 10}" y="${OY + topH / 2}" text-anchor="middle" font-size="11" fill="${isDark ? '#a8a29e' : '#6b6354'}" transform="rotate(-90, ${OX - 10}, ${OY + topH / 2})">${depth} cm</text>
+          <rect x="${OX}" y="${OY}" width="${topW}" height="${topH}" rx="10" fill="#1c1917" stroke="#57534e" stroke-width="1.5"/>
+          <text x="${OX + topW / 2}" y="${OY - 8}" text-anchor="middle" font-size="11" fill="#a8a29e">${width} cm</text>
+          <text x="${OX - 10}" y="${OY + topH / 2}" text-anchor="middle" font-size="11" fill="#a8a29e" transform="rotate(-90, ${OX - 10}, ${OY + topH / 2})">${depth} cm</text>
           ${segsSvg}
           ${dropLineSvgReport}
           ${potsSvgReport}
           ${cotasSvg}
           ${resSvgReport}
         </svg>
-        <div style="font-size:11px; color:${isDark ? '#a8a29e' : '#6b6354'}; margin-top:10px;">Planta baixa (${width} × ${depth} cm) · ${plants} vaso(s) de ${esc(pot.label)} (${esc(potDesc)})</div>
+        <div style="font-size:11px; color:#a8a29e; margin-top:10px;">Planta baixa (${width} × ${depth} cm) · ${plants} vaso(s) de ${esc(pot.label)} (${esc(potDesc)})</div>
       </div>
     </div>
 
@@ -4298,7 +4324,7 @@ function GrowinStones() {
             <td colspan="3" style="font-weight:700;">Custos Extras (frete, estrutura, elétrica)</td>
             <td style="text-align:right; font-weight:700;">${fmtBRL(extraCost)}</td>
           </tr>
-          <tr style="font-size:15px; font-weight:800; color:${isDark ? '#38bdf8' : '#0284c7'};">
+          <tr style="font-size:15px; font-weight:800; color:#38bdf8;">
             <td colspan="3">INVESTIMENTO TOTAL (CAPEX)</td>
             <td style="text-align:right;">${fmtBRL(capex)}</td>
           </tr>
@@ -4306,31 +4332,28 @@ function GrowinStones() {
       </table>
     </div>
 
-    ${shoppingListHtml}
-
     ${safeNotes || safeInst || safeTerms ? `
     <div class="sec-card">
       <h2 class="sec-title">Notas, Instruções & Termos</h2>
-      ${safeNotes ? `<div style="margin-bottom:12px;"><b style="color:${isDark ? '#f59e0b' : '#b45309'}; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Observações</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeNotes)}</div></div>` : ""}
-      ${safeInst ? `<div style="margin-bottom:12px;"><b style="color:${isDark ? '#f59e0b' : '#b45309'}; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Instruções de Operação</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeInst)}</div></div>` : ""}
-      ${safeTerms ? `<div><b style="color:${isDark ? '#f59e0b' : '#b45309'}; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Termos & Condições</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeTerms)}</div></div>` : ""}
+      ${safeNotes ? `<div style="margin-bottom:12px;"><b style="color:#f59e0b; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Observações</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeNotes)}</div></div>` : ""}
+      ${safeInst ? `<div style="margin-bottom:12px;"><b style="color:#f59e0b; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Instruções de Operação</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeInst)}</div></div>` : ""}
+      ${safeTerms ? `<div><b style="color:#f59e0b; display:block; font-size:11px; text-transform:uppercase; margin-bottom:4px;">Termos & Condições</b><div style="white-space:pre-wrap; line-height:1.5;">${esc(safeTerms)}</div></div>` : ""}
     </div>` : ""}
   </div>
   ` : ""}
 
-  {/* ————————————————— SEÇÃO: LINHA DO TEMPO & DIÁRIO DE CULTIVO (REAL-TIME FEED) ————————————————— */}
-  <div id="posts-timeline-section" style="margin-top:24px; margin-bottom:20px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid ${isDark ? '#292524' : '#e2dccc'}; padding-bottom:10px; margin-bottom:16px;">
-      <h2 style="font-size:15px; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:${isDark ? '#f59e0b' : '#b45309'}; margin:0;">
-        Linha do Tempo & Diário de Cultivo
-      </h2>
-      <span style="display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:700; color:#10b981;">
-        <span style="width:7px; height:7px; border-radius:50%; background:#10b981; display:inline-block; box-shadow:0 0 6px #10b981;"></span>
-        <span>Tempo Real</span>
-      </span>
-    </div>
-    <div id="posts-feed-container">
-      ${postsFeedHtml}
+  <!-- ABA 3: SOBRE O CULTIVADOR -->
+  <div id="tab-content-about" class="tab-content">
+    <div class="sec-card">
+      <h2 class="sec-title">Biografia & Filosofia de Cultivo</h2>
+      <p style="font-size:14px; line-height:1.7; color:#f5f5f4; margin-bottom:16px;">
+        ${esc(userBio)}
+      </p>
+      <div class="kv-row"><span>Nome</span><b>${esc(userDisplayName)}</b></div>
+      <div class="kv-row"><span>Identificador (@handle)</span><b>@${esc(userHandle)}</b></div>
+      <div class="kv-row"><span>Localização</span><b>${esc(userLocation)}</b></div>
+      <div class="kv-row"><span>Especialidade / Foco</span><b>${esc(userStrainFocus)}</b></div>
+      <div class="kv-row"><span>Status do Sistema</span><b style="color:#10b981;">Online & Monitorado 24/7</b></div>
     </div>
   </div>
 
@@ -4341,6 +4364,17 @@ function GrowinStones() {
 </div>
 
 <script>
+  function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.remove('active'); });
+    document.querySelectorAll('.tab-btn').forEach(function(btn) {
+      btn.classList.remove('active');
+    });
+    var activeContent = document.getElementById('tab-content-' + tabId);
+    var activeBtn = document.getElementById('tab-btn-' + tabId);
+    if (activeContent) activeContent.classList.add('active');
+    if (activeBtn) activeBtn.classList.add('active');
+  }
+
   (function() {
     var slug = "${displaySlug}";
     var syncUrl = "https://grow.thegrowinstones.com/api/user/sync?username=" + encodeURIComponent(slug);
@@ -4383,7 +4417,7 @@ function GrowinStones() {
     function renderFeed(posts, user) {
       if (!container) return;
       if (!Array.isArray(posts) || posts.length === 0) {
-        container.innerHTML = '<div style="padding:32px 20px; text-align:center; color:${isDark ? '#a8a29e' : '#78716c'}; font-size:13px; background:${isDark ? '#1c1917' : '#ffffff'}; border-radius:16px; border:1px solid ${isDark ? '#292524' : '#e2dccc'};">Nenhuma publicação adicionada ainda ao diário.</div>';
+        container.innerHTML = '<div style="padding:32px 20px; text-align:center; color:#a8a29e; font-size:13px; background:#1c1917; border-radius:16px; border:1px solid #292524;">Nenhuma publicação adicionada ainda ao diário.</div>';
         return;
       }
 
@@ -4396,49 +4430,50 @@ function GrowinStones() {
         var pDate = timeAgo(p.createdAt);
         var pStage = p.stage || "";
 
-        html += '<div class="post-card" style="margin-bottom:20px;">';
+        html += '<div class="post-card">';
         html += '  <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">';
-        html += '    <div style="width:42px; height:42px; min-width:42px; min-height:42px; max-width:42px; max-height:42px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; background:${isDark ? '#292524' : '#e2dccc'}; border:1px solid ${isDark ? '#44403c' : '#d8cfbe'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; color:${isDark ? '#f59e0b' : '#b45309'};">';
+        html += '    <div style="width:44px; height:44px; min-width:44px; min-height:44px; max-width:44px; max-height:44px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; background:#292524; border:1px solid #44403c; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px; color:#f59e0b; position:relative;">';
         if (authorAvatar) {
-          html += '    <img src="' + escapeHtml(authorAvatar) + '" alt="Avatar" style="width:100%; height:100%; aspect-ratio:1/1; object-fit:cover; display:block; border-radius:50%;" />';
+          html += '    <img src="' + escapeHtml(authorAvatar) + '" alt="Avatar" style="width:100%; height:100%; aspect-ratio:1/1; object-fit:cover; display:block; border-radius:50%;" onerror="this.style.display=\\'none\\'; this.nextElementSibling.style.display=\\'flex\\';" />';
+          html += '    <span style="display:none; align-items:center; justify-content:center; width:100%; height:100%;">' + escapeHtml(authorName.charAt(0).toUpperCase()) + '</span>';
         } else {
-          html += '    ' + escapeHtml(authorName.charAt(0).toUpperCase());
+          html += '    <span>' + escapeHtml(authorName.charAt(0).toUpperCase()) + '</span>';
         }
         html += '    </div>';
         html += '    <div style="min-width:0; flex:1;">';
         html += '      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">';
-        html += '        <b style="font-size:14px; color:${isDark ? '#ffffff' : '#1f1b16'};">' + escapeHtml(authorName) + '</b>';
-        html += '        <span style="font-size:12px; font-family:monospace; color:${isDark ? '#a8a29e' : '#6b6354'};">@' + escapeHtml(authorUser) + '</span>';
-        html += '        <span style="font-size:11px; color:${isDark ? '#78716c' : '#a39a87'};">· ' + escapeHtml(pDate) + '</span>';
+        html += '        <b style="font-size:14.5px; color:#ffffff;">' + escapeHtml(authorName) + '</b>';
+        html += '        <span style="font-size:12px; font-family:monospace; color:#a8a29e;">@' + escapeHtml(authorUser) + '</span>';
+        html += '        <span style="font-size:11px; color:#78716c;">· ' + escapeHtml(pDate) + '</span>';
         html += '      </div>';
         if (pStage) {
-          html += '    <span style="display:inline-block; margin-top:2px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:12px; background:${isDark ? 'rgba(245,158,11,0.15)' : '#fef3c7'}; color:${isDark ? '#f59e0b' : '#b45309'};">' + escapeHtml(pStage) + '</span>';
+          html += '    <span style="display:inline-block; margin-top:3px; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:12px; background:rgba(245,158,11,0.15); color:#f59e0b;">' + escapeHtml(pStage) + '</span>';
         }
         html += '    </div>';
         html += '  </div>';
 
         if (p.text) {
-          html += '  <div style="font-size:13.5px; line-height:1.6; color:${isDark ? '#f5f5f4' : '#1f1b16'}; white-space:pre-wrap; margin-bottom:12px;">' + escapeHtml(p.text) + '</div>';
+          html += '  <div style="font-size:14px; line-height:1.6; color:#f5f5f4; white-space:pre-wrap; margin-bottom:14px;">' + escapeHtml(p.text) + '</div>';
         }
 
         if (Array.isArray(p.images) && p.images.length > 0) {
-          html += '  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:8px; border-radius:14px; overflow:hidden; margin-bottom:12px;">';
+          html += '  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:10px; border-radius:14px; overflow:hidden; margin-bottom:14px;">';
           for (var j = 0; j < p.images.length; j++) {
-            html += '    <img src="' + escapeHtml(p.images[j]) + '" alt="Foto do cultivo" onclick="openLightbox(\'' + escapeHtml(p.images[j]) + '\')" style="width:100%; max-height:360px; object-fit:cover; border-radius:12px; border:1px solid ${isDark ? '#292524' : '#e2dccc'}; display:block; cursor:zoom-in;" title="Clique para ver a foto em tamanho real 100%" />';
+            html += '    <img src="' + escapeHtml(p.images[j]) + '" alt="Foto do cultivo" onclick="openLightbox(\\'' + escapeHtml(p.images[j]) + '\\')" style="width:100%; max-height:360px; object-fit:cover; border-radius:12px; border:1px solid #292524; display:block; cursor:zoom-in;" onerror="this.parentElement.style.display=\\'none\\';" title="Clique para ver a foto em tamanho real 100%" />';
           }
           html += '  </div>';
         }
 
         if (Array.isArray(p.videos) && p.videos.length > 0) {
-          html += '  <div style="border-radius:14px; overflow:hidden; margin-bottom:12px; background:#000;">';
+          html += '  <div style="border-radius:14px; overflow:hidden; margin-bottom:14px; background:#000;">';
           for (var k = 0; k < p.videos.length; k++) {
             html += '    <video src="' + escapeHtml(p.videos[k]) + '" controls playsinline style="width:100%; max-height:360px; border-radius:12px; display:block;"></video>';
           }
           html += '  </div>';
         }
 
-        html += '  <div style="display:flex; align-items:center; justify-content:space-between; padding-top:10px; border-top:1px solid ${isDark ? '#292524' : '#e2dccc'}; font-size:12px; color:${isDark ? '#a8a29e' : '#6b6354'};">';
-        html += '    <div style="display:flex; align-items:center; gap:5px; font-weight:700; color:' + (p.liked ? '#f43f5e' : '${isDark ? '#a8a29e' : '#6b6354'}') + ';">';
+        html += '  <div style="display:flex; align-items:center; justify-content:space-between; padding-top:10px; border-top:1px solid #292524; font-size:12px; color:#a8a29e;">';
+        html += '    <div style="display:flex; align-items:center; gap:5px; font-weight:700; color:' + (p.liked ? '#f43f5e' : '#a8a29e') + ';">';
         html += '      <svg width="15" height="15" viewBox="0 0 24 24" fill="' + (p.liked ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
         html += '      <span>' + (p.likes || 0) + ' curtidas</span>';
         html += '    </div>';
@@ -4505,7 +4540,7 @@ function GrowinStones() {
   });
 </script>
 
-{/* LIGHTBOX MODAL EM TELA CHEIA 100% */}
+<!-- LIGHTBOX MODAL EM TELA CHEIA 100% -->
 <div id="lightbox-modal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.92); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); align-items:center; justify-content:center; padding:16px; cursor:zoom-out;" onclick="closeLightbox()">
   <div style="position:relative; max-width:96vw; max-height:92vh; display:flex; align-items:center; justify-content:center;" onclick="event.stopPropagation()">
     <img id="lightbox-modal-img" src="" alt="Tamanho Real" style="max-width:96vw; max-height:92vh; object-fit:contain; border-radius:12px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.7);" />
