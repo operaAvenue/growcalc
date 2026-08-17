@@ -1997,6 +1997,8 @@ function GrowinStones() {
   const [isGrowPublic, setIsGrowPublic] = useState(true); // Se o projeto do grow é público no subdomínio
   const [openConfigCard, setOpenConfigCard] = useState("identificacao"); // Accordion de cards: apenas 1 aberto por vez
   const toggleConfigCard = (id) => setOpenConfigCard((cur) => (cur === id ? null : id));
+  const [openDataCard, setOpenDataCard] = useState(true); // Card dos dados sticky no topo
+  const [openMapCard, setOpenMapCard] = useState(true); // Card do mapa logo abaixo
 
   // estrutura
   const [width, setWidth] = useState(240);
@@ -5494,7 +5496,6 @@ function GrowinStones() {
                       <line x1="12" y1="21" x2="12" y2="23" />
                       <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
                       <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                      <line x1="1" y1="12" x2="3" y2="12" />
                       <line x1="21" y1="12" x2="23" y2="12" />
                       <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
                       <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
@@ -5519,479 +5520,49 @@ function GrowinStones() {
             </div>
 
             {activeTab === "configurator" ? (
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6 items-start w-full max-w-full min-w-0">
-          {/* ————— Configuração ————— */}
-          <div className="lg:col-span-2 space-y-4 sm:space-y-5 w-full max-w-full min-w-0">
+          <div className="w-full max-w-full space-y-4 sm:space-y-6 min-w-0">
+            {/* ————— 1. TOP STICKY: CARD DE DADOS & MÉTRICAS (COLAPSÁVEL) ————— */}
             <CollapsibleCard
-              title="Identificação"
-              subtitle={growName || owner || strain ? `${growName || "Grow"}${strain ? ` · ${strain}` : ""}` : undefined}
-              isOpen={openConfigCard === "identificacao"}
-              onToggle={() => toggleConfigCard("identificacao")}
-              T={T} dark={dark}>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs block mb-1" style={{ color: T.muted }}>Nome do grow</label>
-                  <input type="text" value={growName} placeholder="Ex.: Grow Sala Verde"
-                    onChange={(e) => setGrowName(e.target.value)}
-                    className="w-full h-9 px-3 rounded-lg text-sm font-medium focus:outline-none" style={inputStyle} />
-                </div>
-                <div>
-                  <label className="text-xs block mb-1" style={{ color: T.muted }}>Responsável</label>
-                  <input type="text" value={owner} placeholder="Seu nome"
-                    onChange={(e) => setOwner(e.target.value)}
-                    className="w-full h-9 px-3 rounded-lg text-sm font-medium focus:outline-none" style={inputStyle} />
-                </div>
-                <div>
-                  <label className="text-xs block mb-1" style={{ color: T.muted }}>Variedade / Genética da planta</label>
-                  <input type="text" value={strain} placeholder="Ex.: White Widow, Gorilla Glue..."
-                    onChange={(e) => setStrain(e.target.value)}
-                    className="w-full h-9 px-3 rounded-lg text-sm font-medium focus:outline-none" style={inputStyle} />
-                </div>
-
-                {/* Toggle: Projeto Público / Privado no Subdomínio */}
-                <div className="pt-2.5 mt-1 border-t flex items-center justify-between gap-3" style={{ borderColor: T.borderSoft }}>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-bold" style={{ color: T.text }}>
-                      Projeto Público no Subdomínio
-                    </div>
-                    <div className="text-[11px] mt-0.5" style={{ color: T.muted }}>
-                      {isGrowPublic ? "Visível no seu subdomínio exclusivo" : "Oculto (Apenas seu perfil e posts serão públicos)"}
-                    </div>
+              title="Dados & Métricas do Grow"
+              subtitle={`${priceG > 0 ? fmtBRL(revenueHarvest) : fmtG(yieldHarvest)} / safra · ${harvestsYear.toFixed(1)} safras/ano · CAPEX ${fmtBRL(capex)} · OPEX ${fmtBRL(opexMonth)}/mês`}
+              isOpen={openDataCard}
+              onToggle={() => setOpenDataCard((o) => !o)}
+              className="sticky top-2 sm:top-4 z-30 shadow-md backdrop-blur-md"
+              T={T}
+              dark={dark}
+            >
+              <section className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 pt-1">
+                {[
+                  { label: "Receita / safra", value: priceG > 0 ? fmtBRL(revenueHarvest) : "—", sub: priceG > 0 ? `${fmtG(yieldHarvest)} / safra` : "defina o R$/g" },
+                  { label: "Safras / ano", value: harvestsYear.toFixed(1), sub: `ciclo de ${cycleDays} dias` },
+                  { label: "Produção / safra", value: fmtG(yieldHarvest), sub: `${yieldM2.toFixed(0)} g/m²` },
+                  { label: "Produção / ano", value: fmtG(yieldYear), sub: ledWatts > 0 ? `${gPerW.toFixed(2)} g/W` : "sem luz" },
+                  { label: "Investimento", value: fmtBRL(capex), sub: `${fmtBRL(capexPerPlant)} / planta` },
+                  { label: "OPEX mensal", value: fmtBRL(opexMonth), sub: `${kwhMonth.toFixed(0)} kWh + insumos` },
+                  { label: "Receita / ano", value: priceG > 0 ? fmtBRL(revenueYear) : "—", sub: priceG > 0 ? `${fmtBRL(priceG)}/g` : "defina o R$/g" },
+                  { label: "Payback", value: paybackMonths ? `${paybackMonths.toFixed(1)} m` : "—", sub: paybackMonths ? `${(paybackMonths / (cycleDays / 30)).toFixed(1)} safras` : "lucro ≤ 0" },
+                ].map((s) => (
+                  <div key={s.label} className="rounded-2xl p-3.5 sm:p-4 transition-all"
+                    style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
+                    <p className="text-lg sm:text-xl font-bold tracking-tight" style={{ color: T.text }}>{s.value}</p>
+                    <p className="text-xs font-medium mt-0.5" style={{ color: T.muted }}>{s.label}</p>
+                    <p className="text-[10px]" style={{ color: T.faint }}>{s.sub}</p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsGrowPublic((p) => !p)}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isGrowPublic ? "bg-emerald-600" : "bg-stone-600"}`}
-                    title={isGrowPublic ? "Projeto Público" : "Projeto Privado"}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isGrowPublic ? "translate-x-5" : "translate-x-0"}`}
-                    />
-                  </button>
-                </div>
-              </div>
+                ))}
+              </section>
             </CollapsibleCard>
 
+            {/* ————— 2. TOP: CARD DO MAPA (PLANTA BAIXA & DISPOSIÇÃO) (COLAPSÁVEL) ————— */}
             <CollapsibleCard
-              title="Setups & Presets"
-              subtitle={`${allPresets.length} setups salvos`}
-              isOpen={openConfigCard === "presets"}
-              onToggle={() => toggleConfigCard("presets")}
-              T={T} dark={dark}>
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2 items-center">
-                  {allPresets.map((p) => (
-                    <div key={p.id || p.name} className="flex items-center rounded-full transition-all shrink-0 shadow-sm"
-                      style={{ background: T.surface2, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-                      <button onClick={() => loadPreset(p)}
-                        className="pl-3.5 pr-2 py-1.5 text-xs font-semibold hover:opacity-85 flex items-center gap-1.5 cursor-pointer"
-                        title={`Carregar setup "${p.name}"`}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.accentBorder }}>
-                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                        </svg>
-                        <span>{p.name}</span>
-                      </button>
-                      <button onClick={(e) => { e.stopPropagation(); removePreset(p.id || p.name, p.name); }}
-                        title={`Remover chip "${p.name}"`}
-                        className="pr-3 pl-1 py-1.5 text-xs font-bold transition-colors hover:text-red-500 rounded-r-full cursor-pointer"
-                        style={{ color: T.faint }}>
-                        ×
-                      </button>
-                    </div>
-                  ))}
-
-                  <button onClick={addCurrentAsPreset}
-                    title="Salvar a configuração atual como um novo chip de preset"
-                    className="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all hover:opacity-85 flex items-center gap-1.5 shrink-0 cursor-pointer"
-                    style={{ background: T.surface2, border: `1.5px dashed ${T.accentBorder}`, color: T.text }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="12" y1="5" x2="12" y2="19" />
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                    <span>Salvar preset atual</span>
-                  </button>
-
-                  {allPresets.length === 0 && (
-                    <button onClick={restoreDefaultPresets}
-                      className="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all hover:opacity-85 flex items-center gap-1.5 shrink-0 cursor-pointer"
-                      style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
-                      Restaurar presets padrão
-                    </button>
-                  )}
-                </div>
-              </div>
-            </CollapsibleCard>
-
-            <CollapsibleCard
-              title="1 · Estufa (cm)"
-              subtitle={`${width} × ${depth} × ${height} cm (${areaM2.toFixed(2)} m²)`}
-              isOpen={openConfigCard === "estufa"}
-              onToggle={() => toggleConfigCard("estufa")}
-              T={T} dark={dark}>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between"><span className="text-sm" style={{ color: T.muted }}>Largura</span>{num(width, setWidth, 60, 1000)}</div>
-                <div className="flex items-center justify-between"><span className="text-sm" style={{ color: T.muted }}>Profundidade</span>{num(depth, setDepth, 60, 1000)}</div>
-                <div className="flex items-center justify-between"><span className="text-sm" style={{ color: T.muted }}>Altura</span>{num(height, setHeight, 100, 400)}</div>
-              </div>
-              <p className="text-xs mt-3" style={{ color: T.faint }}>Área {areaM2.toFixed(2)} m² · Volume {volumeM3.toFixed(2)} m³</p>
-            </CollapsibleCard>
-
-            <CollapsibleCard
-              title="2 · Vasos & disposição"
-              subtitle={`${pot.label} (${potW}×${potD}×${potH} cm)`}
-              isOpen={openConfigCard === "vasos"}
-              onToggle={() => toggleConfigCard("vasos")}
-              T={T} dark={dark}>
-
-              {/* Representação Isométrica 3D do Vaso Configurado */}
-              <div className="mb-4 p-3 rounded-2xl transition-all relative overflow-hidden"
-                style={{ background: T.inset, border: `1px solid ${T.borderSoft}` }}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: T.faint }}>
-                    Vista Isométrica 3D do Vaso
-                  </span>
-                  <span className="text-[10px] font-semibold" style={{ color: T.muted }}>
-                    {pot.label} ({potW}×{potD}×{potH} cm)
-                  </span>
-                </div>
-                <IsometricPotSVG
-                  potW={potW}
-                  potD={potD}
-                  potH={potH}
-                  potLiters={pot.liters}
-                  isRect={isRect}
-                  isSquare={isSquare}
-                  isCalha={isCalha}
-                  dark={dark}
-                  T={T}
-                />
-              </div>
-
-              {/* Escolha do Vaso em Linha com Select */}
-              <div className="mb-3 p-2.5 rounded-xl space-y-1"
-                style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
-                <label className="text-[11px] font-bold block" style={{ color: T.text }}>
-                  Tipo de vaso / recipiente
-                </label>
-                <select
-                  value={potIdx}
-                  onChange={(e) => {
-                    const idx = Number(e.target.value);
-                    setPotIdx(idx);
-                    if (idx === POT_SIZES.length) {
-                      setPotShape("calha");
-                    } else if (idx === POT_SIZES.length + 1) {
-                      if (potShape === "calha") setPotShape("square");
-                    } else if (POT_SIZES[idx] && POT_SIZES[idx].shape) {
-                      setPotShape(POT_SIZES[idx].shape);
-                    }
-                  }}
-                  className="w-full h-8 px-2.5 rounded-lg text-xs font-semibold focus:outline-none cursor-pointer transition-all truncate"
-                  style={{ background: T.surface, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-                  {POT_SIZES.map((p, idx) => (
-                    <option key={p.label + idx} value={idx}>
-                      {p.label} · {p.desc}
-                    </option>
-                  ))}
-                  <option value={POT_SIZES.length}>
-                    Calha Hidropônica (Sob Medida)
-                  </option>
-                  <option value={POT_SIZES.length + 1}>
-                    Vaso Sob Medida / Customizado
-                  </option>
-                </select>
-              </div>
-
-              {/* Controles customizados se for vaso sob medida ou calha */}
-              {isCustomPot && (
-                <div className="space-y-3 mb-3 p-3 rounded-xl"
-                  style={{ background: T.surface2, border: `1px dashed ${T.accentBorder}` }}>
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <span className="text-xs font-bold" style={{ color: T.text }}>Formato do recipiente</span>
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <button onClick={() => setPotShape("calha")}
-                        className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-all"
-                        style={potShape === "calha"
-                          ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
-                          : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
-                        Calha
-                      </button>
-                      <button onClick={() => setPotShape("circle")}
-                        className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-all"
-                        style={potShape === "circle"
-                          ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
-                          : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
-                        Redondo
-                      </button>
-                      <button onClick={() => setPotShape("square")}
-                        className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-all"
-                        style={potShape === "square"
-                          ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
-                          : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
-                        Quadrado
-                      </button>
-                      <button onClick={() => setPotShape("rect")}
-                        className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-all"
-                        style={potShape === "rect"
-                          ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
-                          : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
-                        Retangular
-                      </button>
-                    </div>
-                  </div>
-
-                  {potShape === "calha" ? (
-                    <div className="space-y-2.5 pt-1">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-xs font-semibold block" style={{ color: T.text }}>Largura da calha</span>
-                          <span className="text-[10px]" style={{ color: T.faint }}>Seção transversal</span>
-                        </div>
-                        {num(customPotW, setCustomPotW, 5, 200, 1)}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-xs font-semibold block" style={{ color: T.text }}>Comprimento da calha</span>
-                          <span className="text-[10px]" style={{ color: T.faint }}>Extensão longitudinal</span>
-                        </div>
-                        {num(customPotL, setCustomPotL, 10, 1000, 5)}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-xs font-semibold block" style={{ color: T.text }}>Profundidade da calha</span>
-                          <span className="text-[10px]" style={{ color: T.faint }}>Altura útil do leito</span>
-                        </div>
-                        {num(customPotH, setCustomPotH, 5, 150, 1)}
-                      </div>
-                      <p className="text-[11px] font-medium pt-1" style={{ color: T.muted }}>
-                        Volume total da calha: <strong style={{ color: T.text }}>{customLiters} Litros</strong>
-                      </p>
-                    </div>
-                  ) : potShape === "circle" ? (
-                    <div className="space-y-2.5 pt-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold" style={{ color: T.text }}>Diâmetro (cm)</span>
-                        {num(customPotW, setCustomPotW, 10, 150, 1)}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold" style={{ color: T.text }}>Altura (cm)</span>
-                        {num(customPotH, setCustomPotH, 10, 150, 1)}
-                      </div>
-                    </div>
-                  ) : potShape === "square" ? (
-                    <div className="space-y-2.5 pt-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold" style={{ color: T.text }}>Lado / Largura (cm)</span>
-                        {num(customPotW, (v) => { setCustomPotW(v); setCustomPotL(v); }, 10, 150, 1)}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold" style={{ color: T.text }}>Altura (cm)</span>
-                        {num(customPotH, setCustomPotH, 10, 150, 1)}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2.5 pt-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold" style={{ color: T.text }}>Largura (cm)</span>
-                        {num(customPotW, setCustomPotW, 10, 150, 1)}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold" style={{ color: T.text }}>Comprimento (cm)</span>
-                        {num(customPotL, setCustomPotL, 10, 150, 1)}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold" style={{ color: T.text }}>Altura (cm)</span>
-                        {num(customPotH, setCustomPotH, 10, 150, 1)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Botão de girar vaso retangular se aplicável */}
-              {isRect && (
-                <div className="mt-3 p-2.5 rounded-xl flex items-center justify-between transition-all"
-                  style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
-                  <div>
-                    <span className="text-xs font-bold block" style={{ color: T.text }}>
-                      Orientação do vaso retangular
-                    </span>
-                    <span className="text-[11px] block mt-0.5" style={{ color: T.muted }}>
-                      Largura: <strong>{potW} cm</strong> × Profundidade: <strong>{potD} cm</strong>
-                    </span>
-                  </div>
-                  <button onClick={() => setPotFlipped((f) => !f)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:opacity-85 flex items-center gap-1.5 shrink-0"
-                    style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-                     Girar ({potW}×{potD})
-                  </button>
-                </div>
-              )}
-            </CollapsibleCard>
-
-            <CollapsibleCard
-              title="3 · Iluminação & fotoperíodo"
-              subtitle={`${ledWatts}W LED · ${vegaHours}h/${floraHours}h · ${fmtG(yieldHarvest)}/safra`}
-              isOpen={openConfigCard === "iluminacao"}
-              onToggle={() => toggleConfigCard("iluminacao")}
-              T={T} dark={dark}>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-sm font-medium block" style={{ color: T.text }}>Potência do LED</span>
-                    <span className="text-xs" style={{ color: T.faint }}>Consumo total de iluminação</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <NumInput value={watts?.led || 0} onCommit={(n) => setW("led", n)} min={0} max={10000}
-                      className={`w-20 h-8 ${inputCls}`} style={inputStyle} />
-                    <span className="text-xs font-medium" style={{ color: T.muted }}>W</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 pt-2" style={{ borderTop: `1px solid ${T.borderSoft}` }}>
-                  <div>
-                    <span className="text-xs font-medium block mb-1" style={{ color: T.muted }}>Vegetativo</span>
-                    <div className="flex items-center justify-between p-2 rounded-xl" style={{ background: T.surface2 }}>
-                      <span className="text-xs" style={{ color: T.faint }}>Luz</span>
-                      {numSm(vegaHours, setVegaHours, 0, 24, 1)}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-xs font-medium block mb-1" style={{ color: T.muted }}>Floração</span>
-                    <div className="flex items-center justify-between p-2 rounded-xl" style={{ background: T.surface2 }}>
-                      <span className="text-xs" style={{ color: T.faint }}>Luz</span>
-                      {numSm(floraHours, setFloraHours, 0, 24, 1)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 pt-2" style={{ borderTop: `1px solid ${T.borderSoft}` }}>
-                  <div>
-                    <span className="text-xs font-medium block mb-1" style={{ color: T.muted }}>Duração Vega</span>
-                    <div className="flex items-center justify-between p-2 rounded-xl" style={{ background: T.surface2 }}>
-                      <span className="text-xs" style={{ color: T.faint }}>Dias</span>
-                      {numSm(vegaDays, setVegaDays, 1, 180, 5)}
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-xs font-medium block mb-1" style={{ color: T.muted }}>Duração Flora</span>
-                    <div className="flex items-center justify-between p-2 rounded-xl" style={{ background: T.surface2 }}>
-                      <span className="text-xs" style={{ color: T.faint }}>Dias</span>
-                      {numSm(floraDays, setFloraDays, 1, 180, 5)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CollapsibleCard>
-
-            <CollapsibleCard
-              title="4 · Equipamentos & custos"
-              subtitle={`${EQUIPMENT.filter((e) => equip[e.id] > 0).length} ativos · ${fmtBRL(capex)} CAPEX`}
-              isOpen={openConfigCard === "equipamentos"}
-              onToggle={() => toggleConfigCard("equipamentos")}
-              T={T} dark={dark}>
-              <div className="space-y-3">
-                {EQUIPMENT.map((e) => {
-                  const on = equip[e.id] > 0;
-                  const isPerPot = !!perPot[e.id];
-                  const effQty = isPerPot ? equip[e.id] * layout.placed : equip[e.id];
-                  return (
-                    <div key={e.id} className="rounded-xl p-3 transition-colors"
-                      style={{ background: on ? T.surface2 : "transparent", border: `1px solid ${on ? T.border : T.borderSoft}` }}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" checked={on}
-                            onChange={(ev) => setEquip((prev) => ({ ...prev, [e.id]: ev.target.checked ? (prev[e.id] || 1) : 0 }))}
-                            className="rounded w-4 h-4 accent-amber-500 cursor-pointer" />
-                          <span className="text-xs font-medium" style={{ color: on ? T.text : T.muted }}>
-                            {e.name}
-                          </span>
-                        </div>
-                        {on && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[11px]" style={{ color: T.faint }}>qtd</span>
-                            <NumInput value={equip[e.id]} min={1} max={99}
-                              onCommit={(n) => setEquip((prev) => ({ ...prev, [e.id]: n }))}
-                              className={`w-12 h-7 ${inputCls}`} style={inputStyle} />
-                          </div>
-                        )}
-                      </div>
-
-                      {on && (
-                        <div className="mt-3 pt-3 space-y-2" style={{ borderTop: `1px solid ${T.borderSoft}` }}>
-                          <div className="flex items-center gap-3 flex-wrap">
-                            <div className="flex items-center gap-1">
-                              <NumInput value={watts[e.id]} min={0} max={5000}
-                                onCommit={(n) => setW(e.id, n)}
-                                className={`w-16 h-7 ${inputCls}`} style={inputStyle} />
-                              <span className="text-[11px] font-medium" style={{ color: T.muted }}>W</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span className="text-[11px]" style={{ color: T.faint }}>R$/un</span>
-                              <MoneyInput value={costs[e.id]}
-                                onCommit={(n) => setCost(e.id, n)}
-                                className={`w-20 h-7 ${inputCls}`} style={inputStyle} />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </CollapsibleCard>
-
-            <CollapsibleCard
-              title="5 · Observações, instruções e termos"
-              subtitle={notes || instructions || terms ? "Preenchido" : undefined}
-              isOpen={openConfigCard === "observacoes"}
-              onToggle={() => toggleConfigCard("observacoes")}
-              T={T} dark={dark}>
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs block mb-1 font-medium" style={{ color: T.muted }}>Observações</label>
-                  <textarea
-                    rows={2}
-                    value={notes}
-                    placeholder="Notas adicionais do projeto, observações técnicas..."
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="w-full p-2.5 rounded-lg text-xs font-medium focus:outline-none resize-y"
-                    style={inputStyle}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs block mb-1 font-medium" style={{ color: T.muted }}>Instruções de operação</label>
-                  <textarea
-                    rows={2}
-                    value={instructions}
-                    placeholder="Instruções de rega, manutenção, trocas de solução..."
-                    onChange={(e) => setInstructions(e.target.value)}
-                    className="w-full p-2.5 rounded-lg text-xs font-medium focus:outline-none resize-y"
-                    style={inputStyle}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs block mb-1 font-medium" style={{ color: T.muted }}>Termos & Condições</label>
-                  <textarea
-                    rows={2}
-                    value={terms}
-                    placeholder="Termos de garantia, responsabilidade, prazos..."
-                    onChange={(e) => setTerms(e.target.value)}
-                    className="w-full p-2.5 rounded-lg text-xs font-medium focus:outline-none resize-y"
-                    style={inputStyle}
-                  />
-                </div>
-              </div>
-            </CollapsibleCard>
-          </div>
-
-          {/* ————— Planta + resumo ————— */}
-          <div className="lg:col-span-3 space-y-4 sm:space-y-5 w-full max-w-full min-w-0">
-            <CollapsibleCard
-              title={growName ? growName : "Planta baixa"}
-              subtitle={`${layout.nRows} × ${Math.min(layout.useCols, layout.placed)} · ${plants} vasos · ${width} × ${depth} cm`}
-              T={T} dark={dark}>
-              <div className="p-3.5 rounded-xl mb-4 flex items-center justify-between gap-3 flex-wrap"
+              title={growName ? growName : "Planta Baixa & Disposição"}
+              subtitle={`${layout.nRows} × ${Math.min(layout.useCols, layout.placed)} · ${plants} vasos · ${width} × ${depth} cm · ${connInfo.name}`}
+              isOpen={openMapCard}
+              onToggle={() => setOpenMapCard((o) => !o)}
+              className="shadow-sm"
+              T={T}
+              dark={dark}
+            >
+              <div className="p-3 sm:p-3.5 rounded-xl mb-4 flex items-center justify-between gap-3 flex-wrap"
                 style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="h-10 px-3 rounded-lg flex items-center justify-center font-extrabold text-base shrink-0 tracking-tight"
@@ -6044,7 +5615,6 @@ function GrowinStones() {
                       strokeLinecap="round" {...segStyle(s.kind)} />
                   ))}
 
-
                   {layout.grid.map((p, i) => (
                     <g key={i}>
                       {isRect ? (
@@ -6075,7 +5645,7 @@ function GrowinStones() {
                   ))}
 
                   {showRes && (
-                    <g>
+                     <g>
                       <text x={OX} y={resY - 6} fontSize="9" fill={T.faint} style={{ letterSpacing: "0.1em" }}>ZONA TÉCNICA</text>
                       {resItems.map((it) => (
                         <g key={it.id}>
@@ -6204,7 +5774,7 @@ function GrowinStones() {
                           {potW} × {potD} cm
                         </span>
                       </div>
-                  <button onClick={() => setPotFlipped((f) => !f)}
+                      <button onClick={() => setPotFlipped((f) => !f)}
                         className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-all hover:opacity-85 flex items-center gap-1 shrink-0"
                         style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -6233,130 +5803,579 @@ function GrowinStones() {
               </div>
             </CollapsibleCard>
 
-            {/* Resumo */}
-            <section className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { label: "Receita / safra", value: priceG > 0 ? fmtBRL(revenueHarvest) : "—", sub: priceG > 0 ? `${fmtG(yieldHarvest)} / safra` : "defina o R$/g" },
-                { label: "Safras / ano", value: harvestsYear.toFixed(1), sub: `ciclo de ${cycleDays} dias` },
-                { label: "Produção / safra", value: fmtG(yieldHarvest), sub: `${yieldM2.toFixed(0)} g/m²` },
-                { label: "Produção / ano", value: fmtG(yieldYear), sub: ledWatts > 0 ? `${gPerW.toFixed(2)} g/W` : "sem luz" },
-                { label: "Investimento", value: fmtBRL(capex), sub: `${fmtBRL(capexPerPlant)} / planta` },
-                { label: "OPEX mensal", value: fmtBRL(opexMonth), sub: `${kwhMonth.toFixed(0)} kWh + insumos` },
-                { label: "Receita / ano", value: priceG > 0 ? fmtBRL(revenueYear) : "—", sub: priceG > 0 ? `${fmtBRL(priceG)}/g` : "defina o R$/g" },
-                { label: "Payback", value: paybackMonths ? `${paybackMonths.toFixed(1)} m` : "—", sub: paybackMonths ? `${(paybackMonths / (cycleDays / 30)).toFixed(1)} safras` : "lucro ≤ 0" },
-              ].map((s) => (
-                <div key={s.label} className="rounded-2xl p-4"
-                  style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
-                  <p className="text-xl font-bold tracking-tight">{s.value}</p>
-                  <p className="text-xs font-medium mt-0.5" style={{ color: T.muted }}>{s.label}</p>
-                  <p className="text-[10px]" style={{ color: T.faint }}>{s.sub}</p>
-                </div>
-              ))}
-            </section>
+            {/* ————— 3. SÓ ASSIM O RESTANTE DO CONFIGURADOR (FORMULÁRIOS & OPÇÕES) ————— */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 items-start w-full max-w-full min-w-0">
+              {/* Coluna 1: Estrutura, Vasos, Presets, Iluminação, Equipamentos, Observações */}
+              <div className="space-y-4 sm:space-y-5 w-full max-w-full min-w-0">
+                <CollapsibleCard
+                  title="Identificação"
+                  subtitle={growName || owner || strain ? `${growName || "Grow"}${strain ? ` · ${strain}` : ""}` : undefined}
+                  isOpen={openConfigCard === "identificacao"}
+                  onToggle={() => toggleConfigCard("identificacao")}
+                  T={T} dark={dark}>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs block mb-1" style={{ color: T.muted }}>Nome do grow</label>
+                      <input type="text" value={growName} placeholder="Ex.: Grow Sala Verde"
+                        onChange={(e) => setGrowName(e.target.value)}
+                        className="w-full h-9 px-3 rounded-lg text-sm font-medium focus:outline-none" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label className="text-xs block mb-1" style={{ color: T.muted }}>Responsável</label>
+                      <input type="text" value={owner} placeholder="Seu nome"
+                        onChange={(e) => setOwner(e.target.value)}
+                        className="w-full h-9 px-3 rounded-lg text-sm font-medium focus:outline-none" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label className="text-xs block mb-1" style={{ color: T.muted }}>Variedade / Genética da planta</label>
+                      <input type="text" value={strain} placeholder="Ex.: White Widow, Gorilla Glue..."
+                        onChange={(e) => setStrain(e.target.value)}
+                        className="w-full h-9 px-3 rounded-lg text-sm font-medium focus:outline-none" style={inputStyle} />
+                    </div>
 
-            {/* Ajustes de produtividade e custos */}
-            <CollapsibleCard
-              title="Ajustes de produtividade e custos"
-              subtitle="Parâmetros de rendimento, valor de venda e OPEX mensal"
-              T={T} dark={dark}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 p-1">
-                <div className="flex items-center justify-between gap-3 p-3 rounded-xl" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
-                  <span className="text-xs font-semibold" style={{ color: T.text }}>Produtividade (g/planta)</span>
-                  {num(yieldPerPlant, setYieldPerPlant, 1, 2000, 10)}
-                </div>
-                <div className="flex items-center justify-between gap-3 p-3 rounded-xl" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
-                  <span className="text-xs font-semibold" style={{ color: T.text }}>Valor de mercado (R$/g)</span>
-                  {money(priceG, setPriceG, "w-24")}
-                </div>
-                <div className="flex items-center justify-between gap-3 p-3 rounded-xl" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
-                  <span className="text-xs font-semibold" style={{ color: T.text }}>Tarifa de energia (R$/kWh)</span>
-                  {money(tariff, setTariff, "w-24")}
-                </div>
-                <div className="flex items-center justify-between gap-3 p-3 rounded-xl" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
-                  <span className="text-xs font-semibold" style={{ color: T.text }}>Insumos mensais (R$)</span>
-                  {money(monthlyCost, setMonthlyCost, "w-24")}
-                </div>
-              </div>
-            </CollapsibleCard>
-
-            {/* Diagnóstico */}
-            <CollapsibleCard
-              title="Diagnóstico do projeto"
-              subtitle={`${alerts.length} alerta(s)`}
-              T={T} dark={dark}>
-              <ul className="space-y-2">
-                {alerts.map((a, i) => (
-                  <li key={i} className="flex gap-2 text-[13px] leading-snug" style={{ color: alertColor(a.level) }}>
-                    <span className="shrink-0 mt-[5px] w-1.5 h-1.5 rounded-full" style={{ background: alertColor(a.level) }} />
-                    <span>{a.text}</span>
-                  </li>
-                ))}
-              </ul>
-            </CollapsibleCard>
-
-            {/* Lista de materiais & custos */}
-            <CollapsibleCard
-              title="Lista de materiais & custos"
-              subtitle={`CAPEX ${fmtBRL(capex)}`}
-              action={<span className="text-[11px]" style={{ color: T.faint }}>edite o R$ unitário</span>}
-              T={T} dark={dark}>
-              <ul className="text-sm">
-                {materialRows.map((r) => (
-                  <li key={r.key + r.label} className="py-2 flex items-center justify-between gap-3 flex-wrap"
-                    style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                    <span className="min-w-0 flex-1" style={{ color: T.muted }}>
-                      {r.label} <span style={{ color: T.faint }}>· {r.qty} {r.unitLabel}</span>
-                    </span>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="flex items-center gap-1">
-                        <span className="text-[11px]" style={{ color: T.faint }}>R$</span>
-                        <MoneyInput value={r.unitCost}
-                          onCommit={(n) => (r.customId ? updCustom(r.customId, { cost: n }) : setCost(r.key, n))}
-                          className={`w-20 h-7 ${inputCls}`} style={inputStyle} />
+                    {/* Toggle: Projeto Público / Privado no Subdomínio */}
+                    <div className="pt-2.5 mt-1 border-t flex items-center justify-between gap-3" style={{ borderColor: T.borderSoft }}>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold" style={{ color: T.text }}>
+                          Projeto Público no Subdomínio
+                        </div>
+                        <div className="text-[11px] mt-0.5" style={{ color: T.muted }}>
+                          {isGrowPublic ? "Visível no seu subdomínio exclusivo" : "Oculto (Apenas seu perfil e posts serão públicos)"}
+                        </div>
                       </div>
-                      <span className="font-semibold w-20 text-right">{fmtBRL(r.subtotal)}</span>
                       <button
-                        onClick={() => removeMaterialRow(r)}
-                        title={`Remover "${r.label}"`}
-                        aria-label={`Remover ${r.label}`}
-                        className="w-7 h-7 rounded-lg transition-all hover:opacity-80 flex items-center justify-center shrink-0"
-                        style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="18" y1="6" x2="6" y2="18" />
-                          <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
+                        type="button"
+                        onClick={() => setIsGrowPublic((p) => !p)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isGrowPublic ? "bg-emerald-600" : "bg-stone-600"}`}
+                        title={isGrowPublic ? "Projeto Público" : "Projeto Privado"}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isGrowPublic ? "translate-x-5" : "translate-x-0"}`}
+                        />
                       </button>
                     </div>
-                  </li>
-                ))}
-                <li className="py-2 flex items-center justify-between gap-3"
-                  style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
-                  <span style={{ color: T.muted }}>Custos extras (frete, elétrica, estrutura…)</span>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {money(extraCost, setExtraCost)}
-                    <span className="font-semibold w-24 text-right">{fmtBRL(extraCost)}</span>
                   </div>
-                </li>
-                <li className="pt-3 flex items-center justify-between">
-                  <span className="text-sm font-bold">Investimento total (CAPEX)</span>
-                  <span className="text-lg font-extrabold">{fmtBRL(capex)}</span>
-                </li>
-              </ul>
-            </CollapsibleCard>
+                </CollapsibleCard>
 
-            <button onClick={() => setShowReport(true)}
-              className="w-full py-3.5 rounded-2xl text-sm font-bold transition-opacity hover:opacity-85 flex items-center justify-center gap-2"
-              style={{ background: T.text, color: T.bg }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" y1="13" x2="8" y2="13" />
-                <line x1="16" y1="17" x2="8" y2="17" />
-              </svg>
-              <span>Exportar relatório completo (PDF)</span>
-            </button>
+                <CollapsibleCard
+                  title="Setups & Presets"
+                  subtitle={`${allPresets.length} setups salvos`}
+                  isOpen={openConfigCard === "presets"}
+                  onToggle={() => toggleConfigCard("presets")}
+                  T={T} dark={dark}>
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      {allPresets.map((p) => (
+                        <div key={p.id || p.name} className="flex items-center rounded-full transition-all shrink-0 shadow-sm"
+                          style={{ background: T.surface2, border: `1px solid ${T.accentBorder}`, color: T.text }}>
+                          <button onClick={() => loadPreset(p)}
+                            className="pl-3.5 pr-2 py-1.5 text-xs font-semibold hover:opacity-85 flex items-center gap-1.5 cursor-pointer"
+                            title={`Carregar setup "${p.name}"`}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.accentBorder }}>
+                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                            </svg>
+                            <span>{p.name}</span>
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); removePreset(p.id || p.name, p.name); }}
+                            title={`Remover chip "${p.name}"`}
+                            className="pr-3 pl-1 py-1.5 text-xs font-bold transition-colors hover:text-red-500 rounded-r-full cursor-pointer"
+                            style={{ color: T.faint }}>
+                            ×
+                          </button>
+                        </div>
+                      ))}
+
+                      <button onClick={addCurrentAsPreset}
+                        title="Salvar a configuração atual como um novo chip de preset"
+                        className="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all hover:opacity-85 flex items-center gap-1.5 shrink-0 cursor-pointer"
+                        style={{ background: T.surface2, border: `1.5px dashed ${T.accentBorder}`, color: T.text }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="12" y1="5" x2="12" y2="19" />
+                          <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        <span>Salvar preset atual</span>
+                      </button>
+
+                      {allPresets.length === 0 && (
+                        <button onClick={restoreDefaultPresets}
+                          className="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all hover:opacity-85 flex items-center gap-1.5 shrink-0 cursor-pointer"
+                          style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
+                          Restaurar presets padrão
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </CollapsibleCard>
+
+                <CollapsibleCard
+                  title="1 · Estufa (cm)"
+                  subtitle={`${width} × ${depth} × ${height} cm (${areaM2.toFixed(2)} m²)`}
+                  isOpen={openConfigCard === "estufa"}
+                  onToggle={() => toggleConfigCard("estufa")}
+                  T={T} dark={dark}>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between"><span className="text-sm" style={{ color: T.muted }}>Largura</span>{num(width, setWidth, 60, 1000)}</div>
+                    <div className="flex items-center justify-between"><span className="text-sm" style={{ color: T.muted }}>Profundidade</span>{num(depth, setDepth, 60, 1000)}</div>
+                    <div className="flex items-center justify-between"><span className="text-sm" style={{ color: T.muted }}>Altura</span>{num(height, setHeight, 100, 400)}</div>
+                  </div>
+                  <p className="text-xs mt-3" style={{ color: T.faint }}>Área {areaM2.toFixed(2)} m² · Volume {volumeM3.toFixed(2)} m³</p>
+                </CollapsibleCard>
+
+                <CollapsibleCard
+                  title="2 · Vasos & disposição"
+                  subtitle={`${pot.label} (${potW}×${potD}×${potH} cm)`}
+                  isOpen={openConfigCard === "vasos"}
+                  onToggle={() => toggleConfigCard("vasos")}
+                  T={T} dark={dark}>
+
+                  {/* Representação Isométrica 3D do Vaso Configurado */}
+                  <div className="mb-4 p-3 rounded-2xl transition-all relative overflow-hidden"
+                    style={{ background: T.inset, border: `1px solid ${T.borderSoft}` }}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider block" style={{ color: T.faint }}>
+                        Vista Isométrica 3D do Vaso
+                      </span>
+                      <span className="text-[10px] font-semibold" style={{ color: T.muted }}>
+                        {pot.label} ({potW}×{potD}×{potH} cm)
+                      </span>
+                    </div>
+                    <IsometricPotSVG
+                      potW={potW}
+                      potD={potD}
+                      potH={potH}
+                      potLiters={pot.liters}
+                      isRect={isRect}
+                      isSquare={isSquare}
+                      isCalha={isCalha}
+                      dark={dark}
+                      T={T}
+                    />
+                  </div>
+
+                  {/* Escolha do Vaso em Linha com Select */}
+                  <div className="mb-3 p-2.5 rounded-xl space-y-1"
+                    style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
+                    <label className="text-[11px] font-bold block" style={{ color: T.text }}>
+                      Tipo de vaso / recipiente
+                    </label>
+                    <select
+                      value={potIdx}
+                      onChange={(e) => {
+                        const idx = Number(e.target.value);
+                        setPotIdx(idx);
+                        if (idx === POT_SIZES.length) {
+                          setPotShape("calha");
+                        } else if (idx === POT_SIZES.length + 1) {
+                          if (potShape === "calha") setPotShape("square");
+                        } else if (POT_SIZES[idx] && POT_SIZES[idx].shape) {
+                          setPotShape(POT_SIZES[idx].shape);
+                        }
+                      }}
+                      className="w-full h-8 px-2.5 rounded-lg text-xs font-semibold focus:outline-none cursor-pointer transition-all truncate"
+                      style={{ background: T.surface, border: `1px solid ${T.accentBorder}`, color: T.text }}>
+                      {POT_SIZES.map((p, idx) => (
+                        <option key={p.label + idx} value={idx}>
+                          {p.label} · {p.desc}
+                        </option>
+                      ))}
+                      <option value={POT_SIZES.length}>
+                        Calha Hidropônica (Sob Medida)
+                      </option>
+                      <option value={POT_SIZES.length + 1}>
+                        Vaso Sob Medida / Customizado
+                      </option>
+                    </select>
+                  </div>
+
+                  {/* Controles customizados se for vaso sob medida ou calha */}
+                  {isCustomPot && (
+                    <div className="space-y-3 mb-3 p-3 rounded-xl"
+                      style={{ background: T.surface2, border: `1px dashed ${T.accentBorder}` }}>
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <span className="text-xs font-bold" style={{ color: T.text }}>Formato do recipiente</span>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <button onClick={() => setPotShape("calha")}
+                            className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-all"
+                            style={potShape === "calha"
+                              ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
+                              : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
+                            Calha
+                          </button>
+                          <button onClick={() => setPotShape("circle")}
+                            className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-all"
+                            style={potShape === "circle"
+                              ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
+                              : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
+                            Redondo
+                          </button>
+                          <button onClick={() => setPotShape("square")}
+                            className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-all"
+                            style={potShape === "square"
+                              ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
+                              : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
+                            Quadrado
+                          </button>
+                          <button onClick={() => setPotShape("rect")}
+                            className="px-2.5 py-1 rounded-md text-[11px] font-bold transition-all"
+                            style={potShape === "rect"
+                              ? { background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }
+                              : { background: T.surface, border: `1px solid ${T.border}`, color: T.muted }}>
+                            Retangular
+                          </button>
+                        </div>
+                      </div>
+
+                      {potShape === "calha" ? (
+                        <div className="space-y-2.5 pt-1">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="text-xs font-semibold block" style={{ color: T.text }}>Largura da calha</span>
+                              <span className="text-[10px]" style={{ color: T.faint }}>Seção transversal</span>
+                            </div>
+                            {num(customPotW, setCustomPotW, 5, 200, 1)}
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="text-xs font-semibold block" style={{ color: T.text }}>Comprimento da calha</span>
+                              <span className="text-[10px]" style={{ color: T.faint }}>Extensão longitudinal</span>
+                            </div>
+                            {num(customPotL, setCustomPotL, 10, 1000, 5)}
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="text-xs font-semibold block" style={{ color: T.text }}>Profundidade da calha</span>
+                              <span className="text-[10px]" style={{ color: T.faint }}>Altura útil do leito</span>
+                            </div>
+                            {num(customPotH, setCustomPotH, 5, 150, 1)}
+                          </div>
+                          <p className="text-[11px] font-medium pt-1" style={{ color: T.muted }}>
+                            Volume total da calha: <strong style={{ color: T.text }}>{customLiters} Litros</strong>
+                          </p>
+                        </div>
+                      ) : potShape === "circle" ? (
+                        <div className="space-y-2.5 pt-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold" style={{ color: T.text }}>Diâmetro (cm)</span>
+                            {num(customPotW, setCustomPotW, 10, 150, 1)}
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold" style={{ color: T.text }}>Altura (cm)</span>
+                            {num(customPotH, setCustomPotH, 10, 150, 1)}
+                          </div>
+                        </div>
+                      ) : potShape === "square" ? (
+                        <div className="space-y-2.5 pt-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold" style={{ color: T.text }}>Lado / Largura (cm)</span>
+                            {num(customPotW, (v) => { setCustomPotW(v); setCustomPotL(v); }, 10, 150, 1)}
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold" style={{ color: T.text }}>Altura (cm)</span>
+                            {num(customPotH, setCustomPotH, 10, 150, 1)}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2.5 pt-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold" style={{ color: T.text }}>Largura (cm)</span>
+                            {num(customPotW, setCustomPotW, 10, 150, 1)}
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold" style={{ color: T.text }}>Comprimento (cm)</span>
+                            {num(customPotL, setCustomPotL, 10, 150, 1)}
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold" style={{ color: T.text }}>Altura (cm)</span>
+                            {num(customPotH, setCustomPotH, 10, 150, 1)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Botão de girar vaso retangular se aplicável */}
+                  {isRect && (
+                    <div className="mt-3 p-2.5 rounded-xl flex items-center justify-between transition-all"
+                      style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
+                      <div>
+                        <span className="text-xs font-bold block" style={{ color: T.text }}>
+                          Orientação do vaso retangular
+                        </span>
+                        <span className="text-[11px] block mt-0.5" style={{ color: T.muted }}>
+                          Largura: <strong>{potW} cm</strong> × Profundidade: <strong>{potD} cm</strong>
+                        </span>
+                      </div>
+                      <button onClick={() => setPotFlipped((f) => !f)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:opacity-85 flex items-center gap-1.5 shrink-0"
+                        style={{ background: T.accentBg, border: `1px solid ${T.accentBorder}`, color: T.text }}>
+                         Girar ({potW}×{potD})
+                      </button>
+                    </div>
+                  )}
+                </CollapsibleCard>
+
+                <CollapsibleCard
+                  title="3 · Iluminação & fotoperíodo"
+                  subtitle={`${ledWatts}W LED · ${vegaHours}h/${floraHours}h · ${fmtG(yieldHarvest)}/safra`}
+                  isOpen={openConfigCard === "iluminacao"}
+                  onToggle={() => toggleConfigCard("iluminacao")}
+                  T={T} dark={dark}>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-sm font-medium block" style={{ color: T.text }}>Potência do LED</span>
+                        <span className="text-xs" style={{ color: T.faint }}>Consumo total de iluminação</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <NumInput value={watts?.led || 0} onCommit={(n) => setW("led", n)} min={0} max={10000}
+                          className={`w-20 h-8 ${inputCls}`} style={inputStyle} />
+                        <span className="text-xs font-medium" style={{ color: T.muted }}>W</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-2" style={{ borderTop: `1px solid ${T.borderSoft}` }}>
+                      <div>
+                        <span className="text-xs font-medium block mb-1" style={{ color: T.muted }}>Vegetativo</span>
+                        <div className="flex items-center justify-between p-2 rounded-xl" style={{ background: T.surface2 }}>
+                          <span className="text-xs" style={{ color: T.faint }}>Luz</span>
+                          {numSm(vegaHours, setVegaHours, 0, 24, 1)}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-xs font-medium block mb-1" style={{ color: T.muted }}>Floração</span>
+                        <div className="flex items-center justify-between p-2 rounded-xl" style={{ background: T.surface2 }}>
+                          <span className="text-xs" style={{ color: T.faint }}>Luz</span>
+                          {numSm(floraHours, setFloraHours, 0, 24, 1)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-2" style={{ borderTop: `1px solid ${T.borderSoft}` }}>
+                      <div>
+                        <span className="text-xs font-medium block mb-1" style={{ color: T.muted }}>Duração Vega</span>
+                        <div className="flex items-center justify-between p-2 rounded-xl" style={{ background: T.surface2 }}>
+                          <span className="text-xs" style={{ color: T.faint }}>Dias</span>
+                          {numSm(vegaDays, setVegaDays, 1, 180, 5)}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-xs font-medium block mb-1" style={{ color: T.muted }}>Duração Flora</span>
+                        <div className="flex items-center justify-between p-2 rounded-xl" style={{ background: T.surface2 }}>
+                          <span className="text-xs" style={{ color: T.faint }}>Dias</span>
+                          {numSm(floraDays, setFloraDays, 1, 180, 5)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CollapsibleCard>
+
+                <CollapsibleCard
+                  title="4 · Equipamentos & custos"
+                  subtitle={`${EQUIPMENT.filter((e) => equip[e.id] > 0).length} ativos · ${fmtBRL(capex)} CAPEX`}
+                  isOpen={openConfigCard === "equipamentos"}
+                  onToggle={() => toggleConfigCard("equipamentos")}
+                  T={T} dark={dark}>
+                  <div className="space-y-3">
+                    {EQUIPMENT.map((e) => {
+                      const on = equip[e.id] > 0;
+                      const isPerPot = !!perPot[e.id];
+                      const effQty = isPerPot ? equip[e.id] * layout.placed : equip[e.id];
+                      return (
+                        <div key={e.id} className="rounded-xl p-3 transition-colors"
+                          style={{ background: on ? T.surface2 : "transparent", border: `1px solid ${on ? T.border : T.borderSoft}` }}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <input type="checkbox" checked={on}
+                                onChange={(ev) => setEquip((prev) => ({ ...prev, [e.id]: ev.target.checked ? (prev[e.id] || 1) : 0 }))}
+                                className="rounded w-4 h-4 accent-amber-500 cursor-pointer" />
+                              <span className="text-xs font-medium" style={{ color: on ? T.text : T.muted }}>
+                                {e.name}
+                              </span>
+                            </div>
+                            {on && (
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[11px]" style={{ color: T.faint }}>qtd</span>
+                                <NumInput value={equip[e.id]} min={1} max={99}
+                                  onCommit={(n) => setEquip((prev) => ({ ...prev, [e.id]: n }))}
+                                  className={`w-12 h-7 ${inputCls}`} style={inputStyle} />
+                              </div>
+                            )}
+                          </div>
+
+                          {on && (
+                            <div className="mt-3 pt-3 space-y-2" style={{ borderTop: `1px solid ${T.borderSoft}` }}>
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <div className="flex items-center gap-1">
+                                  <NumInput value={watts[e.id]} min={0} max={5000}
+                                    onCommit={(n) => setW(e.id, n)}
+                                    className={`w-16 h-7 ${inputCls}`} style={inputStyle} />
+                                  <span className="text-[11px] font-medium" style={{ color: T.muted }}>W</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[11px]" style={{ color: T.faint }}>R$/un</span>
+                                  <MoneyInput value={costs[e.id]}
+                                    onCommit={(n) => setCost(e.id, n)}
+                                    className={`w-20 h-7 ${inputCls}`} style={inputStyle} />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CollapsibleCard>
+
+                <CollapsibleCard
+                  title="5 · Observações, instruções e termos"
+                  subtitle={notes || instructions || terms ? "Preenchido" : undefined}
+                  isOpen={openConfigCard === "observacoes"}
+                  onToggle={() => toggleConfigCard("observacoes")}
+                  T={T} dark={dark}>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs block mb-1 font-medium" style={{ color: T.muted }}>Observações</label>
+                      <textarea
+                        rows={2}
+                        value={notes}
+                        placeholder="Notas adicionais do projeto, observações técnicas..."
+                        onChange={(e) => setNotes(e.target.value)}
+                        className="w-full p-2.5 rounded-lg text-xs font-medium focus:outline-none resize-y"
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs block mb-1 font-medium" style={{ color: T.muted }}>Instruções de operação</label>
+                      <textarea
+                        rows={2}
+                        value={instructions}
+                        placeholder="Instruções de rega, manutenção, trocas de solução..."
+                        onChange={(e) => setInstructions(e.target.value)}
+                        className="w-full p-2.5 rounded-lg text-xs font-medium focus:outline-none resize-y"
+                        style={inputStyle}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs block mb-1 font-medium" style={{ color: T.muted }}>Termos & Condições</label>
+                      <textarea
+                        rows={2}
+                        value={terms}
+                        placeholder="Termos de garantia, responsabilidade, prazos..."
+                        onChange={(e) => setTerms(e.target.value)}
+                        className="w-full p-2.5 rounded-lg text-xs font-medium focus:outline-none resize-y"
+                        style={inputStyle}
+                      />
+                    </div>
+                  </div>
+                </CollapsibleCard>
+              </div>
+
+              {/* Coluna 2: Produtividade/Custos, Diagnóstico, Lista de Materiais, Botão PDF */}
+              <div className="space-y-4 sm:space-y-5 w-full max-w-full min-w-0">
+                {/* Ajustes de produtividade e custos */}
+                <CollapsibleCard
+                  title="Ajustes de produtividade e custos"
+                  subtitle="Parâmetros de rendimento, valor de venda e OPEX mensal"
+                  T={T} dark={dark}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 p-1">
+                    <div className="flex items-center justify-between gap-3 p-3 rounded-xl" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
+                      <span className="text-xs font-semibold" style={{ color: T.text }}>Produtividade (g/planta)</span>
+                      {num(yieldPerPlant, setYieldPerPlant, 1, 2000, 10)}
+                    </div>
+                    <div className="flex items-center justify-between gap-3 p-3 rounded-xl" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
+                      <span className="text-xs font-semibold" style={{ color: T.text }}>Valor de mercado (R$/g)</span>
+                      {money(priceG, setPriceG, "w-24")}
+                    </div>
+                    <div className="flex items-center justify-between gap-3 p-3 rounded-xl" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
+                      <span className="text-xs font-semibold" style={{ color: T.text }}>Tarifa de energia (R$/kWh)</span>
+                      {money(tariff, setTariff, "w-24")}
+                    </div>
+                    <div className="flex items-center justify-between gap-3 p-3 rounded-xl" style={{ background: T.surface2, border: `1px solid ${T.borderSoft}` }}>
+                      <span className="text-xs font-semibold" style={{ color: T.text }}>Insumos mensais (R$)</span>
+                      {money(monthlyCost, setMonthlyCost, "w-24")}
+                    </div>
+                  </div>
+                </CollapsibleCard>
+
+                {/* Diagnóstico */}
+                <CollapsibleCard
+                  title="Diagnóstico do projeto"
+                  subtitle={`${alerts.length} alerta(s)`}
+                  T={T} dark={dark}>
+                  <ul className="space-y-2">
+                    {alerts.map((a, i) => (
+                      <li key={i} className="flex gap-2 text-[13px] leading-snug" style={{ color: alertColor(a.level) }}>
+                        <span className="shrink-0 mt-[5px] w-1.5 h-1.5 rounded-full" style={{ background: alertColor(a.level) }} />
+                        <span>{a.text}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CollapsibleCard>
+
+                {/* Lista de materiais & custos */}
+                <CollapsibleCard
+                  title="Lista de materiais & custos"
+                  subtitle={`CAPEX ${fmtBRL(capex)}`}
+                  action={<span className="text-[11px]" style={{ color: T.faint }}>edite o R$ unitário</span>}
+                  T={T} dark={dark}>
+                  <ul className="text-sm">
+                    {materialRows.map((r) => (
+                      <li key={r.key + r.label} className="py-2 flex items-center justify-between gap-3 flex-wrap"
+                        style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                        <span className="min-w-0 flex-1" style={{ color: T.muted }}>
+                          {r.label} <span style={{ color: T.faint }}>· {r.qty} {r.unitLabel}</span>
+                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-1">
+                            <span className="text-[11px]" style={{ color: T.faint }}>R$</span>
+                            <MoneyInput value={r.unitCost}
+                              onCommit={(n) => (r.customId ? updCustom(r.customId, { cost: n }) : setCost(r.key, n))}
+                              className={`w-20 h-7 ${inputCls}`} style={inputStyle} />
+                          </div>
+                          <span className="font-semibold w-20 text-right">{fmtBRL(r.subtotal)}</span>
+                          <button
+                            onClick={() => removeMaterialRow(r)}
+                            title={`Remover "${r.label}"`}
+                            aria-label={`Remover ${r.label}`}
+                            className="w-7 h-7 rounded-lg transition-all hover:opacity-80 flex items-center justify-center shrink-0"
+                            style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <line x1="18" y1="6" x2="6" y2="18" />
+                              <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                    <li className="py-2 flex items-center justify-between gap-3"
+                      style={{ borderBottom: `1px solid ${T.borderSoft}` }}>
+                      <span style={{ color: T.muted }}>Custos extras (frete, elétrica, estrutura…)</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {money(extraCost, setExtraCost)}
+                        <span className="font-semibold w-24 text-right">{fmtBRL(extraCost)}</span>
+                      </div>
+                    </li>
+                    <li className="pt-3 flex items-center justify-between">
+                      <span className="text-sm font-bold">Investimento total (CAPEX)</span>
+                      <span className="text-lg font-extrabold">{fmtBRL(capex)}</span>
+                    </li>
+                  </ul>
+                </CollapsibleCard>
+
+                <button onClick={() => setShowReport(true)}
+                  className="w-full py-3.5 rounded-2xl text-sm font-bold transition-opacity hover:opacity-85 flex items-center justify-center gap-2 shadow-sm"
+                  style={{ background: T.text, color: T.bg }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                  </svg>
+                  <span>Exportar relatório completo (PDF)</span>
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
         ) : (
           <ComparisonView
             allPresets={allPresets}
