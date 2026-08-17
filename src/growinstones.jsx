@@ -4143,7 +4143,9 @@ function GrowinStones() {
 <header>
   <div class="header-in">
     <div style="display:flex; align-items:center; gap:12px;">
-      ${logoSvg}
+      <a href="https://grow.thegrowinstones.com" style="display:inline-flex; align-items:center; text-decoration:none;" title="GrowinStones App">
+        ${logoSvg}
+      </a>
       <span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.14em; color:#a8a29e; border-left:1px solid #44403c; padding-left:10px;">Perfil do Cultivador</span>
     </div>
     <a href="https://${displaySlug}.thegrowinstones.com" target="_blank" class="badge-live">https://${displaySlug}.thegrowinstones.com</a>
