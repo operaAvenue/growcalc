@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import ESP32WebFlasherModal from "./components/ESP32WebFlasherModal";
 import ESP32GPIOConfigModal from "./components/ESP32GPIOConfigModal";
-import { UserProfileView } from "./UserProfileView";
+import { UserProfileView, parseObsidianMarkdown } from "./UserProfileView";
 
 // ————————————————————————— ESP32 TELEMETRY & CONTROLE —————————————————————————
 function MQTTMonitorView({ currentUser, T, dark, showToast }) {
@@ -3972,8 +3972,8 @@ function GrowinStones() {
             </div>
           </div>
 
-          <div style="font-size:14px; line-height:1.6; color:${isDark ? '#f5f5f4' : '#1f1b16'}; white-space:pre-wrap; margin-bottom:14px;">
-            ${esc(p.text)}
+          <div class="obsidian-rendered-post" style="font-size:14px; line-height:1.6; color:${isDark ? '#f5f5f4' : '#1f1b16'}; margin-bottom:14px;">
+            ${parseObsidianMarkdown(p.text, isDark)}
           </div>
 
           ${p.images && p.images.length > 0 ? `
@@ -4486,6 +4486,8 @@ function GrowinStones() {
       }
     }
 
+    var parseObsidianMarkdownClient = (${parseObsidianMarkdown.toString()});
+
     function renderFeed(posts, user) {
       if (!container) return;
       if (!Array.isArray(posts) || posts.length === 0) {
@@ -4525,7 +4527,7 @@ function GrowinStones() {
         html += '  </div>';
 
         if (p.text) {
-          html += '  <div style="font-size:14px; line-height:1.6; color:#f5f5f4; white-space:pre-wrap; margin-bottom:14px;">' + escapeHtml(p.text) + '</div>';
+          html += '  <div class="obsidian-rendered-post" style="font-size:14px; line-height:1.6; color:#f5f5f4; margin-bottom:14px;">' + parseObsidianMarkdownClient(p.text) + '</div>';
         }
 
         if (Array.isArray(p.images) && p.images.length > 0) {

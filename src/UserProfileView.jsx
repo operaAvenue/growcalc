@@ -1,5 +1,167 @@
 import React, { useState, useEffect, useRef } from "react";
 
+// ————————————————— OBSIDIAN MARKDOWN PARSER & RENDERER —————————————————
+export function parseObsidianMarkdown(markdown, isDark = true) {
+  if (!markdown) return "";
+
+  // 1. Initial sanitize: encode HTML tags
+  let src = String(markdown)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  // Restore blockquote markers
+  src = src.replace(/^&gt;\s?/gm, "> ");
+
+  // 2. Fenced Code Blocks: ```lang\ncode\n```
+  const codeBlocks = [];
+  src = src.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (match, lang, code) => {
+    const id = `__CODE_BLOCK_${codeBlocks.length}__`;
+    codeBlocks.push(`
+      <div class="obsidian-code-block" style="background:#141210; border:1px solid #292524; border-radius:10px; margin:10px 0; overflow:hidden; font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">
+        ${lang ? `<div style="background:#1c1917; padding:4px 10px; font-size:10.5px; font-weight:700; color:#a8a29e; border-bottom:1px solid #292524; text-transform:uppercase;">${lang}</div>` : ''}
+        <pre style="margin:0; padding:10px 12px; overflow-x:auto; font-size:12px; line-height:1.5; color:#38bdf8; white-space:pre-wrap; word-break:break-all;"><code>${code.trim()}</code></pre>
+      </div>
+    `);
+    return id;
+  });
+
+  // 3. Obsidian Callouts: > [!NOTE], > [!TIP], > [!WARNING], > [!DANGER], > [!INFO], > [!SUCCESS], etc.
+  const calloutColors = {
+    note: { bg: 'rgba(2,132,199,0.12)', border: '#0284c7', text: '#38bdf8', icon: 'ℹ️', title: 'Nota' },
+    info: { bg: 'rgba(2,132,199,0.12)', border: '#0284c7', text: '#38bdf8', icon: 'ℹ️', title: 'Informação' },
+    tip: { bg: 'rgba(16,185,129,0.12)', border: '#10b981', text: '#34d399', icon: '💡', title: 'Dica' },
+    success: { bg: 'rgba(16,185,129,0.12)', border: '#10b981', text: '#34d399', icon: '✅', title: 'Sucesso' },
+    check: { bg: 'rgba(16,185,129,0.12)', border: '#10b981', text: '#34d399', icon: '✅', title: 'Check' },
+    warning: { bg: 'rgba(245,158,11,0.12)', border: '#f59e0b', text: '#fbbf24', icon: '⚠️', title: 'Aviso' },
+    danger: { bg: 'rgba(239,68,68,0.12)', border: '#ef4444', text: '#f87171', icon: '🚨', title: 'Atenção' },
+    error: { bg: 'rgba(239,68,68,0.12)', border: '#ef4444', text: '#f87171', icon: '❌', title: 'Erro' },
+    quote: { bg: 'rgba(168,162,158,0.12)', border: '#a8a29e', text: '#e7e5e4', icon: '💬', title: 'Citação' }
+  };
+
+  src = src.replace(/^>\s*\[!([a-zA-Z]+)\]\s*(.*)?(?:\n(?:>\s*.*(?:\n|$))*)?/gm, (match, typeRaw, customTitle) => {
+    const type = typeRaw.toLowerCase();
+    const cfg = calloutColors[type] || calloutColors.note;
+    const title = (customTitle && customTitle.trim()) ? customTitle.trim() : (cfg.title || type.toUpperCase());
+    
+    const lines = match.split('\n');
+    let bodyLines = [];
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].replace(/^>\s?/, '');
+      if (line) bodyLines.push(line);
+    }
+    const bodyContent = bodyLines.join('<br />').trim();
+
+    return `
+      <div class="obsidian-callout" style="background:${cfg.bg}; border-left:4px solid ${cfg.border}; border-radius:8px; padding:10px 14px; margin:10px 0;">
+        <div style="display:flex; align-items:center; gap:6px; font-weight:700; font-size:12.5px; color:${cfg.text};">
+          <span>${cfg.icon}</span>
+          <span>${title}</span>
+        </div>
+        ${bodyContent ? `<div style="font-size:13px; line-height:1.5; color:#f5f5f4; margin-top:6px;">${bodyContent}</div>` : ''}
+      </div>
+    `;
+  });
+
+  // Standard blockquotes: > quote
+  src = src.replace(/^>\s+(.+)$/gm, `
+    <blockquote style="margin:8px 0; padding:6px 12px; border-left:3px solid #78716c; background:rgba(255,255,255,0.03); color:#d6d3d1; font-style:italic; border-radius:0 6px 6px 0;">$1</blockquote>
+  `);
+
+  // 4. Tables (Obsidian / Markdown Tables)
+  src = src.replace(/(?:^\|.+?\|$\n?)+/gm, (tableMatch) => {
+    const rows = tableMatch.trim().split('\n').filter(r => r.trim().startsWith('|'));
+    if (rows.length < 2) return tableMatch;
+    
+    let html = '<div style="overflow-x:auto; margin:10px 0;"><table style="width:100%; border-collapse:collapse; font-size:12.5px; border-radius:8px; overflow:hidden;">';
+    let isHeader = true;
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i].trim();
+      if (row.match(/^\|\s*[-:]+[-| :]*\|$/)) {
+        isHeader = false;
+        continue;
+      }
+      const cols = row.split('|').slice(1, -1);
+      html += '<tr>';
+      for (let c of cols) {
+        const cell = c.trim();
+        if (isHeader && i === 0) {
+          html += `<th style="text-align:left; padding:6px 10px; background:#1c1917; border-bottom:2px solid #44403c; color:#a8a29e; font-weight:700; font-size:11px; text-transform:uppercase;">${cell}</th>`;
+        } else {
+          html += `<td style="padding:6px 10px; border-bottom:1px solid #292524; color:#e7e5e4;">${cell}</td>`;
+        }
+      }
+      html += '</tr>';
+      if (i === 0) isHeader = false;
+    }
+    html += '</table></div>';
+    return html;
+  });
+
+  // 5. Headings (Obsidian standard #, ##, ###, ####, #####, ######)
+  src = src.replace(/^######\s+(.+)$/gm, '<h6 style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; color:#a8a29e; margin:12px 0 4px;">$1</h6>');
+  src = src.replace(/^#####\s+(.+)$/gm, '<h5 style="font-size:13px; font-weight:800; color:#cbd5e1; margin:12px 0 4px;">$1</h5>');
+  src = src.replace(/^####\s+(.+)$/gm, '<h4 style="font-size:14px; font-weight:800; color:#e2e8f0; margin:14px 0 6px;">$1</h4>');
+  src = src.replace(/^###\s+(.+)$/gm, '<h3 style="font-size:15.5px; font-weight:800; color:#f8fafc; margin:16px 0 6px;">$1</h3>');
+  src = src.replace(/^##\s+(.+)$/gm, '<h2 style="font-size:17.5px; font-weight:800; color:#ffffff; border-bottom:1px solid #292524; padding-bottom:4px; margin:18px 0 8px;">$1</h2>');
+  src = src.replace(/^#\s+(.+)$/gm, '<h1 style="font-size:20px; font-weight:900; color:#f59e0b; border-bottom:2px solid rgba(245,158,11,0.3); padding-bottom:5px; margin:20px 0 10px;">$1</h1>');
+
+  // 6. Horizontal Rules: ---, ***, ___
+  src = src.replace(/^(?:---|\*\*\*|___)$/gm, '<hr style="border:none; border-top:1px solid #292524; margin:14px 0;" />');
+
+  // 7. Obsidian Task Lists (Checkboxes): - [ ] and - [x]
+  src = src.replace(/^-\s+\[ \]\s+(.+)$/gm, `
+    <div style="display:flex; align-items:center; gap:8px; margin:3px 0; font-size:13px;">
+      <input type="checkbox" disabled style="accent-color:#f59e0b; cursor:default; width:14px; height:14px;" />
+      <span style="color:#e7e5e4;">$1</span>
+    </div>
+  `);
+  src = src.replace(/^-\s+\[x\]\s+(.+)$/gim, `
+    <div style="display:flex; align-items:center; gap:8px; margin:3px 0; font-size:13px;">
+      <input type="checkbox" checked disabled style="accent-color:#10b981; cursor:default; width:14px; height:14px;" />
+      <span style="color:#78716c; text-decoration:line-through;">$1</span>
+    </div>
+  `);
+
+  // 8. Lists: Unordered (- or *) & Ordered (1., 2.)
+  src = src.replace(/^[-*]\s+(.+)$/gm, '<li style="margin-left:18px; list-style-type:disc; margin-bottom:3px; font-size:13px;">$1</li>');
+  src = src.replace(/^\d+\.\s+(.+)$/gm, '<li style="margin-left:18px; list-style-type:decimal; margin-bottom:3px; font-size:13px;">$1</li>');
+
+  // 9. Obsidian Highlights: ==text==
+  src = src.replace(/==([^=]+)==/g, '<mark style="background:rgba(245,158,11,0.28); color:#fef08a; padding:1px 5px; border-radius:4px; font-weight:600;">$1</mark>');
+
+  // 10. Obsidian Wikilinks: [[Target|Alias]] or [[Target]]
+  src = src.replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g, '<span class="obsidian-wikilink" style="color:#38bdf8; text-decoration:underline; font-weight:600; cursor:pointer;" title="Link interno: $1">$2</span>');
+  src = src.replace(/\[\[([^\]]+)\]\]/g, '<span class="obsidian-wikilink" style="color:#38bdf8; text-decoration:underline; font-weight:600; cursor:pointer;" title="Link interno">$1</span>');
+
+  // 11. Obsidian Tags: #tag
+  src = src.replace(/(^|\s)#([a-zA-Z0-9_\-\/]+)/g, '$1<span class="obsidian-tag" style="display:inline-block; background:rgba(245,158,11,0.14); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); padding:0 6px; border-radius:10px; font-size:11px; font-weight:700; margin:0 2px;">#$2</span>');
+
+  // 12. Text styles: Bold, Italic, Strikethrough, Inline Code
+  src = src.replace(/\*\*\*([^*]+)\*\*\*/g, '<b><i>$1</i></b>');
+  src = src.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+  src = src.replace(/__([^_]+)__/g, '<b>$1</b>');
+  src = src.replace(/\*([^*]+)\*/g, '<i>$1</i>');
+  src = src.replace(/_([^_]+)_/g, '<i>$1</i>');
+  src = src.replace(/~~([^~]+)~~/g, '<del style="color:#78716c;">$1</del>');
+  src = src.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.08); color:#38bdf8; padding:1px 5px; border-radius:4px; font-size:12px; font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;">$1</code>');
+
+  // 13. Standard Markdown Links: [text](url)
+  src = src.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color:#38bdf8; text-decoration:underline; font-weight:600;">$1</a>');
+
+  // 14. Restore Code Blocks
+  for (let i = 0; i < codeBlocks.length; i++) {
+    src = src.replace(`__CODE_BLOCK_${i}__`, codeBlocks[i]);
+  }
+
+  // 15. Paragraphs & Line Breaks
+  src = src.replace(/\n\n+/g, '<div style="height:8px;"></div>');
+  src = src.replace(/\n/g, '<br />');
+
+  return src;
+}
+
 export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToast }) {
   const [activeTab, setActiveTab] = useState("posts"); // "posts" | "media" | "about"
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -15,12 +177,15 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
   // Post Creator State
   const [postText, setPostText] = useState("");
   const [postStage, setPostStage] = useState("Floração");
+  const [postEditorMode, setPostEditorMode] = useState("write"); // "write" | "preview"
   const [attachedImages, setAttachedImages] = useState([]);
   const [attachedVideos, setAttachedVideos] = useState([]);
   const [isPosting, setIsPosting] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null);
   const [cropImageSrc, setCropImageSrc] = useState(null);
   const [isCropperOpen, setIsCropperOpen] = useState(false);
+
+  const postTextareaRef = useRef(null);
 
   // Sync whenever currentUser updates from cloud or login
   useEffect(() => {
@@ -58,7 +223,7 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
       if (saved) return JSON.parse(saved);
     } catch (e) {}
 
-    // Default sample posts
+    // Default sample posts with Obsidian Markdown formatting
     return [
       {
         id: "post_1",
@@ -68,7 +233,27 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
           avatarUrl: currentUser?.avatarUrl || ""
         },
         createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-        text: "Hoje entramos na 4ª semana de floração! O sistema de recirculação DWC com pedras expandidas está mantendo o EC em 1.4 mS/cm e o pH cravado em 5.9. O desenvolvimento das flores está surpreendente.",
+        text: `# 🌸 4ª Semana de Floração: Setup DWC Estabilizado
+
+Hoje completamos 28 dias de 12/12. O sistema de recirculação **GrowinStones** está mantendo os parâmetros cravados!
+
+## 📊 Medições do Dia
+| Parâmetro | Alvo | Medido | Status |
+|---|---|---|---|
+| pH | 5.8 | **5.9** | ✅ Perfeito |
+| EC | 1.4 mS/cm | **1.42** | ✅ Estável |
+| Temp. Solução | 20°C | **19.8°C** | ❄️ Ideal |
+
+> [!TIP] Dica de Manejo
+> A desfolha realizada na semana 3 abriu espaço para os buds inferiores receberem iluminação direta. Resina começando a pipocar forte! ==Tricomas leitosos iniciando==.
+
+### Checklist Semanal
+- [x] Troca parcial da solução nutritiva
+- [x] Calibração da sonda de pH e EC
+- [x] Limpeza do biofiltro
+- [ ] Flush preventivo na semana 6
+
+#hidroponia #dwc #cultivoindoor`,
         stage: "Floração",
         images: [
           "https://images.unsplash.com/photo-1536939459926-301728717817?auto=format&fit=crop&w=800&q=80"
@@ -88,7 +273,24 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
           avatarUrl: currentUser?.avatarUrl || ""
         },
         createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-        text: "Novo setup configurado no GrowinStones e sincronizado com o controlador ESP32 via MQTT. Telemetria em tempo real 24/7 funcionando perfeitamente!",
+        text: `# ⚡ Automação com ESP32 Conectada
+
+Novo setup configurado no GrowinStones e sincronizado com o controlador via **MQTT**.
+
+> [!SUCCESS] Telemetria Ativa
+> Sensores transmitindo temperatura, umidade, VPD e nível do reservatório **24/7** com envio de alertas automáticos.
+
+\`\`\`javascript
+// Payload de telemetria MQTT
+{
+  "temp": 24.5,
+  "humidity": 58.2,
+  "vpd": 1.24,
+  "status": "OPTIMAL"
+}
+\`\`\`
+
+#automacao #iot #esp32`,
         stage: "Setup & Automação",
         images: [],
         videos: [],
@@ -622,9 +824,9 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
             <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight" style={{ color: T.text }}>
               {currentUser?.name || "Cultivador GrowinStones"}
             </h1>
-            <div className="text-xs font-mono font-semibold mt-0.5" style={{ color: T.brand }}>
+            <p className="text-xs sm:text-sm font-mono" style={{ color: T.brand }}>
               @{currentUser?.username || "grower"}
-            </div>
+            </p>
 
             <p className="text-xs sm:text-sm mt-2.5 leading-relaxed max-w-2xl" style={{ color: T.text }}>
               {currentUser?.bio || editBio}
@@ -679,8 +881,8 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
         </button>
       </div>
 
-      {/* ————————————————— POST CREATOR (TWITTER STYLE) ————————————————— */}
-      <div className="p-5 rounded-2xl border shadow-sm mb-8" style={{ background: T.surface, borderColor: T.border }}>
+      {/* ————————————————— POST CREATOR (OBSIDIAN MARKDOWN POWERED) ————————————————— */}
+      <div className="p-4 sm:p-5 rounded-2xl border shadow-sm mb-8" style={{ background: T.surface, borderColor: T.border }}>
         <div className="flex items-start gap-3.5">
           <div
             className="w-10 h-10 min-w-[40px] min-h-[40px] aspect-square rounded-full overflow-hidden shrink-0 font-bold flex items-center justify-center text-sm border relative"
@@ -717,14 +919,150 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
           </div>
 
           <div className="flex-1 min-w-0">
-            <textarea
-              value={postText}
-              onChange={(e) => setPostText(e.target.value)}
-              placeholder="O que está acontecendo no seu grow? Compartilhe medições, fotos, podas, floração..."
-              rows={3}
-              className="w-full bg-transparent outline-none text-sm resize-none"
-              style={{ color: T.text }}
-            />
+            {/* MARKDOWN OBSIDIAN TOOLBAR & TABS */}
+            <div className="flex items-center justify-between gap-2 mb-2.5 pb-2 border-b flex-wrap" style={{ borderColor: T.borderSoft }}>
+              {/* OBSIDIAN FORMATTING SHORTCUTS */}
+              <div className="flex items-center gap-1 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown("# ")}
+                  className="px-2 py-1 rounded text-xs font-black hover:bg-white/10 transition-colors"
+                  style={{ color: T.brand }}
+                  title="Título H1 (# )"
+                >
+                  H1
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown("## ")}
+                  className="px-2 py-1 rounded text-xs font-extrabold hover:bg-white/10 transition-colors"
+                  style={{ color: T.text }}
+                  title="Título H2 (## )"
+                >
+                  H2
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown("### ")}
+                  className="px-2 py-1 rounded text-xs font-bold hover:bg-white/10 transition-colors"
+                  style={{ color: T.text }}
+                  title="Título H3 (### )"
+                >
+                  H3
+                </button>
+                <span className="w-[1px] h-4 bg-stone-700/50 mx-1"></span>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown("**", "**")}
+                  className="px-2 py-1 rounded text-xs font-bold hover:bg-white/10 transition-colors"
+                  style={{ color: T.text }}
+                  title="Negrito (**texto**)"
+                >
+                  <b>B</b>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown("*", "*")}
+                  className="px-2 py-1 rounded text-xs italic font-serif hover:bg-white/10 transition-colors"
+                  style={{ color: T.text }}
+                  title="Itálico (*texto*)"
+                >
+                  I
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown("==", "==")}
+                  className="px-2 py-1 rounded text-xs font-bold hover:bg-white/10 transition-colors"
+                  style={{ color: "#fef08a", background: "rgba(245,158,11,0.25)" }}
+                  title="Destaque Obsidian (==texto==)"
+                >
+                  ==
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown("- [ ] ")}
+                  className="px-2 py-1 rounded text-xs font-semibold hover:bg-white/10 transition-colors"
+                  style={{ color: T.text }}
+                  title="Checklist (- [ ] item)"
+                >
+                  ☑ Task
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown("- ")}
+                  className="px-2 py-1 rounded text-xs hover:bg-white/10 transition-colors"
+                  style={{ color: T.text }}
+                  title="Lista (- item)"
+                >
+                  • Lista
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown("> [!NOTE] Nota\n> ")}
+                  className="px-2 py-1 rounded text-xs font-semibold hover:bg-white/10 transition-colors"
+                  style={{ color: "#38bdf8" }}
+                  title="Callout Obsidian (> [!NOTE])"
+                >
+                  [!Note]
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown("```javascript\n", "\n```")}
+                  className="px-2 py-1 rounded text-xs font-mono hover:bg-white/10 transition-colors"
+                  style={{ color: T.muted }}
+                  title="Bloco de Código (```)"
+                >
+                  &lt;/&gt;
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertMarkdown("\n| Parâmetro | Valor |\n|---|---|\n| pH | 5.9 |\n| EC | 1.4 |\n")}
+                  className="px-2 py-1 rounded text-xs hover:bg-white/10 transition-colors"
+                  style={{ color: T.text }}
+                  title="Tabela Markdown"
+                >
+                  ⊞ Tabela
+                </button>
+              </div>
+
+              {/* EDITOR MODE TOGGLE */}
+              <div className="flex items-center gap-1 bg-black/20 p-0.5 rounded-lg border" style={{ borderColor: T.borderSoft }}>
+                <button
+                  type="button"
+                  onClick={() => setPostEditorMode("write")}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${postEditorMode === "write" ? "bg-stone-800 text-amber-400 shadow-sm" : "text-stone-400 hover:text-stone-200"}`}
+                >
+                  ✏️ Markdown
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPostEditorMode("preview")}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${postEditorMode === "preview" ? "bg-stone-800 text-amber-400 shadow-sm" : "text-stone-400 hover:text-stone-200"}`}
+                >
+                  👁️ Prévia
+                </button>
+              </div>
+            </div>
+
+            {postEditorMode === "write" ? (
+              <textarea
+                ref={postTextareaRef}
+                value={postText}
+                onChange={(e) => setPostText(e.target.value)}
+                placeholder="Escreva em formato Markdown (Obsidian)... Use # para H1, ## para H2, **negrito**, ==destaque==, - [ ] checklist, > [!NOTE]"
+                rows={4}
+                className="w-full bg-transparent outline-none text-sm resize-none font-mono"
+                style={{ color: T.text }}
+              />
+            ) : (
+              <div
+                className="w-full min-h-[100px] max-h-[300px] overflow-y-auto p-3 rounded-xl border mb-2 text-sm leading-relaxed"
+                style={{ background: T.surface2, borderColor: T.borderSoft, color: T.text }}
+                dangerouslySetInnerHTML={{
+                  __html: parseObsidianMarkdown(postText, dark) || `<span style="color:${T.faint}; font-style:italic;">A pré-visualização formatada do Obsidian aparecerá aqui...</span>`
+                }}
+              />
+            )}
 
             {/* PREVIEWS OF ATTACHED MEDIA */}
             {(attachedImages.length > 0 || attachedVideos.length > 0) && (
@@ -762,7 +1100,7 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
                 {/* ATTACH IMAGE BUTTON */}
                 <button
                   onClick={() => imageAttachRef.current?.click()}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                   style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
                   title="Anexar Fotos"
                 >
@@ -773,7 +1111,7 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
                 {/* ATTACH VIDEO BUTTON */}
                 <button
                   onClick={() => videoAttachRef.current?.click()}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                   style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}
                   title="Anexar Vídeo"
                 >
@@ -801,7 +1139,7 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
               <button
                 onClick={handleCreatePost}
                 disabled={isPosting || (!postText.trim() && attachedImages.length === 0 && attachedVideos.length === 0)}
-                className="px-5 py-2 rounded-xl text-xs font-extrabold text-white transition-all shadow-md disabled:opacity-40 flex items-center gap-1.5"
+                className="px-5 py-2 rounded-xl text-xs font-extrabold text-white transition-all shadow-md disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
                 style={{ background: dark ? "#0284c7" : "#0369a1" }}
               >
                 {isPosting ? "Publicando..." : "Publicar"}
@@ -1091,11 +1429,13 @@ function PostCard({ post, currentUser, T, dark, onToggleLike, onDelete, onAddCom
         )}
       </div>
 
-      {/* POST TEXT */}
+      {/* POST TEXT (OBSIDIAN MARKDOWN RENDERED) */}
       {post.text && (
-        <div className="text-sm leading-relaxed mb-3.5 whitespace-pre-wrap" style={{ color: T.text }}>
-          {post.text}
-        </div>
+        <div
+          className="text-sm leading-relaxed mb-3.5 obsidian-rendered-content"
+          style={{ color: T.text }}
+          dangerouslySetInnerHTML={{ __html: parseObsidianMarkdown(post.text, dark) }}
+        />
       )}
 
       {/* MEDIA ATTACHMENTS WITH LIGHTBOX CLICK */}
