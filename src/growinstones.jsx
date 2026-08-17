@@ -2314,7 +2314,7 @@ function GrowinStones() {
       width, depth, height,
       potCount, potIdx, potShape, potFlipped, customPotW, customPotL, customPotH,
       gaugeIdx, spacing, cols, conn, recirculate,
-      equip, perPot, watts, equipUrls, equipShopping, customItems,
+      equipList, perPot, watts, customItems,
       vegaHours, floraHours, vegaDays, floraDays, yieldPerPlant, priceG, tariff,
       costs, extraCost, monthlyCost,
       notes, instructions, terms,
@@ -2408,11 +2408,30 @@ function GrowinStones() {
     if (data.cols !== undefined) setCols(data.cols);
     if (data.conn !== undefined) setConn(data.conn);
     if (data.recirculate !== undefined) setRecirculate(data.recirculate);
-    if (data.equip !== undefined) setEquip(data.equip);
+    if (Array.isArray(data.equipList)) {
+      setEquipList(data.equipList);
+    } else if (data.equip && typeof data.equip === "object") {
+      const converted = [];
+      EQUIPMENT.forEach((eq) => {
+        const q = data.equip[eq.id] || 0;
+        if (q > 0) {
+          converted.push({
+            id: "eq_" + eq.id + "_" + Date.now(),
+            name: eq.name,
+            qty: q,
+            cost: (data.costs && data.costs[eq.id]) || eq.defCost,
+            watts: (data.watts && data.watts[eq.id]) || eq.defW,
+            hours: (data.watts && data.watts[eq.id] === 0) ? 0 : eq.hours,
+            inShoppingList: !!(data.equipShopping && data.equipShopping[eq.id]),
+            url: (data.equipUrls && data.equipUrls[eq.id]) || "",
+            isCollapsed: true,
+          });
+        }
+      });
+      if (converted.length > 0) setEquipList(converted);
+    }
     if (data.perPot !== undefined) setPerPot(data.perPot);
     if (data.watts !== undefined) setWatts(data.watts);
-    if (data.equipUrls !== undefined) setEquipUrls(data.equipUrls);
-    if (data.equipShopping !== undefined) setEquipShopping(data.equipShopping);
     if (data.customItems !== undefined) setCustomItems(data.customItems);
     if (data.vegaHours !== undefined) setVegaHours(data.vegaHours);
     if (data.floraHours !== undefined) setFloraHours(data.floraHours);
@@ -2513,7 +2532,7 @@ function GrowinStones() {
       width, depth, height,
       potCount, potIdx, potShape, potFlipped, customPotW, customPotL, customPotH,
       gaugeIdx, spacing, cols, conn, recirculate,
-      equip, perPot, watts, equipUrls, equipShopping, customItems,
+      equipList, perPot, watts, customItems,
       vegaHours, floraHours, vegaDays, floraDays, yieldPerPlant, priceG, tariff,
       costs, extraCost, monthlyCost,
       notes, instructions, terms,
@@ -2533,7 +2552,7 @@ function GrowinStones() {
     currentUser, growName, owner, strain, width, depth, height,
     potCount, potIdx, potShape, potFlipped, customPotW, customPotL, customPotH,
     gaugeIdx, spacing, cols, conn, recirculate,
-    equip, perPot, watts, equipUrls, equipShopping, customItems,
+    equipList, perPot, watts, customItems,
     vegaHours, floraHours, vegaDays, floraDays, yieldPerPlant, priceG, tariff,
     costs, extraCost, monthlyCost, notes, instructions, terms, allPresets, dark
   ]);
@@ -2780,7 +2799,6 @@ function GrowinStones() {
 
   const gauge = PIPE_GAUGES[gaugeIdx] || PIPE_GAUGES[0];
   const connInfo = CONNECTIONS.find((k) => k.id === conn) || CONNECTIONS[0];
-  const setEq = (id, delta, max) => setEquip((e) => ({ ...e, [id]: Math.min(max, Math.max(0, ((e && e[id]) || 0) + delta)) }));
   const setW = (id, v) => setWatts((w) => ({ ...w, [id]: Math.min(5000, Math.max(0, Math.round(v) || 0)) }));
   const setCost = (key, v) => setCosts((c) => ({ ...c, [key]: Math.max(0, Number(v) || 0) }));
 
@@ -2797,7 +2815,6 @@ function GrowinStones() {
       if (p.apply.cols !== undefined) setCols(p.apply.cols);
       if (p.apply.conn !== undefined) setConn(p.apply.conn);
       if (p.apply.recirculate !== undefined) setRecirculate(p.apply.recirculate);
-      if (p.equip) setEquip({ ...p.equip });
       if (p.data) loadUserSetupFromData(p.data);
     } else if (p.data) {
       loadUserSetupFromData(p.data);
@@ -3190,7 +3207,7 @@ function GrowinStones() {
       curX += it.w + gap;
       return { ...it, x };
     });
-  }, [equip.tanque, equip.bombaAgua, equip.bombaAr, reservoir, topW, OX]);
+  }, [reservoir, topW, OX]);
 
   const getCotaElements = (scale, ox, oy, lay, pW, pD, sp, w, d) => {
     if (!lay || lay.placed === 0) return [];
