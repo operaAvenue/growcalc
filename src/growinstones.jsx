@@ -2307,6 +2307,17 @@ function GrowinStones() {
     return INITIAL_PRESETS;
   });
 
+  const [activePresetId, setActivePresetId] = useState(() => {
+    try {
+      const saved = localStorage.getItem("growinstones_all_presets_v2");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed[0].id || parsed[0].name;
+      }
+    } catch (e) {}
+    return INITIAL_PRESETS[0]?.id || "";
+  });
+
   const syncAllToCloud = (overrideSetup = null, overridePresets = null) => {
     if (!currentUser || (!currentUser.username && !currentUser.email)) return;
     const setupData = overrideSetup || {
@@ -2344,23 +2355,33 @@ function GrowinStones() {
   };
 
   const removePreset = (id, name) => {
-    if (window.confirm(`Deseja remover o chip "${name}"?`)) {
+    if (window.confirm(`Deseja excluir o setup "${name}"?`)) {
       const updated = allPresets.filter((p) => (p.id || p.name) !== id);
       saveAllPresetsToStorage(updated);
-      showToast(` Preset "${name}" removido.`);
+      if (activePresetId === id) {
+        if (updated.length > 0) {
+          loadPreset(updated[0]);
+        } else {
+          setActivePresetId("");
+        }
+      }
+      showToast(`Setup "${name}" excluído.`);
     }
   };
 
   const restoreDefaultPresets = () => {
     saveAllPresetsToStorage(INITIAL_PRESETS);
-    showToast(` Presets padrão restaurados!`);
+    if (INITIAL_PRESETS.length > 0) {
+      loadPreset(INITIAL_PRESETS[0]);
+    }
+    showToast(`Presets padrão restaurados!`);
   };
 
   const addCurrentAsPreset = () => {
     const defaultName = growName.trim()
       ? `${growName.trim()} (${potCount}v)`
       : `Meu Setup (${potCount} vasos)`;
-    const name = window.prompt("Digite o nome para o novo preset:", defaultName);
+    const name = window.prompt("Digite o nome para o novo setup:", defaultName);
     if (!name || !name.trim()) return;
 
     const newPreset = {
@@ -2370,18 +2391,21 @@ function GrowinStones() {
     };
     const updated = [...allPresets, newPreset];
     saveAllPresetsToStorage(updated);
-    showToast(` Preset "${name.trim()}" adicionado!`);
+    setActivePresetId(newPreset.id);
+    showToast(`Setup "${name.trim()}" salvo com sucesso!`);
   };
 
   const loadPreset = (preset) => {
     if (!preset) return;
+    const pId = preset.id || preset.name;
+    setActivePresetId(pId);
     if (preset.data) {
       loadSetupData(preset.data);
     }
     if (preset.apply) {
       applyPreset(preset);
     }
-    showToast(` Setup "${preset.name}" carregado!`);
+    showToast(`Setup "${preset.name}" carregado!`);
   };
 
   const fileInputRef = useRef(null);
@@ -5520,6 +5544,92 @@ function GrowinStones() {
 
             {activeTab === "configurator" ? (
           <div className="w-full max-w-full space-y-4 sm:space-y-6 min-w-0">
+            {/* ————— BARRA DE CHIPS DE SETUPS NO TOPO DO CONFIGURADOR ————— */}
+            <div
+              className="p-3 sm:p-4 rounded-2xl shadow-sm flex items-center justify-between gap-3 flex-wrap"
+              style={{ background: T.surface, border: `1px solid ${T.border}` }}
+            >
+              <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
+                <span className="text-[11px] sm:text-xs font-extrabold uppercase tracking-wider flex items-center gap-1.5 shrink-0" style={{ color: T.muted }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg>
+                  <span>Setups:</span>
+                </span>
+
+                {allPresets.map((p) => {
+                  const pId = p.id || p.name;
+                  const isActive = activePresetId === pId;
+                  return (
+                    <div
+                      key={pId}
+                      className={`inline-flex items-center rounded-xl transition-all shrink-0 cursor-pointer shadow-sm select-none ${isActive ? "scale-105" : "hover:opacity-85"}`}
+                      style={{
+                        background: isActive ? "rgba(245, 158, 11, 0.18)" : T.surface2,
+                        border: `1.5px solid ${isActive ? "#f59e0b" : T.border}`,
+                        color: isActive ? "#f59e0b" : T.text,
+                      }}
+                      onClick={() => loadPreset(p)}
+                    >
+                      <div className="pl-3 pr-1.5 py-1.5 flex items-center gap-1.5">
+                        {isActive && (
+                          <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-pulse" />
+                        )}
+                        <span className={`text-xs ${isActive ? "font-black" : "font-semibold"}`}>
+                          {p.name}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removePreset(pId, p.name);
+                        }}
+                        title={`Excluir setup "${p.name}"`}
+                        className="pr-2.5 pl-1 py-1.5 text-xs font-bold transition-colors hover:text-red-500 rounded-r-xl"
+                        style={{ color: isActive ? "#f59e0b" : T.faint }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {allPresets.length === 0 && (
+                  <span className="text-xs italic" style={{ color: T.faint }}>
+                    Nenhum setup salvo.
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={addCurrentAsPreset}
+                  title="Salvar a configuração atual como um novo chip de setup"
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105 flex items-center gap-1.5 shrink-0 shadow-sm"
+                  style={{ background: "#f59e0b", color: "#1c1917" }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  <span>Salvar Setup Atual</span>
+                </button>
+
+                {allPresets.length === 0 && (
+                  <button
+                    type="button"
+                    onClick={restoreDefaultPresets}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:opacity-85"
+                    style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}
+                  >
+                    Restaurar Padrões
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* ————— 1. TOP STICKY: CARD DE DADOS & MÉTRICAS (COLAPSÁVEL) ————— */}
             <CollapsibleCard
               title="Dados & Métricas do Grow"
@@ -5861,58 +5971,8 @@ function GrowinStones() {
 
             {/* ————— 3. SÓ ASSIM O RESTANTE DO CONFIGURADOR (FORMULÁRIOS & OPÇÕES) ————— */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 items-start w-full max-w-full min-w-0">
-              {/* Coluna 1: Estrutura, Vasos, Presets, Iluminação, Equipamentos, Observações */}
+              {/* Coluna 1: Estrutura, Vasos, Iluminação, Equipamentos, Observações */}
               <div className="space-y-4 sm:space-y-5 w-full max-w-full min-w-0">
-                <CollapsibleCard
-                  title="Setups & Presets"
-                  subtitle={`${allPresets.length} setups salvos`}
-                  isOpen={openConfigCard === "presets"}
-                  onToggle={() => toggleConfigCard("presets")}
-                  T={T} dark={dark}>
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap gap-2 items-center">
-                      {allPresets.map((p) => (
-                        <div key={p.id || p.name} className="flex items-center rounded-full transition-all shrink-0 shadow-sm"
-                          style={{ background: T.surface2, border: `1px solid ${T.accentBorder}`, color: T.text }}>
-                          <button onClick={() => loadPreset(p)}
-                            className="pl-3.5 pr-2 py-1.5 text-xs font-semibold hover:opacity-85 flex items-center gap-1.5 cursor-pointer"
-                            title={`Carregar setup "${p.name}"`}>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.accentBorder }}>
-                              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                            </svg>
-                            <span>{p.name}</span>
-                          </button>
-                          <button onClick={(e) => { e.stopPropagation(); removePreset(p.id || p.name, p.name); }}
-                            title={`Remover chip "${p.name}"`}
-                            className="pr-3 pl-1 py-1.5 text-xs font-bold transition-colors hover:text-red-500 rounded-r-full cursor-pointer"
-                            style={{ color: T.faint }}>
-                            ×
-                          </button>
-                        </div>
-                      ))}
-
-                      <button onClick={addCurrentAsPreset}
-                        title="Salvar a configuração atual como um novo chip de preset"
-                        className="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all hover:opacity-85 flex items-center gap-1.5 shrink-0 cursor-pointer"
-                        style={{ background: T.surface2, border: `1.5px dashed ${T.accentBorder}`, color: T.text }}>
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="12" y1="5" x2="12" y2="19" />
-                          <line x1="5" y1="12" x2="19" y2="12" />
-                        </svg>
-                        <span>Salvar preset atual</span>
-                      </button>
-
-                      {allPresets.length === 0 && (
-                        <button onClick={restoreDefaultPresets}
-                          className="px-3.5 py-1.5 rounded-full text-xs font-bold transition-all hover:opacity-85 flex items-center gap-1.5 shrink-0 cursor-pointer"
-                          style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.muted }}>
-                          Restaurar presets padrão
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </CollapsibleCard>
-
                 <CollapsibleCard
                   title="1 · Estufa (cm)"
                   subtitle={`${width} × ${depth} × ${height} cm (${areaM2.toFixed(2)} m²)`}
