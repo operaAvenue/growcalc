@@ -2037,15 +2037,42 @@ function GrowinStones() {
       url: "",
       isCollapsed: false,
     };
-    setEquipList((prev) => [newItem, ...prev]);
+    setEquipList((prev) => {
+      const updated = [newItem, ...prev];
+      try {
+        const saved = localStorage.getItem("growinstones_saved_setup");
+        const curData = saved ? JSON.parse(saved) : {};
+        curData.equipList = updated;
+        localStorage.setItem("growinstones_saved_setup", JSON.stringify(curData));
+      } catch(e) {}
+      return updated;
+    });
   };
 
   const updEquip = (id, patch) => {
-    setEquipList((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+    setEquipList((prev) => {
+      const updated = prev.map((it) => (it.id === id ? { ...it, ...patch } : it));
+      try {
+        const saved = localStorage.getItem("growinstones_saved_setup");
+        const curData = saved ? JSON.parse(saved) : {};
+        curData.equipList = updated;
+        localStorage.setItem("growinstones_saved_setup", JSON.stringify(curData));
+      } catch(e) {}
+      return updated;
+    });
   };
 
   const delEquip = (id) => {
-    setEquipList((prev) => prev.filter((it) => it.id !== id));
+    setEquipList((prev) => {
+      const updated = prev.filter((it) => it.id !== id);
+      try {
+        const saved = localStorage.getItem("growinstones_saved_setup");
+        const curData = saved ? JSON.parse(saved) : {};
+        curData.equipList = updated;
+        localStorage.setItem("growinstones_saved_setup", JSON.stringify(curData));
+      } catch(e) {}
+      return updated;
+    });
     showToast("Equipamento removido!");
   };
 
@@ -2412,82 +2439,19 @@ function GrowinStones() {
   const [toastMsg, setToastMsg] = useState("");
 
   // ————— SISTEMA DE PERSISTÊNCIA E ISOLAMENTO DE USUÁRIOS —————
-  const loadUserSetupFromData = (data) => {
-    if (!data || typeof data !== "object") return;
-    if (data.growName !== undefined) setGrowName(data.growName);
-    if (data.owner !== undefined) setOwner(data.owner);
-    if (data.strain !== undefined) setStrain(data.strain);
-    if (data.width !== undefined) setWidth(data.width);
-    if (data.depth !== undefined) setDepth(data.depth);
-    if (data.height !== undefined) setHeight(data.height);
-    if (data.potCount !== undefined) setPotCount(data.potCount);
-    if (data.potIdx !== undefined) setPotIdx(data.potIdx);
-    if (data.potShape !== undefined) setPotShape(data.potShape);
-    if (data.potFlipped !== undefined) setPotFlipped(data.potFlipped);
-    if (data.customPotW !== undefined) setCustomPotW(data.customPotW);
-    if (data.customPotL !== undefined) setCustomPotL(data.customPotL);
-    if (data.customPotH !== undefined) setCustomPotH(data.customPotH);
-    if (data.gaugeIdx !== undefined) setGaugeIdx(data.gaugeIdx);
-    if (data.spacing !== undefined) setSpacing(data.spacing);
-    if (data.cols !== undefined) setCols(data.cols);
-    if (data.conn !== undefined) setConn(data.conn);
-    if (data.recirculate !== undefined) setRecirculate(data.recirculate);
-    if (Array.isArray(data.equipList)) {
-      setEquipList(data.equipList);
-    } else if (data.equip && typeof data.equip === "object") {
-      const converted = [];
-      EQUIPMENT.forEach((eq) => {
-        const q = data.equip[eq.id] || 0;
-        if (q > 0) {
-          converted.push({
-            id: "eq_" + eq.id + "_" + Date.now(),
-            name: eq.name,
-            qty: q,
-            cost: (data.costs && data.costs[eq.id]) || eq.defCost,
-            watts: (data.watts && data.watts[eq.id]) || eq.defW,
-            hours: (data.watts && data.watts[eq.id] === 0) ? 0 : eq.hours,
-            inShoppingList: !!(data.equipShopping && data.equipShopping[eq.id]),
-            url: (data.equipUrls && data.equipUrls[eq.id]) || "",
-            isCollapsed: true,
-          });
-        }
-      });
-      if (converted.length > 0) setEquipList(converted);
-    }
-    if (data.watts !== undefined) setWatts(data.watts);
-    if (data.vegaHours !== undefined) setVegaHours(data.vegaHours);
-    if (data.floraHours !== undefined) setFloraHours(data.floraHours);
-    if (data.vegaDays !== undefined) setVegaDays(data.vegaDays);
-    if (data.floraDays !== undefined) setFloraDays(data.floraDays);
-    if (data.yieldPerPlant !== undefined) setYieldPerPlant(data.yieldPerPlant);
-    if (data.priceG !== undefined) setPriceG(data.priceG);
-    if (data.tariff !== undefined) setTariff(data.tariff);
-    if (data.costs !== undefined) setCosts(data.costs);
-    if (data.extraCost !== undefined) setExtraCost(data.extraCost);
-    if (data.monthlyCost !== undefined) setMonthlyCost(data.monthlyCost);
-    if (data.notes !== undefined) setNotes(data.notes);
-    if (data.instructions !== undefined) setInstructions(data.instructions);
-    if (data.terms !== undefined) setTerms(data.terms);
-    if (data.isGrowPublic !== undefined) setIsGrowPublic(Boolean(data.isGrowPublic));
-    if (data.dark !== undefined) setDark(Boolean(data.dark));
-    if (data.allPresets !== undefined && Array.isArray(data.allPresets) && data.allPresets.length > 0) {
-      setAllPresets(data.allPresets);
-    }
-  };
-
   const loadUserSetup = (user) => {
     if (!user || !user.username) return;
     const key = `growcalc_user_setup_${user.username}`;
     try {
       const saved = localStorage.getItem(key);
       if (saved) {
-        loadUserSetupFromData(JSON.parse(saved));
+        loadSetupData(JSON.parse(saved));
       }
     } catch (e) {}
   };
 
   // Carregar dados salvos do usuário e sincronizar com a nuvem
-  const fetchCloudUserSync = async () => {
+  const fetchCloudUserSync = async (initial = false) => {
     if (!currentUser || (!currentUser.email && !currentUser.username)) return;
     try {
       const syncUrl = `https://grow.thegrowinstones.com/api/user/sync?email=${encodeURIComponent(currentUser.email || "")}&username=${encodeURIComponent(currentUser.username || "")}&name=${encodeURIComponent(currentUser.name || "")}`;
@@ -2503,14 +2467,14 @@ function GrowinStones() {
             setAllPresets(data.presets);
             try { localStorage.setItem("growinstones_all_presets_v2", JSON.stringify(data.presets)); } catch(e) {}
           } else {
-            // Se a nuvem não tem presets salvos mas o dispositivo atual tem, envia para a nuvem
             const localPresets = allPresets;
             if (Array.isArray(localPresets) && localPresets.length > 0) {
               syncAllToCloud(null, localPresets);
             }
           }
-          if (data.setup) {
-            loadUserSetupFromData(data.setup);
+          // Apenas carrega os dados do setup se for a chamada inicial (login/troca de usuário)
+          if (initial && data.setup) {
+            loadSetupData(data.setup);
           }
         }
       }
@@ -2524,7 +2488,7 @@ function GrowinStones() {
     if (currentUser && (currentUser?.username || currentUser?.email)) {
       loadUserSetup(currentUser);
       if (currentUser.username) setSubdomainInput(currentUser.username);
-      fetchCloudUserSync();
+      fetchCloudUserSync(true);
     }
   }, [currentUser?.username, currentUser?.email]);
 
@@ -2532,12 +2496,12 @@ function GrowinStones() {
   useEffect(() => {
     const handleSync = () => {
       if (currentUser && (currentUser.email || currentUser.username)) {
-        fetchCloudUserSync();
+        fetchCloudUserSync(false);
       }
     };
     window.addEventListener("focus", handleSync);
     document.addEventListener("visibilitychange", handleSync);
-    const syncTimer = setInterval(handleSync, 10000); // Sincroniza em segundo plano a cada 10s entre dispositivos
+    const syncTimer = setInterval(handleSync, 15000); // Polling suave a cada 15s sem sobrescrever form ativo
 
     return () => {
       window.removeEventListener("focus", handleSync);
@@ -2565,10 +2529,10 @@ function GrowinStones() {
       localStorage.setItem(`growcalc_user_setup_${currentUser?.username}`, JSON.stringify(userSetup));
     } catch (e) {}
 
-    // Sincronizar na nuvem após debounce de 1 segundo
+    // Sincronizar na nuvem após debounce rápido de 400ms
     const timer = setTimeout(() => {
       syncAllToCloud(userSetup, allPresets);
-    }, 1200);
+    }, 400);
     return () => clearTimeout(timer);
   }, [
     currentUser, growName, owner, strain, width, depth, height,
