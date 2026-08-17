@@ -1995,7 +1995,7 @@ function GrowinStones() {
   const [owner, setOwner] = useState("");
   const [strain, setStrain] = useState(""); // Variedade / Genética da planta
   const [isGrowPublic, setIsGrowPublic] = useState(true); // Se o projeto do grow é público no subdomínio
-  const [openConfigCard, setOpenConfigCard] = useState("identificacao"); // Accordion de cards: apenas 1 aberto por vez
+  const [openConfigCard, setOpenConfigCard] = useState("estufa"); // Accordion de cards: apenas 1 aberto por vez
   const toggleConfigCard = (id) => setOpenConfigCard((cur) => (cur === id ? null : id));
   const [openDataCard, setOpenDataCard] = useState(true); // Card dos dados sticky no topo
   const [openMapCard, setOpenMapCard] = useState(true); // Card do mapa logo abaixo
@@ -2018,15 +2018,36 @@ function GrowinStones() {
   const [cols, setCols] = useState(4);
   const [conn, setConn] = useState("espinha");
   const [recirculate, setRecirculate] = useState(true);
-  const [equip, setEquip] = useState(PRESETS[1].equip);
-  const [perPot, setPerPot] = useState({});
-  const [watts, setWatts] = useState(Object.fromEntries(EQUIPMENT.map((e) => [e.id, e.defW])));
-  const [equipUrls, setEquipUrls] = useState({});
-  const [equipShopping, setEquipShopping] = useState({});
+  const [equipList, setEquipList] = useState([]); // Lista dinâmica de equipamentos adicionados pelo usuário
+  const [watts, setWatts] = useState({ led: 240 });
 
-  const togglePerPot = (id) => setPerPot((prev) => ({ ...prev, [id]: !prev[id] }));
-  const setEquipUrl = (id, url) => setEquipUrls((prev) => ({ ...prev, [id]: url }));
-  const toggleEquipShopping = (id) => setEquipShopping((prev) => ({ ...prev, [id]: !prev[id] }));
+  const addEquipItem = () => {
+    const newItem = {
+      id: "eq_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+      name: "",
+      qty: 1,
+      cost: 0,
+      watts: 0,
+      hours: 24,
+      inShoppingList: true,
+      url: "",
+      isCollapsed: false,
+    };
+    setEquipList((prev) => [newItem, ...prev]);
+  };
+
+  const updEquip = (id, patch) => {
+    setEquipList((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+  };
+
+  const delEquip = (id) => {
+    setEquipList((prev) => prev.filter((it) => it.id !== id));
+    showToast("Equipamento removido!");
+  };
+
+  const toggleEquipCollapse = (id) => {
+    setEquipList((prev) => prev.map((it) => (it.id === id ? { ...it, isCollapsed: !it.isCollapsed } : it)));
+  };
 
   // cultivo & mercado & ciclo de luz
   const [vegaHours, setVegaHours] = useState(18);
@@ -2039,31 +2060,17 @@ function GrowinStones() {
   const [priceG, setPriceG] = useState(0); // R$/g
   const [tariff, setTariff] = useState(0.95); // R$/kWh
 
-  // custos
-  const [costs, setCosts] = useState({
-    ...BASE_COSTS,
-    ...Object.fromEntries(EQUIPMENT.map((e) => [e.id, e.defCost])),
-  });
+  // custos base estruturais
+  const [costs, setCosts] = useState({ ...BASE_COSTS });
   const [extraCost, setExtraCost] = useState(0); // investimento extra (único)
   const [monthlyCost, setMonthlyCost] = useState(0); // insumos mensais
 
-  // itens extras adicionados pelo usuário
-  const [customItems, setCustomItems] = useState([]);
-  const addCustom = () =>
-    setCustomItems((a) => [...a, { id: Date.now() + Math.random(), name: "", watts: 0, hours: 24, qty: 1, cost: 0, perPot: false, url: "", inShoppingList: false }]);
-  const updCustom = (id, patch) => setCustomItems((a) => a.map((it) => (it.id === id ? { ...it, ...patch } : it)));
-  const delCustom = (id) => setCustomItems((a) => a.filter((it) => it.id !== id));
-
   const removeMaterialRow = (r) => {
-    if (r.customId) {
-      delCustom(r.customId);
-      showToast(` Item "${r.label}" removido da lista!`);
-    } else if (r.isEquip || EQUIPMENT.some((e) => e.id === r.key)) {
-      setEquip((prev) => ({ ...prev, [r.key]: 0 }));
-      showToast(` Equipamento "${r.label}" removido da lista!`);
+    if (r.equipId) {
+      delEquip(r.equipId);
     } else {
       setCost(r.key, 0);
-      showToast(` Custo do item "${r.label}" zerado!`);
+      showToast(`Custo do item "${r.label}" zerado!`);
     }
   };
 
@@ -2551,11 +2558,8 @@ function GrowinStones() {
     cols,
     conn,
     recirculate,
-    equip,
-    perPot,
+    equipList,
     watts,
-    equipUrls,
-    equipShopping,
     vegaHours,
     floraHours,
     vegaDays,
@@ -2567,7 +2571,6 @@ function GrowinStones() {
     costs,
     extraCost,
     monthlyCost,
-    customItems,
     notes,
     instructions,
     terms,
@@ -2595,11 +2598,30 @@ function GrowinStones() {
     if (typeof data.cols === "number") setCols(data.cols);
     if (typeof data.conn === "string") setConn(data.conn === "duplo_manifold" ? "paralelo" : data.conn);
     if (typeof data.recirculate === "boolean") setRecirculate(data.recirculate);
-    if (data.equip && typeof data.equip === "object") setEquip((prev) => ({ ...prev, ...data.equip }));
-    if (data.perPot && typeof data.perPot === "object") setPerPot(data.perPot);
+    if (Array.isArray(data.equipList)) {
+      setEquipList(data.equipList);
+    } else if (data.equip && typeof data.equip === "object") {
+      // Conversão retrocompatível de setups antigos
+      const converted = [];
+      EQUIPMENT.forEach((eq) => {
+        const q = data.equip[eq.id] || 0;
+        if (q > 0) {
+          converted.push({
+            id: "eq_" + eq.id + "_" + Date.now(),
+            name: eq.name,
+            qty: q,
+            cost: (data.costs && data.costs[eq.id]) || eq.defCost,
+            watts: (data.watts && data.watts[eq.id]) || eq.defW,
+            hours: (data.watts && data.watts[eq.id] === 0) ? 0 : eq.hours,
+            inShoppingList: !!(data.equipShopping && data.equipShopping[eq.id]),
+            url: (data.equipUrls && data.equipUrls[eq.id]) || "",
+            isCollapsed: true,
+          });
+        }
+      });
+      if (converted.length > 0) setEquipList(converted);
+    }
     if (data.watts && typeof data.watts === "object") setWatts((prev) => ({ ...prev, ...data.watts }));
-    if (data.equipUrls && typeof data.equipUrls === "object") setEquipUrls(data.equipUrls);
-    if (data.equipShopping && typeof data.equipShopping === "object") setEquipShopping(data.equipShopping);
     if (typeof data.vegaHours === "number") setVegaHours(data.vegaHours);
     if (typeof data.floraHours === "number") setFloraHours(data.floraHours);
     if (typeof data.vegaDays === "number") setVegaDays(data.vegaDays);
@@ -2610,7 +2632,6 @@ function GrowinStones() {
     if (data.costs && typeof data.costs === "object") setCosts((prev) => ({ ...prev, ...data.costs }));
     if (typeof data.extraCost === "number") setExtraCost(data.extraCost);
     if (typeof data.monthlyCost === "number") setMonthlyCost(data.monthlyCost);
-    if (Array.isArray(data.customItems)) setCustomItems(data.customItems);
     if (typeof data.notes === "string") setNotes(data.notes);
     if (typeof data.instructions === "string") setInstructions(data.instructions);
     if (typeof data.terms === "string") setTerms(data.terms);
@@ -2650,8 +2671,8 @@ function GrowinStones() {
     }
   }, [
     growName, owner, strain, width, depth, height, potCount, potIdx, potShape, potFlipped, customPotW, customPotL, customPotH, gaugeIdx,
-    spacing, cols, conn, recirculate, equip, perPot, watts, equipUrls, equipShopping, vegaHours, floraHours, vegaDays, floraDays, cycleDays, yieldPerPlant, priceG,
-    tariff, costs, extraCost, monthlyCost, customItems, notes, instructions, terms, isGrowPublic, dark
+    spacing, cols, conn, recirculate, equipList, watts, vegaHours, floraHours, vegaDays, floraDays, cycleDays, yieldPerPlant, priceG,
+    tariff, costs, extraCost, monthlyCost, notes, instructions, terms, isGrowPublic, dark
   ]);
 
   // Exportar setup completo em arquivo JSON
@@ -3047,16 +3068,14 @@ function GrowinStones() {
   // produção & plantas
   const plants = layout.placed;
   const reservoir = Math.max(20, Math.ceil(plants * (pot?.liters || 11) * 0.35));
-  const getEquipQty = (id) => (equip?.[id] || 0) * (perPot?.[id] ? Math.max(1, plants) : 1);
-
-  const customWatts = (customItems || []).reduce((s, it) => s + (it.watts || 0) * (it.qty || 0) * (it.perPot ? Math.max(1, plants) : 1), 0);
-  const customKwh = (customItems || []).reduce((s, it) => s + ((it.watts || 0) * (it.hours || 0) * (it.qty || 0) * (it.perPot ? Math.max(1, plants) : 1) * 30) / 1000, 0);
-  const totalWatts = EQUIPMENT.reduce((s, e) => s + (watts?.[e.id] || 0) * getEquipQty(e.id), 0) + customWatts;
+  const equipWatts = (equipList || []).reduce((s, it) => s + (Number(it.watts) || 0) * (Number(it.qty) || 1), 0);
+  const equipKwhMonth = (equipList || []).reduce((s, it) => s + (((Number(it.watts) || 0) * (Number(it.hours) || 0) * (Number(it.qty) || 1) * 30) / 1000), 0);
+  const ledWatts = Number(watts?.led) || 0;
+  const totalWatts = ledWatts + equipWatts;
   const ledHours = cycleDays > 0 ? Math.round(((vegaHours * vegaDays) + (floraHours * floraDays)) / cycleDays) : 18;
-  const getEquipHours = (e) => (e.id === "led" ? ledHours : e.hours);
-  const kwhMonth = EQUIPMENT.reduce((s, e) => s + ((watts?.[e.id] || 0) * getEquipHours(e) * getEquipQty(e.id) * 30) / 1000, 0) + customKwh;
-  const ledWatts = (watts?.led || 0) * getEquipQty("led");
-  const ledPerM2 = ledWatts > 0 ? Math.round(ledWatts / areaM2) : 0;
+  const ledKwhMonth = (ledWatts * ledHours * 30) / 1000;
+  const kwhMonth = ledKwhMonth + equipKwhMonth;
+  const ledPerM2 = areaM2 > 0 ? Math.round(ledWatts / areaM2) : 0;
   const airFlowNeeded = Math.ceil(volumeM3 * 60);
   const pipeTotal = plumbing.len + 60;
   const pipeMeters = Math.ceil((pipeTotal / 100) * 1.15);
@@ -3065,85 +3084,42 @@ function GrowinStones() {
   const yieldHarvest = plants * yieldPerPlant; // g
   const yieldYear = yieldHarvest * harvestsYear;
   const yieldM2 = areaM2 > 0 ? yieldHarvest / areaM2 : 0;
-  const gPerW = ledWatts > 0 ? yieldHarvest / ledWatts : 0;
+  const gPerW = totalWatts > 0 ? yieldHarvest / totalWatts : 0;
 
   // financeiro
   const materialRows = useMemo(() => {
-    const rows = [
-      { key: "pot", label: `Vasos ${pot.label} (${potDesc})`, qty: plants, unitLabel: "un" },
-      { key: "pipeM", label: `Mangueira/tubo ${gauge.label} — ${connInfo.short}`, qty: pipeMeters, unitLabel: "m" },
-      { key: "fitting", label: `Conexões ${gauge.label} (T, cotovelos, engates)`, qty: plumbing.fittings, unitLabel: "un" },
-      { key: "reservoir", label: "Reservatório principal", qty: 1, unitLabel: `un (≥ ${reservoir} L)` },
-      ...EQUIPMENT.filter((e) => equip[e.id] > 0).map((e) => {
-        const isPerPot = !!perPot[e.id];
-        const effQty = equip[e.id] * (isPerPot ? Math.max(1, plants) : 1);
-        return {
-          key: e.id,
-          isEquip: true,
-          label: `${e.name}${watts[e.id] > 0 ? ` (${watts[e.id]} W)` : ""}${isPerPot ? ` (${equip[e.id]}/vaso × ${plants} vasos)` : ""}`,
-          qty: effQty,
-          unitLabel: "un",
-        };
-      }),
+    const baseRows = [
+      { key: "pot", label: `Vasos ${pot.label} (${potDesc})`, qty: plants, unitLabel: "un", unitCost: costs.pot ?? 15, subtotal: (costs.pot ?? 15) * plants },
+      { key: "pipeM", label: `Mangueira/tubo ${gauge.label} — ${connInfo.short}`, qty: pipeMeters, unitLabel: "m", unitCost: costs.pipeM ?? 4, subtotal: (costs.pipeM ?? 4) * pipeMeters },
+      { key: "fitting", label: `Conexões ${gauge.label} (T, cotovelos, engates)`, qty: plumbing.fittings, unitLabel: "un", unitCost: costs.fitting ?? 3, subtotal: (costs.fitting ?? 3) * plumbing.fittings },
+      { key: "reservoir", label: "Reservatório principal", qty: 1, unitLabel: `un (≥ ${reservoir} L)`, unitCost: costs.reservoir ?? 120, subtotal: costs.reservoir ?? 120 },
     ];
-    const base = rows.map((r) => ({ ...r, unitCost: costs[r.key] ?? 0, subtotal: (costs[r.key] ?? 0) * r.qty }));
-    const extras = customItems
-      .filter((it) => it.qty > 0)
-      .map((it) => {
-        const isPerPot = !!it.perPot;
-        const effQty = it.qty * (isPerPot ? Math.max(1, plants) : 1);
-        return {
-          key: `custom-${it.id}`,
-          customId: it.id,
-          label: `${it.name.trim() || "Item extra"}${it.watts > 0 ? ` (${it.watts} W)` : ""}${isPerPot ? ` (${it.qty}/vaso × ${plants} vasos)` : ""}`,
-          qty: effQty,
-          unitLabel: "un",
-          unitCost: it.cost,
-          subtotal: it.cost * effQty,
-        };
-      });
-    return [...base, ...extras];
-  }, [pot, gauge, connInfo, pipeMeters, plumbing.fittings, reservoir, equip, perPot, watts, costs, plants, customItems]);
+    const equipRows = (equipList || []).map((it) => ({
+      key: it.id,
+      equipId: it.id,
+      label: `${it.name.trim() || "Equipamento"}${it.watts > 0 ? ` (${it.watts} W)` : ""}${it.hours > 0 ? ` · ${it.hours}h/dia` : ""}`,
+      qty: it.qty || 1,
+      unitLabel: "un",
+      unitCost: it.cost || 0,
+      subtotal: (it.cost || 0) * (it.qty || 1),
+      url: it.url || "",
+      inShoppingList: it.inShoppingList,
+    }));
+    return [...baseRows, ...equipRows];
+  }, [pot, potDesc, plants, gauge, connInfo, pipeMeters, plumbing.fittings, reservoir, costs, equipList]);
 
   const shoppingListItems = useMemo(() => {
-    const items = [];
-
-    EQUIPMENT.forEach((e) => {
-      if (equip[e.id] > 0 && equipShopping[e.id]) {
-        const isPerPot = !!perPot[e.id];
-        const effQty = equip[e.id] * (isPerPot ? Math.max(1, plants) : 1);
-        const unitCost = costs[e.id] ?? 0;
-        const subtotal = unitCost * effQty;
-        items.push({
-          id: e.id,
-          name: `${e.name}${watts[e.id] > 0 ? ` (${watts[e.id]} W)` : ""}`,
-          qty: effQty,
-          unitCost,
-          subtotal,
-          url: equipUrls[e.id] || "",
-        });
-      }
-    });
-
-    (customItems || []).forEach((it) => {
-      if (it.qty > 0 && it.inShoppingList) {
-        const isPerPot = !!it.perPot;
-        const effQty = it.qty * (isPerPot ? Math.max(1, plants) : 1);
-        const unitCost = it.cost || 0;
-        const subtotal = unitCost * effQty;
-        items.push({
-          id: `custom-${it.id}`,
-          name: `${it.name.trim() || "Item extra"}${it.watts > 0 ? ` (${it.watts} W)` : ""}`,
-          qty: effQty,
-          unitCost,
-          subtotal,
-          url: it.url || "",
-        });
-      }
-    });
-
-    return items;
-  }, [equip, equipShopping, perPot, plants, watts, costs, equipUrls, customItems]);
+    return (equipList || [])
+      .filter((it) => it.inShoppingList && (it.qty > 0))
+      .map((it) => ({
+        id: it.id,
+        name: `${it.name.trim() || "Equipamento"}${it.watts > 0 ? ` (${it.watts} W)` : ""}`,
+        qty: it.qty || 1,
+        unitCost: it.cost || 0,
+        subtotal: (it.cost || 0) * (it.qty || 1),
+        url: it.url || "",
+      }));
+  }, [equipList]);
 
   const materialsTotal = materialRows.reduce((s, r) => s + r.subtotal, 0);
   const capex = materialsTotal + extraCost;
@@ -3168,21 +3144,10 @@ function GrowinStones() {
     alerts.push({ level: "hi", text: `Cabem no máximo ${layout.capacity} vasos de ${pot.label} nesta configuração (${layout.useCols} colunas). Reduza a quantidade, o vaso ou o espaçamento — ou aumente a estufa.` });
   if (layout.colsClamped)
     alerts.push({ level: "mid", text: `Você pediu ${cols} colunas, mas só cabem ${layout.maxCols} na largura atual. Usando ${layout.useCols}.` });
-  if (conn === "anel" && equip.bombaAgua === 0)
-    alerts.push({ level: "mid", text: "Anel recirculante (RDWC) precisa de bomba de água para manter o fluxo no loop." });
-  if (conn === "anel" && equip.bombaAr === 0)
-    alerts.push({ level: "mid", text: "Em RDWC, a oxigenação vem da bomba de ar — adicione ao menos uma." });
-  if (equip.exaustor === 0)
-    alerts.push({ level: "hi", text: `Sem exaustor: o cultivo precisa renovar ~${airFlowNeeded} m³/h de ar. Adicione ao menos 1 exaustor.` });
-  else
-    alerts.push({ level: "lo", text: `Renovação de ar: dimensione o conjunto para ≥ ${airFlowNeeded} m³/h (~${Math.ceil(airFlowNeeded / equip.exaustor)} m³/h por exaustor).` });
-  if (equip.led > 0 && ledPerM2 < 150)
-    alerts.push({ level: "mid", text: `Luz em ${ledPerM2} W/m² — abaixo dos ~150 W/m² recomendados para flora.` });
-  if (equip.led === 0) alerts.push({ level: "hi", text: "Nenhum board de LED no projeto." });
   if ((gauge.mm === 16 && plants > 4) || (gauge.mm === 20 && plants > 8) || (gauge.mm === 25 && plants > 16))
     alerts.push({ level: "mid", text: `Bitola ${gauge.label} pode limitar a vazão para ${plants} vasos — considere subir um degrau.` });
-  if (equip.bombaAgua === 0 && equip.bombaAr === 0 && plants > 0)
-    alerts.push({ level: "mid", text: "Sem bomba de água nem de ar: hidroponia ativa exige ao menos uma delas." });
+  if (ledWatts > 0 && ledPerM2 < 150)
+    alerts.push({ level: "mid", text: `Luz em ${ledPerM2} W/m² — abaixo dos ~150 W/m² recomendados para flora.` });
   if (priceG <= 0)
     alerts.push({ level: "lo", text: "Preencha o valor de mercado (R$/g) em Cultivo & mercado para liberar receita, lucro e payback." });
 
@@ -3197,39 +3162,18 @@ function GrowinStones() {
   const svgH = topH + OY + resZoneH;
   const pipeW = Math.max(2, gauge.mm * topScale * 0.1 + 1.2);
   const resY = OY + topH + 26;
-  const showRes = equip.tanque > 0 || equip.bombaAgua > 0 || equip.bombaAr > 0;
+  const showRes = true;
 
   const resItems = useMemo(() => {
-    const items = [];
-    if (equip.tanque > 0) {
-      for (let i = 0; i < equip.tanque; i++) {
-        items.push({
-          id: `tk_${i}`,
-          label: i === 0 ? `${reservoir} L` : "tanque",
-          w: 54,
-          h: 32,
-          type: "tank",
-        });
-      }
-    }
-    if (equip.bombaAgua > 0) {
-      items.push({
-        id: "pump_water",
-        label: `água ×${equip.bombaAgua}`,
-        w: 48,
-        h: 26,
-        type: "pump",
-      });
-    }
-    if (equip.bombaAr > 0) {
-      items.push({
-        id: "pump_air",
-        label: `ar ×${equip.bombaAr}`,
-        w: 42,
-        h: 24,
-        type: "air",
-      });
-    }
+    const items = [
+      {
+        id: "tk_0",
+        label: `${reservoir} L`,
+        w: 54,
+        h: 32,
+        type: "tank",
+      },
+    ];
     const gap = 10;
     const totalW = items.reduce((s, it) => s + it.w, 0) + Math.max(0, items.length - 1) * gap;
     const startX = OX + Math.max(10, (topW - totalW) / 2);
@@ -5562,6 +5506,63 @@ function GrowinStones() {
               T={T}
               dark={dark}
             >
+              {/* ————— IDENTIFICAÇÃO DO PROJETO DENTRO DO CARD DO MAPA ————— */}
+              <div className="p-3 sm:p-4 rounded-xl mb-4 space-y-3 transition-all"
+                style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider block" style={{ color: T.faint }}>
+                    Identificação do Projeto
+                  </span>
+                  {strain && (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-md" style={{ background: T.surface, border: `1px solid ${T.border}`, color: "#f59e0b" }}>
+                      {strain}
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="text-[11px] font-semibold block mb-1" style={{ color: T.muted }}>Nome do grow</label>
+                    <input type="text" value={growName} placeholder="Ex.: Grow Sala Verde"
+                      onChange={(e) => setGrowName(e.target.value)}
+                      className="w-full h-8 px-2.5 rounded-lg text-xs font-medium focus:outline-none" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold block mb-1" style={{ color: T.muted }}>Responsável</label>
+                    <input type="text" value={owner} placeholder="Seu nome"
+                      onChange={(e) => setOwner(e.target.value)}
+                      className="w-full h-8 px-2.5 rounded-lg text-xs font-medium focus:outline-none" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold block mb-1" style={{ color: T.muted }}>Variedade / Genética da planta</label>
+                    <input type="text" value={strain} placeholder="Ex.: White Widow, Gorilla Glue..."
+                      onChange={(e) => setStrain(e.target.value)}
+                      className="w-full h-8 px-2.5 rounded-lg text-xs font-medium focus:outline-none" style={inputStyle} />
+                  </div>
+                </div>
+
+                {/* Toggle: Projeto Público / Privado no Subdomínio */}
+                <div className="pt-2.5 mt-1 border-t flex items-center justify-between gap-3" style={{ borderColor: T.borderSoft }}>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold" style={{ color: T.text }}>
+                      Projeto Público no Subdomínio
+                    </div>
+                    <div className="text-[11px] mt-0.5" style={{ color: T.muted }}>
+                      {isGrowPublic ? "Visível no seu subdomínio exclusivo" : "Oculto (Apenas seu perfil e posts serão públicos)"}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsGrowPublic((p) => !p)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isGrowPublic ? "bg-emerald-600" : "bg-stone-600"}`}
+                    title={isGrowPublic ? "Projeto Público" : "Projeto Privado"}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isGrowPublic ? "translate-x-5" : "translate-x-0"}`}
+                    />
+                  </button>
+                </div>
+              </div>
+
               <div className="p-3 sm:p-3.5 rounded-xl mb-4 flex items-center justify-between gap-3 flex-wrap"
                 style={{ background: T.surface2, border: `1px solid ${T.border}` }}>
                 <div className="flex items-center gap-3 min-w-0">
@@ -5807,56 +5808,6 @@ function GrowinStones() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 items-start w-full max-w-full min-w-0">
               {/* Coluna 1: Estrutura, Vasos, Presets, Iluminação, Equipamentos, Observações */}
               <div className="space-y-4 sm:space-y-5 w-full max-w-full min-w-0">
-                <CollapsibleCard
-                  title="Identificação"
-                  subtitle={growName || owner || strain ? `${growName || "Grow"}${strain ? ` · ${strain}` : ""}` : undefined}
-                  isOpen={openConfigCard === "identificacao"}
-                  onToggle={() => toggleConfigCard("identificacao")}
-                  T={T} dark={dark}>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-xs block mb-1" style={{ color: T.muted }}>Nome do grow</label>
-                      <input type="text" value={growName} placeholder="Ex.: Grow Sala Verde"
-                        onChange={(e) => setGrowName(e.target.value)}
-                        className="w-full h-9 px-3 rounded-lg text-sm font-medium focus:outline-none" style={inputStyle} />
-                    </div>
-                    <div>
-                      <label className="text-xs block mb-1" style={{ color: T.muted }}>Responsável</label>
-                      <input type="text" value={owner} placeholder="Seu nome"
-                        onChange={(e) => setOwner(e.target.value)}
-                        className="w-full h-9 px-3 rounded-lg text-sm font-medium focus:outline-none" style={inputStyle} />
-                    </div>
-                    <div>
-                      <label className="text-xs block mb-1" style={{ color: T.muted }}>Variedade / Genética da planta</label>
-                      <input type="text" value={strain} placeholder="Ex.: White Widow, Gorilla Glue..."
-                        onChange={(e) => setStrain(e.target.value)}
-                        className="w-full h-9 px-3 rounded-lg text-sm font-medium focus:outline-none" style={inputStyle} />
-                    </div>
-
-                    {/* Toggle: Projeto Público / Privado no Subdomínio */}
-                    <div className="pt-2.5 mt-1 border-t flex items-center justify-between gap-3" style={{ borderColor: T.borderSoft }}>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs font-bold" style={{ color: T.text }}>
-                          Projeto Público no Subdomínio
-                        </div>
-                        <div className="text-[11px] mt-0.5" style={{ color: T.muted }}>
-                          {isGrowPublic ? "Visível no seu subdomínio exclusivo" : "Oculto (Apenas seu perfil e posts serão públicos)"}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsGrowPublic((p) => !p)}
-                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isGrowPublic ? "bg-emerald-600" : "bg-stone-600"}`}
-                        title={isGrowPublic ? "Projeto Público" : "Projeto Privado"}
-                      >
-                        <span
-                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isGrowPublic ? "translate-x-5" : "translate-x-0"}`}
-                        />
-                      </button>
-                    </div>
-                  </div>
-                </CollapsibleCard>
-
                 <CollapsibleCard
                   title="Setups & Presets"
                   subtitle={`${allPresets.length} setups salvos`}
@@ -6171,58 +6122,279 @@ function GrowinStones() {
 
                 <CollapsibleCard
                   title="4 · Equipamentos & custos"
-                  subtitle={`${EQUIPMENT.filter((e) => equip[e.id] > 0).length} ativos · ${fmtBRL(capex)} CAPEX`}
+                  subtitle={`${equipList.length} equipamento(s) · ${fmtBRL(equipCapex)} CAPEX · ${equipWatts}W`}
                   isOpen={openConfigCard === "equipamentos"}
                   onToggle={() => toggleConfigCard("equipamentos")}
                   T={T} dark={dark}>
-                  <div className="space-y-3">
-                    {EQUIPMENT.map((e) => {
-                      const on = equip[e.id] > 0;
-                      const isPerPot = !!perPot[e.id];
-                      const effQty = isPerPot ? equip[e.id] * layout.placed : equip[e.id];
-                      return (
-                        <div key={e.id} className="rounded-xl p-3 transition-colors"
-                          style={{ background: on ? T.surface2 : "transparent", border: `1px solid ${on ? T.border : T.borderSoft}` }}>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <input type="checkbox" checked={on}
-                                onChange={(ev) => setEquip((prev) => ({ ...prev, [e.id]: ev.target.checked ? (prev[e.id] || 1) : 0 }))}
-                                className="rounded w-4 h-4 accent-amber-500 cursor-pointer" />
-                              <span className="text-xs font-medium" style={{ color: on ? T.text : T.muted }}>
-                                {e.name}
-                              </span>
-                            </div>
-                            {on && (
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[11px]" style={{ color: T.faint }}>qtd</span>
-                                <NumInput value={equip[e.id]} min={1} max={99}
-                                  onCommit={(n) => setEquip((prev) => ({ ...prev, [e.id]: n }))}
-                                  className={`w-12 h-7 ${inputCls}`} style={inputStyle} />
-                              </div>
-                            )}
-                          </div>
+                  <div className="space-y-4">
+                    {/* Botão de Adicionar Novo Equipamento */}
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-medium" style={{ color: T.muted }}>
+                        Cadastre os aparelhos elétricos do seu cultivo:
+                      </p>
+                      <button
+                        type="button"
+                        onClick={addEquipItem}
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 shrink-0 hover:scale-105"
+                        style={{ background: "#f59e0b", color: "#1c1917" }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="12" y1="5" x2="12" y2="19" />
+                          <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        <span>Adicionar Equipamento</span>
+                      </button>
+                    </div>
 
-                          {on && (
-                            <div className="mt-3 pt-3 space-y-2" style={{ borderTop: `1px solid ${T.borderSoft}` }}>
-                              <div className="flex items-center gap-3 flex-wrap">
-                                <div className="flex items-center gap-1">
-                                  <NumInput value={watts[e.id]} min={0} max={5000}
-                                    onCommit={(n) => setW(e.id, n)}
-                                    className={`w-16 h-7 ${inputCls}`} style={inputStyle} />
-                                  <span className="text-[11px] font-medium" style={{ color: T.muted }}>W</span>
+                    {/* Lista Vazia */}
+                    {equipList.length === 0 ? (
+                      <div className="text-center py-6 px-4 rounded-xl border border-dashed flex flex-col items-center justify-center gap-2"
+                        style={{ borderColor: T.borderSoft, background: T.surface2 }}>
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.faint }}>
+                          <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                        </svg>
+                        <p className="text-xs font-medium" style={{ color: T.muted }}>Nenhum equipamento cadastrado</p>
+                        <p className="text-[11px]" style={{ color: T.faint }}>Cadastre exaustores, bombas, timers, medidores, desumidificadores, etc.</p>
+                        <button
+                          type="button"
+                          onClick={addEquipItem}
+                          className="mt-2 px-3 py-1.5 rounded-lg text-xs font-semibold"
+                          style={{ background: T.surface, border: `1px solid ${T.border}`, color: T.text }}
+                        >
+                          + Adicionar primeiro equipamento
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {equipList.map((eq, idx) => {
+                          const isCollapsed = !!eq.isCollapsed;
+                          const hasUrl = typeof eq.url === "string" && eq.url.trim().length > 0;
+                          const itemSubtotal = (Number(eq.cost) || 0) * (Number(eq.qty) || 1);
+                          const itemWatts = (Number(eq.watts) || 0) * (Number(eq.qty) || 1);
+                          const safeUrl = hasUrl ? (eq.url.trim().startsWith("http") ? eq.url.trim() : `https://${eq.url.trim()}`) : "";
+
+                          return (
+                            <div
+                              key={eq.id}
+                              className="rounded-xl overflow-hidden transition-all"
+                              style={{ background: T.surface2, border: `1px solid ${T.border}` }}
+                            >
+                              {/* Header do Equipamento (Colapsável & Excluível) */}
+                              <div
+                                className="p-3 flex items-center justify-between gap-2 cursor-pointer select-none"
+                                onClick={() => toggleEquipCollapse(eq.id)}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                  <div className="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0"
+                                    style={{ background: T.surface, color: T.muted, border: `1px solid ${T.border}` }}>
+                                    {idx + 1}
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-xs font-bold truncate" style={{ color: T.text }}>
+                                        {eq.name?.trim() || `Equipamento #${idx + 1}`}
+                                      </span>
+                                      {eq.inShoppingList && (
+                                        <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold" style={{ background: "rgba(245, 158, 11, 0.15)", color: "#f59e0b", border: "1px solid rgba(245, 158, 11, 0.3)" }}>
+                                          Lista de compras
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-[10.5px] mt-0.5 flex-wrap" style={{ color: T.faint }}>
+                                      <span>Qtd: <b style={{ color: T.muted }}>{eq.qty} un</b></span>
+                                      <span>·</span>
+                                      <span>Total: <b style={{ color: "#38bdf8" }}>{fmtBRL(itemSubtotal)}</b></span>
+                                      <span>·</span>
+                                      <span>{itemWatts > 0 ? `${itemWatts}W` : "0W"}</span>
+                                      <span>·</span>
+                                      <span>{eq.hours || 0}h/dia</span>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[11px]" style={{ color: T.faint }}>R$/un</span>
-                                  <MoneyInput value={costs[e.id]}
-                                    onCommit={(n) => setCost(e.id, n)}
-                                    className={`w-20 h-7 ${inputCls}`} style={inputStyle} />
+
+                                <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                  {/* Botão COMPRAR */}
+                                  {hasUrl && (
+                                    <a
+                                      href={safeUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-transform hover:scale-105 flex items-center gap-1 shrink-0 shadow-sm"
+                                      style={{ background: "#f59e0b", color: "#1c1917" }}
+                                      title="Abrir link de compra"
+                                    >
+                                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="9" cy="21" r="1"/>
+                                        <circle cx="20" cy="21" r="1"/>
+                                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                                      </svg>
+                                      <span>COMPRAR</span>
+                                    </a>
+                                  )}
+
+                                  {/* Toggle Chevron */}
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleEquipCollapse(eq.id)}
+                                    className="p-1 rounded-lg hover:bg-stone-700/30 transition-colors"
+                                    style={{ color: T.muted }}
+                                    title={isCollapsed ? "Expandir" : "Recolher"}
+                                  >
+                                    <svg
+                                      width="15"
+                                      height="15"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      className={`transition-transform duration-200 ${isCollapsed ? "-rotate-90" : "rotate-0"}`}
+                                    >
+                                      <polyline points="6 9 12 15 18 9" />
+                                    </svg>
+                                  </button>
+
+                                  {/* Botão Excluir */}
+                                  <button
+                                    type="button"
+                                    onClick={() => delEquip(eq.id)}
+                                    className="p-1 rounded-lg hover:bg-red-500/20 text-stone-400 hover:text-red-400 transition-colors"
+                                    title="Excluir equipamento"
+                                  >
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                      <polyline points="3 6 5 6 21 6" />
+                                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                    </svg>
+                                  </button>
                                 </div>
                               </div>
+
+                              {/* Corpo Editável do Equipamento */}
+                              {!isCollapsed && (
+                                <div className="p-3 pt-2 space-y-3 border-t" style={{ borderColor: T.borderSoft, background: T.surface }}>
+                                  {/* Nome do Equipamento */}
+                                  <div>
+                                    <label className="text-[11px] font-semibold block mb-1" style={{ color: T.muted }}>
+                                      Nome do equipamento
+                                    </label>
+                                    <input
+                                      type="text"
+                                      value={eq.name}
+                                      placeholder="Ex: Exaustor Turbo 150mm, Bomba de Ar Boyu, Timer Digital..."
+                                      onChange={(e) => updEquip(eq.id, { name: e.target.value })}
+                                      className="w-full h-8 px-2.5 rounded-lg text-xs font-medium focus:outline-none"
+                                      style={inputStyle}
+                                    />
+                                  </div>
+
+                                  {/* Grid de Quantidade, Valor Unitário, Watts e Horas por Dia */}
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    <div>
+                                      <label className="text-[11px] font-semibold block mb-1" style={{ color: T.muted }}>
+                                        Quantidade
+                                      </label>
+                                      <NumInput
+                                        value={eq.qty}
+                                        min={1}
+                                        max={999}
+                                        onCommit={(n) => updEquip(eq.id, { qty: n })}
+                                        className={`w-full h-8 ${inputCls}`}
+                                        style={inputStyle}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-[11px] font-semibold block mb-1" style={{ color: T.muted }}>
+                                        Valor unit. (R$)
+                                      </label>
+                                      <MoneyInput
+                                        value={eq.cost}
+                                        onCommit={(n) => updEquip(eq.id, { cost: n })}
+                                        className={`w-full h-8 ${inputCls}`}
+                                        style={inputStyle}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-[11px] font-semibold block mb-1" style={{ color: T.muted }}>
+                                        Potência (Watts)
+                                      </label>
+                                      <NumInput
+                                        value={eq.watts}
+                                        min={0}
+                                        max={10000}
+                                        onCommit={(n) => updEquip(eq.id, { watts: n })}
+                                        className={`w-full h-8 ${inputCls}`}
+                                        style={inputStyle}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-[11px] font-semibold block mb-1" style={{ color: T.muted }}>
+                                        Ligada (h/dia)
+                                      </label>
+                                      <NumInput
+                                        value={eq.hours}
+                                        min={0}
+                                        max={24}
+                                        onCommit={(n) => updEquip(eq.id, { hours: n })}
+                                        className={`w-full h-8 ${inputCls}`}
+                                        style={inputStyle}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Checkbox Lista de Compras */}
+                                  <div className="pt-1">
+                                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                                      <input
+                                        type="checkbox"
+                                        checked={!!eq.inShoppingList}
+                                        onChange={(e) => updEquip(eq.id, { inShoppingList: e.target.checked })}
+                                        className="rounded w-4 h-4 accent-amber-500 cursor-pointer"
+                                      />
+                                      <span className="text-xs font-semibold" style={{ color: T.text }}>
+                                        Incluir na lista de compras e relatório
+                                      </span>
+                                    </label>
+                                  </div>
+
+                                  {/* URL para Compra do Produto */}
+                                  <div>
+                                    <label className="text-[11px] font-semibold block mb-1" style={{ color: T.muted }}>
+                                      URL / Link para compra do produto (gera QR Code no relatório impresso):
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="url"
+                                        value={eq.url || ""}
+                                        placeholder="https://mercadolivre.com.br/... ou https://..."
+                                        onChange={(e) => updEquip(eq.id, { url: e.target.value })}
+                                        className="flex-1 h-8 px-2.5 rounded-lg text-xs font-medium focus:outline-none"
+                                        style={inputStyle}
+                                      />
+                                      {hasUrl && (
+                                        <a
+                                          href={safeUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="h-8 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 shrink-0 transition-transform hover:scale-105 shadow-sm"
+                                          style={{ background: "#f59e0b", color: "#1c1917" }}
+                                        >
+                                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                            <circle cx="9" cy="21" r="1"/>
+                                            <circle cx="20" cy="21" r="1"/>
+                                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                                          </svg>
+                                          <span>COMPRAR</span>
+                                        </a>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </CollapsibleCard>
 
