@@ -2,6 +2,10 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import ESP32WebFlasherModal from "./components/ESP32WebFlasherModal";
 import ESP32GPIOConfigModal from "./components/ESP32GPIOConfigModal";
 import { UserProfileView, parseObsidianMarkdown } from "./UserProfileView";
+import CommunityFeedView from "./components/CommunityFeedView";
+import SuperuserUsersCrudView from "./components/SuperuserUsersCrudView";
+
+const SUPERUSER_EMAIL = "roger.ra@gmail.com";
 
 // ————————————————————————— ESP32 TELEMETRY & CONTROLE —————————————————————————
 function MQTTMonitorView({ currentUser, T, dark, showToast }) {
@@ -2087,6 +2091,8 @@ function GrowinStones() {
       return null;
     }
   });
+
+  const isSuperuser = currentUser?.email?.toLowerCase() === SUPERUSER_EMAIL || currentUser?.role === "Superuser";
 
 
 
@@ -4992,11 +4998,13 @@ function GrowinStones() {
                   <div className="space-y-1">
                     {[
                       { id: "profile", label: "Perfil & Diário", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
+                      { id: "feed", label: "Feed da Comunidade", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg> },
                       { id: "configurator", label: "Configurador de Grow", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg> },
                       { id: "my_grows", label: "Meus Grows", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22v-9"/><path d="M12 13a6 6 0 0 1 6-6c0 6-6 6-6 6z"/><path d="M12 13a6 6 0 0 0-6-6c0 6 6 6 6 6z"/></svg> },
                       { id: "comparison", label: "Comparador de Setups", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
                       { id: "mqtt", label: "Controlador ESP32", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/></svg> },
-                      { id: "settings", label: "Ajustes & Subdomínio", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> }
+                      { id: "settings", label: "Ajustes & Subdomínio", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> },
+                      ...(isSuperuser ? [{ id: "admin_users", label: "Usuários (Superuser)", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-500"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> }] : [])
                     ].map((item) => {
                       const active = activeTab === item.id;
                       return (
@@ -5111,10 +5119,14 @@ function GrowinStones() {
           )}
 
           {/* Menu Items com Ícones Vetoriais Monocromáticos */}
+          {/* Menu Items com Ícones Vetoriais Monocromáticos */}
           <nav className="space-y-1.5">
             {[
               { id: "profile", label: "Meu Perfil", badge: "NOVO", icon: (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              )},
+              { id: "feed", label: "Feed da Comunidade", badge: "FEED", icon: (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
               )},
               { id: "configurator", label: "Configurador de Grow", icon: (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
@@ -5130,7 +5142,20 @@ function GrowinStones() {
               )},
               { id: "settings", label: "Configurações", icon: (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-              )}
+              )},
+              ...(isSuperuser ? [{
+                id: "admin_users",
+                label: "Usuários",
+                badge: "SUPERUSER",
+                icon: (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-amber-500">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                  </svg>
+                )
+              }] : [])
             ].map((item) => {
               const active = activeTab === item.id;
               return (
@@ -5140,16 +5165,23 @@ function GrowinStones() {
                   className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${active ? "shadow-sm" : "hover:opacity-85"}`}
                   style={{
                     background: active ? T.sidebarActiveBg : "transparent",
-                    color: active ? T.text : T.muted,
-                    border: active ? `1px solid ${T.border}` : "1px solid transparent"
+                    color: active ? (item.id === "admin_users" ? "#f59e0b" : T.text) : T.muted,
+                    border: active ? `1px solid ${item.id === "admin_users" ? "#f59e0b" : T.border}` : "1px solid transparent"
                   }}
                 >
                   {item.icon}
                   {!sidebarCollapsed && (
                     <div className="flex items-center justify-between w-full">
-                      <span>{item.label}</span>
+                      <span className={item.id === "admin_users" ? "font-black" : ""}>{item.label}</span>
                       {item.badge && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ background: T.surface2, border: `1px solid ${T.border}`, color: T.text }}>
+                        <span
+                          className="px-1.5 py-0.5 rounded text-[10px] font-extrabold"
+                          style={{
+                            background: item.id === "admin_users" ? "rgba(245, 158, 11, 0.15)" : T.surface2,
+                            border: `1px solid ${item.id === "admin_users" ? "#f59e0b" : T.border}`,
+                            color: item.id === "admin_users" ? "#f59e0b" : T.text
+                          }}
+                        >
                           {item.badge}
                         </span>
                       )}
@@ -5229,6 +5261,14 @@ function GrowinStones() {
         {/* Render Tab Content */}
         {activeTab === "profile" && (
           <UserProfileView currentUser={currentUser} setCurrentUser={setCurrentUser} T={T} dark={dark} showToast={showToast} />
+        )}
+
+        {activeTab === "feed" && (
+          <CommunityFeedView currentUser={currentUser} T={T} dark={dark} onNavigateToProfile={() => setActiveTab("profile")} />
+        )}
+
+        {activeTab === "admin_users" && isSuperuser && (
+          <SuperuserUsersCrudView currentUser={currentUser} T={T} dark={dark} />
         )}
 
         {activeTab === "mqtt" && (
