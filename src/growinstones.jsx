@@ -4148,7 +4148,6 @@ function GrowinStones() {
       </a>
       <span style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.14em; color:#a8a29e; border-left:1px solid #44403c; padding-left:10px;">Perfil do Cultivador</span>
     </div>
-    <a href="https://${displaySlug}.thegrowinstones.com" target="_blank" class="badge-live">https://${displaySlug}.thegrowinstones.com</a>
   </div>
 </header>
 
