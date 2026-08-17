@@ -720,7 +720,7 @@ Novo setup configurado no GrowinStones e sincronizado com o controlador via **MQ
         className="rounded-none sm:rounded-3xl overflow-hidden border-0 sm:border border-b sm:border-b shadow-none sm:shadow-sm relative group mb-3 sm:mb-6 min-h-[calc(100dvh-58px)] sm:min-h-0 flex flex-col justify-between"
         style={{ background: T.surface, borderColor: T.border }}
       >
-        <div className="h-[36vh] min-h-[180px] max-h-[320px] sm:h-64 w-full relative overflow-hidden shrink-0" style={{ background: T.surface2 }}>
+        <div className="h-[30vh] min-h-[140px] max-h-[220px] sm:h-52 w-full relative overflow-hidden shrink-0" style={{ background: T.surface2 }}>
           {(bannerPreview || currentUser?.bannerUrl) ? (
             <img
               src={bannerPreview || currentUser?.bannerUrl}
@@ -745,11 +745,11 @@ Novo setup configurado no GrowinStones e sincronizado com o controlador via **MQ
 
         {/* PROFILE INFO BAR */}
         <div className="px-4 sm:px-6 pb-6 pt-0 relative w-full max-w-full flex-1 flex flex-col justify-between">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 -mt-12 sm:-mt-20 mb-3">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 -mt-10 sm:-mt-16 mb-3">
             {/* AVATAR OVERLAY */}
             <div className="relative group shrink-0 self-start">
               <div
-                className="w-20 h-20 sm:w-32 sm:h-32 min-w-[80px] min-h-[80px] sm:min-w-[128px] sm:min-h-[128px] aspect-square rounded-full overflow-hidden border-4 shadow-xl flex items-center justify-center font-extrabold text-2xl sm:text-3xl shrink-0 relative"
+                className="w-20 h-20 sm:w-28 sm:h-28 min-w-[80px] min-h-[80px] sm:min-w-[112px] sm:min-h-[112px] aspect-square rounded-full overflow-hidden border-4 shadow-xl flex items-center justify-center font-extrabold text-2xl sm:text-3xl shrink-0 relative"
                 style={{
                   background: T.surface2,
                   borderColor: T.surface,

@@ -4053,7 +4053,7 @@ function GrowinStones() {
   }
 
   .profile-banner {
-    height: 220px;
+    height: 180px;
     width: 100%;
     position: relative;
     overflow: hidden;
@@ -4179,9 +4179,11 @@ function GrowinStones() {
       box-shadow: none !important;
     }
     .profile-banner {
-      height: 38vh !important;
-      min-height: 190px !important;
-      max-height: 340px !important;
+      height: 30% !important;
+      height: 30dvh !important;
+      height: 30vh !important;
+      min-height: 140px !important;
+      max-height: 220px !important;
     }
     .profile-content {
       padding: 0 18px 24px !important;
@@ -4223,7 +4225,7 @@ function GrowinStones() {
 <div class="container">
   <!-- CARD PRINCIPAL: PERFIL DO CULTIVADOR (FULLHEIGHT CANVAS NO MOBILE) -->
   <div class="profile-card">
-    <!-- FOTO DE CAPA -->
+    <!-- FOTO DE CAPA (30% DO CANVAS) -->
     <div class="profile-banner">
       <img id="user-banner-img" src="${userBannerUrl || ''}" alt="Capa do Perfil" style="width:100%; height:100%; object-fit:cover; display:${userBannerUrl ? 'block' : 'none'};" onerror="this.style.display='none'; document.getElementById('user-banner-placeholder').style.display='block';" />
       <div id="user-banner-placeholder" style="display:${userBannerUrl ? 'none' : 'block'}; width:100%; height:100%; background:linear-gradient(135deg, #1c1917 0%, #292524 50%, #44403c 100%);"></div>
@@ -4231,8 +4233,8 @@ function GrowinStones() {
 
     <div class="profile-content">
       <!-- AVATAR & BADGES -->
-      <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-top:-50px; margin-bottom:14px;">
-        <div style="width:100px; height:100px; min-width:100px; min-height:100px; max-width:100px; max-height:100px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; border:4px solid #1c1917; background:#292524; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:32px; color:#f59e0b; box-shadow:0 10px 25px rgba(0,0,0,0.3); position:relative;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-top:-40px; margin-bottom:14px;">
+        <div style="width:84px; height:84px; min-width:84px; min-height:84px; max-width:84px; max-height:84px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; border:4px solid #1c1917; background:#292524; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:28px; color:#f59e0b; box-shadow:0 10px 25px rgba(0,0,0,0.3); position:relative;">
           <img id="user-avatar-img" src="${userAvatarUrl || ''}" alt="Avatar" style="width:100%; height:100%; aspect-ratio:1/1; object-fit:cover; display:${userAvatarUrl ? 'block' : 'none'}; border-radius:50%;" onerror="this.style.display='none'; document.getElementById('user-avatar-text').style.display='flex';" />
           <span id="user-avatar-text" style="display:${userAvatarUrl ? 'none' : 'flex'}; align-items:center; justify-content:center; width:100%; height:100%;">${esc(userDisplayName ? userDisplayName.charAt(0).toUpperCase() : 'G')}</span>
         </div>
