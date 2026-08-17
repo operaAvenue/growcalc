@@ -715,9 +715,9 @@ Novo setup configurado no GrowinStones e sincronizado com o controlador via **MQ
       <input type="file" ref={imageAttachRef} accept="image/*" multiple onChange={handleAttachImages} className="hidden" />
       <input type="file" ref={videoAttachRef} accept="video/*" onChange={handleAttachVideo} className="hidden" />
 
-      {/* ————————————————— PROFILE HEADER (FULL CANVAS RESPONSIVE NO MOBILE) ————————————————— */}
+      {/* ————————————————— PROFILE HEADER ————————————————— */}
       <div
-        className="rounded-none sm:rounded-3xl overflow-hidden border-0 sm:border border-b sm:border-b shadow-none sm:shadow-sm relative group mb-3 sm:mb-6 min-h-[calc(100dvh-58px)] sm:min-h-0 flex flex-col justify-between"
+        className="rounded-2xl sm:rounded-3xl overflow-hidden border shadow-sm relative group mb-6"
         style={{ background: T.surface, borderColor: T.border }}
       >
         <div className="h-44 sm:h-64 w-full relative overflow-hidden shrink-0" style={{ background: T.surface2 }}>
@@ -744,7 +744,7 @@ Novo setup configurado no GrowinStones e sincronizado com o controlador via **MQ
         </div>
 
         {/* PROFILE INFO BAR */}
-        <div className="px-4 sm:px-6 pb-6 pt-0 relative w-full max-w-full flex-1 flex flex-col justify-between">
+        <div className="px-4 sm:px-6 pb-6 pt-0 relative w-full">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 -mt-12 sm:-mt-20 mb-3">
             {/* AVATAR OVERLAY */}
             <div className="relative group shrink-0 self-start">

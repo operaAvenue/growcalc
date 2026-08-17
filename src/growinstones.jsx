@@ -4153,60 +4153,15 @@ function GrowinStones() {
 
   .footer { text-align: center; font-size: 12px; color: #78716c; margin-top: 40px; }
 
-  /* MOBILE FULLHEIGHT RESPONSIVE DISPLAY & CANVAS */
+  /* RESPONSIVE MOBILE */
   @media (max-width: 768px) {
-    html, body {
-      width: 100vw;
-      overflow-x: hidden;
-    }
-    .container {
-      max-width: 100% !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      width: 100vw !important;
-    }
-    .profile-card {
-      border-radius: 0 !important;
-      border-left: none !important;
-      border-right: none !important;
-      border-top: none !important;
-      margin-bottom: 0 !important;
-      min-height: calc(100dvh - 58px) !important;
-      min-height: calc(100vh - 58px) !important;
-      display: flex !important;
-      flex-direction: column !important;
-      justify-content: space-between !important;
-      box-shadow: none !important;
-    }
-    .profile-banner {
-      height: 30% !important;
-      height: 30dvh !important;
-      height: 30vh !important;
-      min-height: 140px !important;
-      max-height: 220px !important;
-    }
-    .profile-content {
-      padding: 0 18px 24px !important;
-      flex: 1 !important;
-      display: flex !important;
-      flex-direction: column !important;
-      justify-content: space-between !important;
-    }
-    .tabs-bar {
-      padding: 4px 12px !important;
-      margin-bottom: 0 !important;
-      position: sticky !important;
-      top: 57px !important;
-      background: #1c1917 !important;
-      z-index: 40 !important;
-    }
-    .tab-content {
-      padding: 16px 12px 60px !important;
-    }
-    .sec-card, .post-card, .hero-card {
-      border-radius: 16px !important;
-      padding: 16px !important;
-    }
+    .container { padding: 0 16px 40px; margin: 16px auto; }
+    .header-in { padding: 12px 16px; }
+    .kpi-grid { grid-template-columns: 1fr; }
+    .profile-card { margin-bottom: 16px; border-radius: 18px; }
+    .profile-banner { height: 160px; }
+    .profile-content { padding: 0 16px 18px; }
+    .sec-card, .post-card, .hero-card { border-radius: 16px; padding: 16px; }
   }
 </style>
 </head>
@@ -4223,9 +4178,9 @@ function GrowinStones() {
 </header>
 
 <div class="container">
-  <!-- CARD PRINCIPAL: PERFIL DO CULTIVADOR (FULLHEIGHT CANVAS NO MOBILE) -->
+  <!-- CARD PRINCIPAL: PERFIL DO CULTIVADOR -->
   <div class="profile-card">
-    <!-- FOTO DE CAPA (30% DO CANVAS) -->
+    <!-- FOTO DE CAPA -->
     <div class="profile-banner">
       <img id="user-banner-img" src="${userBannerUrl || ''}" alt="Capa do Perfil" style="width:100%; height:100%; object-fit:cover; display:${userBannerUrl ? 'block' : 'none'};" onerror="this.style.display='none'; document.getElementById('user-banner-placeholder').style.display='block';" />
       <div id="user-banner-placeholder" style="display:${userBannerUrl ? 'none' : 'block'}; width:100%; height:100%; background:linear-gradient(135deg, #1c1917 0%, #292524 50%, #44403c 100%);"></div>
@@ -4233,8 +4188,8 @@ function GrowinStones() {
 
     <div class="profile-content">
       <!-- AVATAR & BADGES -->
-      <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-top:-40px; margin-bottom:14px;">
-        <div style="width:84px; height:84px; min-width:84px; min-height:84px; max-width:84px; max-height:84px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; border:4px solid #1c1917; background:#292524; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:28px; color:#f59e0b; box-shadow:0 10px 25px rgba(0,0,0,0.3); position:relative;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-top:-50px; margin-bottom:14px;">
+        <div style="width:100px; height:100px; min-width:100px; min-height:100px; max-width:100px; max-height:100px; aspect-ratio:1/1; flex-shrink:0; border-radius:50%; overflow:hidden; border:4px solid #1c1917; background:#292524; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:32px; color:#f59e0b; box-shadow:0 10px 25px rgba(0,0,0,0.3); position:relative;">
           <img id="user-avatar-img" src="${userAvatarUrl || ''}" alt="Avatar" style="width:100%; height:100%; aspect-ratio:1/1; object-fit:cover; display:${userAvatarUrl ? 'block' : 'none'}; border-radius:50%;" onerror="this.style.display='none'; document.getElementById('user-avatar-text').style.display='flex';" />
           <span id="user-avatar-text" style="display:${userAvatarUrl ? 'none' : 'flex'}; align-items:center; justify-content:center; width:100%; height:100%;">${esc(userDisplayName ? userDisplayName.charAt(0).toUpperCase() : 'G')}</span>
         </div>
