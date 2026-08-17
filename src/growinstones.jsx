@@ -2314,7 +2314,7 @@ function GrowinStones() {
       width, depth, height,
       potCount, potIdx, potShape, potFlipped, customPotW, customPotL, customPotH,
       gaugeIdx, spacing, cols, conn, recirculate,
-      equipList, perPot, watts, customItems,
+      equipList, watts,
       vegaHours, floraHours, vegaDays, floraDays, yieldPerPlant, priceG, tariff,
       costs, extraCost, monthlyCost,
       notes, instructions, terms,
@@ -2430,9 +2430,7 @@ function GrowinStones() {
       });
       if (converted.length > 0) setEquipList(converted);
     }
-    if (data.perPot !== undefined) setPerPot(data.perPot);
     if (data.watts !== undefined) setWatts(data.watts);
-    if (data.customItems !== undefined) setCustomItems(data.customItems);
     if (data.vegaHours !== undefined) setVegaHours(data.vegaHours);
     if (data.floraHours !== undefined) setFloraHours(data.floraHours);
     if (data.vegaDays !== undefined) setVegaDays(data.vegaDays);
@@ -2532,7 +2530,7 @@ function GrowinStones() {
       width, depth, height,
       potCount, potIdx, potShape, potFlipped, customPotW, customPotL, customPotH,
       gaugeIdx, spacing, cols, conn, recirculate,
-      equipList, perPot, watts, customItems,
+      equipList, watts,
       vegaHours, floraHours, vegaDays, floraDays, yieldPerPlant, priceG, tariff,
       costs, extraCost, monthlyCost,
       notes, instructions, terms,
@@ -2552,7 +2550,7 @@ function GrowinStones() {
     currentUser, growName, owner, strain, width, depth, height,
     potCount, potIdx, potShape, potFlipped, customPotW, customPotL, customPotH,
     gaugeIdx, spacing, cols, conn, recirculate,
-    equipList, perPot, watts, customItems,
+    equipList, watts,
     vegaHours, floraHours, vegaDays, floraDays, yieldPerPlant, priceG, tariff,
     costs, extraCost, monthlyCost, notes, instructions, terms, allPresets, dark
   ]);
@@ -3093,6 +3091,7 @@ function GrowinStones() {
   const reservoir = Math.max(20, Math.ceil(plants * (pot?.liters || 11) * 0.35));
   const equipWatts = (equipList || []).reduce((s, it) => s + (Number(it.watts) || 0) * (Number(it.qty) || 1), 0);
   const equipKwhMonth = (equipList || []).reduce((s, it) => s + (((Number(it.watts) || 0) * (Number(it.hours) || 0) * (Number(it.qty) || 1) * 30) / 1000), 0);
+  const equipCapex = (equipList || []).reduce((s, it) => s + (Number(it.cost) || 0) * (Number(it.qty) || 1), 0);
   const ledWatts = Number(watts?.led) || 0;
   const totalWatts = ledWatts + equipWatts;
   const ledHours = cycleDays > 0 ? Math.round(((vegaHours * vegaDays) + (floraHours * floraDays)) / cycleDays) : 18;
@@ -3370,7 +3369,6 @@ function GrowinStones() {
       <h2 className="text-[11px] font-semibold uppercase mb-4" style={{ color: T.faint, letterSpacing: "0.14em" }}>{children}</h2>
     );
     return E;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dark]);
   const alertColor = (lvl) =>
     lvl === "hi" ? (dark ? "#e0a0a0" : "#8c3b3b") : lvl === "mid" ? (dark ? "#d9be8a" : "#8a6a2a") : T.muted;
@@ -6558,7 +6556,7 @@ function GrowinStones() {
                           <div className="flex items-center gap-1">
                             <span className="text-[11px]" style={{ color: T.faint }}>R$</span>
                             <MoneyInput value={r.unitCost}
-                              onCommit={(n) => (r.customId ? updCustom(r.customId, { cost: n }) : setCost(r.key, n))}
+                              onCommit={(n) => (r.equipId ? updEquip(r.equipId, { cost: n }) : setCost(r.key, n))}
                               className={`w-20 h-7 ${inputCls}`} style={inputStyle} />
                           </div>
                           <span className="font-semibold w-20 text-right">{fmtBRL(r.subtotal)}</span>

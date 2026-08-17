@@ -187,6 +187,25 @@ export function UserProfileView({ currentUser, setCurrentUser, T, dark, showToas
 
   const postTextareaRef = useRef(null);
 
+  const insertMarkdown = (before, after = "") => {
+    const textarea = postTextareaRef.current;
+    if (!textarea) {
+      setPostText((prev) => prev + before + after);
+      return;
+    }
+    const start = textarea.selectionStart || 0;
+    const end = textarea.selectionEnd || 0;
+    const previousValue = textarea.value || "";
+    const selectedText = previousValue.substring(start, end);
+    const replacement = before + selectedText + after;
+    const newValue = previousValue.substring(0, start) + replacement + previousValue.substring(end);
+    setPostText(newValue);
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + before.length, start + before.length + selectedText.length);
+    }, 0);
+  };
+
   // Sync whenever currentUser updates from cloud or login
   useEffect(() => {
     if (currentUser?.avatarUrl) setAvatarPreview(currentUser.avatarUrl);
